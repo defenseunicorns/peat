@@ -1,39 +1,39 @@
 [workspace]
 resolver = "2"
 members = [
-    "hive-schema",
-    "hive-protocol",
-    "hive-transport",
-    "hive-persistence",
-    "hive-sim",
-    "hive-discovery",
-    "hive-ffi",
-    "hive-commander",
-    "hive-inference",
-    "hive-tak-bridge",
-    "hive-ble-test",
+    "peat-schema",
+    "peat-protocol",
+    "peat-transport",
+    "peat-persistence",
+    "peat-sim",
+    "peat-discovery",
+    "peat-ffi",
+    "peat-commander",
+    "peat-inference",
+    "peat-tak-bridge",
+    "peat-ble-test",
 ]
-exclude = ["examples/m5stack-core2-hive"]
+exclude = ["examples/m5stack-core2-peat"]
 
 # For local development, uncomment to use local checkouts:
 # [patch.crates-io]
-# hive-mesh = { path = "../hive-mesh" }
+# peat-mesh = { path = "../peat-mesh" }
 # [patch.crates-io]
-# hive-btle = { path = "../hive-btle" }
+# peat-btle = { path = "../peat-btle" }
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
 authors = ["Kit Plummer <kit@revolveteam.com>"]
 license = "Apache-2.0"
-repository = "https://github.com/kitplummer/hive"
+repository = "https://github.com/defenseunicorns/peat"
 
 [workspace.dependencies]
 # Mesh networking
-hive-mesh = "0.2.2"
+peat-mesh = "0.3.0"
 
 # BLE mesh transport (ADR-039)
-hive-btle = "0.1.3"
+peat-btle = "0.2.0"
 
 # CRDT synchronization
 dittolive-ditto = "=4.11.5"

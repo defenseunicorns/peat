@@ -45,12 +45,12 @@ struct Tombstone {
 2. Without the tombstone, sync would resurrect the document
 3. No safe point to garbage collect without coordination
 
-**In HIVE's tactical context:**
+**In PEAT's tactical context:**
 - A 10-node squad generating 1 beacon/second for 8 hours = 288,000 records
 - If 10% are "deleted" (superseded), that's 28,800 tombstones
 - Tombstones sync forever, consuming bandwidth on reconnection
 
-### HIVE-Specific Considerations
+### PEAT-Specific Considerations
 
 | Data Type | Deletion Semantics | Retention Need |
 |-----------|-------------------|----------------|
@@ -63,7 +63,7 @@ struct Tombstone {
 
 ### Current State
 
-HIVE currently has **no explicit deletion mechanism**:
+PEAT currently has **no explicit deletion mechanism**:
 - `DocumentStore::delete()` is not implemented
 - Old documents accumulate indefinitely
 - `SyncMode::LatestOnly` discards history but not documents

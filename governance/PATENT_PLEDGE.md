@@ -1,12 +1,12 @@
-# HIVE Protocol Patent Pledge
+# PEAT Protocol Patent Pledge
 
 ## Purpose
 
-This document establishes the intellectual property commitments for the HIVE Protocol, ensuring that the protocol can be freely implemented while protecting the ecosystem from patent aggression.
+This document establishes the intellectual property commitments for the PEAT Protocol, ensuring that the protocol can be freely implemented while protecting the ecosystem from patent aggression.
 
 ## Patent Holdings
 
-(r)evolve, Inc. holds the following provisional patent applications related to the HIVE Protocol:
+(r)evolve, Inc. holds the following provisional patent applications related to the PEAT Protocol:
 
 ### Provisional Application 1: Hierarchical Capability Composition
 
@@ -34,15 +34,15 @@ This document establishes the intellectual property commitments for the HIVE Pro
 
 Subject to the conditions below, (r)evolve, Inc. grants to any person or entity ("You") a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable patent license to:
 
-- **Make** implementations of the HIVE Protocol
-- **Have made** implementations of the HIVE Protocol
-- **Use** implementations of the HIVE Protocol
-- **Offer to sell** implementations of the HIVE Protocol
-- **Sell** implementations of the HIVE Protocol
-- **Import** implementations of the HIVE Protocol
-- **Otherwise transfer** implementations of the HIVE Protocol
+- **Make** implementations of the PEAT Protocol
+- **Have made** implementations of the PEAT Protocol
+- **Use** implementations of the PEAT Protocol
+- **Offer to sell** implementations of the PEAT Protocol
+- **Sell** implementations of the PEAT Protocol
+- **Import** implementations of the PEAT Protocol
+- **Otherwise transfer** implementations of the PEAT Protocol
 
-This grant covers any patent claims owned or controlled by (r)evolve, Inc. that are necessarily infringed by implementing the HIVE Protocol specification as published in the `/spec/` directory of the official repository.
+This grant covers any patent claims owned or controlled by (r)evolve, Inc. that are necessarily infringed by implementing the PEAT Protocol specification as published in the `/spec/` directory of the official repository.
 
 ### Covered Uses
 
@@ -66,8 +66,8 @@ This patent grant does NOT cover:
 |----------|---------|
 | Proprietary extensions incompatible with the specification | ❌ No |
 | Implementations that deviate from the specification | ❌ No |
-| Uses unrelated to the HIVE Protocol | ❌ No |
-| Patent assertion against HIVE implementations (see Defensive Termination) | ❌ No |
+| Uses unrelated to the PEAT Protocol | ❌ No |
+| Patent assertion against PEAT implementations (see Defensive Termination) | ❌ No |
 
 ---
 
@@ -77,11 +77,11 @@ This patent grant does NOT cover:
 
 This patent grant automatically terminates with respect to You if You (or any entity You control, or any entity that controls You, or any entity under common control with You):
 
-1. **Initiate patent litigation** against any entity alleging that the HIVE Protocol, or any implementation thereof, infringes a patent; or
+1. **Initiate patent litigation** against any entity alleging that the PEAT Protocol, or any implementation thereof, infringes a patent; or
 
-2. **Assert patent claims** against any implementation of the HIVE Protocol in any legal proceeding; or
+2. **Assert patent claims** against any implementation of the PEAT Protocol in any legal proceeding; or
 
-3. **Acquire patents** with the intent to assert them against HIVE Protocol implementations.
+3. **Acquire patents** with the intent to assert them against PEAT Protocol implementations.
 
 ### Reinstatement
 
@@ -133,7 +133,7 @@ This pledge aligns with W3C Patent Policy and Open Web Foundation Agreement prin
 
 (r)evolve, Inc. commits to:
 
-1. Disclose all patent applications related to HIVE Protocol
+1. Disclose all patent applications related to PEAT Protocol
 2. Not acquire patents for offensive assertion against implementations
 3. Maintain this pledge for any future related patents
 
@@ -173,7 +173,7 @@ The reference implementation uses Apache 2.0, which includes its own patent gran
 
 ## FAQ
 
-### Q: Can I make a commercial product using HIVE?
+### Q: Can I make a commercial product using PEAT?
 
 **A**: Yes. Commercial use is explicitly permitted under this pledge, provided your implementation conforms to the specification.
 
@@ -183,7 +183,7 @@ The reference implementation uses Apache 2.0, which includes its own patent gran
 
 ### Q: Does this cover all CRDT-related patents?
 
-**A**: No. This covers only patents necessarily infringed by implementing the HIVE Protocol specification. It does not cover CRDT implementations in general (which are covered by their own patents, if any).
+**A**: No. This covers only patents necessarily infringed by implementing the PEAT Protocol specification. It does not cover CRDT implementations in general (which are covered by their own patents, if any).
 
 ### Q: What if a patent troll sues me?
 
@@ -200,7 +200,7 @@ The reference implementation uses Apache 2.0, which includes its own patent gran
 For questions about this patent pledge:
 
 - Email: kit@revolveteam.com
-- GitHub: https://github.com/kitplummer/hive/issues
+- GitHub: https://github.com/defenseunicorns/peat/issues
 
 For legal questions, please consult your own legal counsel.
 
@@ -218,4 +218,4 @@ For legal questions, please consult your own legal counsel.
 
 This document constitutes a binding commitment by (r)evolve, Inc. regarding the patents identified above. It is not legal advice. Recipients should consult their own legal counsel regarding their specific situations.
 
-HIVE Protocol is a trademark of (r)evolve, Inc. Use of the trademark is permitted for implementations that conform to the specification.
+PEAT Protocol is a trademark of (r)evolve, Inc. Use of the trademark is permitted for implementations that conform to the specification.

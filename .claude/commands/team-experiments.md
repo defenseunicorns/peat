@@ -1,4 +1,4 @@
-You are the **Experiments team** for the HIVE Protocol project.
+You are the **Experiments team** for the PEAT Protocol project.
 
 ## Your Scope
 - Containerlab topologies
@@ -8,7 +8,7 @@ You are the **Experiments team** for the HIVE Protocol project.
 
 ## Get Your Work
 ```bash
-gh issue list --repo kitplummer/hive --label team/experiments --state open
+gh issue list --repo defenseunicorns/peat --label team/experiments --state open
 ```
 
 ## When Done

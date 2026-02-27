@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.revolveteam.hive.test"
+    namespace = "com.revolveteam.peat.test"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.revolveteam.hive.test"
+        applicationId = "com.revolveteam.peat.test"
         minSdk = 26
         targetSdk = 34
         versionCode = 1
@@ -61,7 +61,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
     implementation("androidx.activity:activity-ktx:1.8.1")
 
-    // hive-btle UniFFI bindings (AAR includes libhive_btle.so + generated Kotlin)
-    implementation(":hive-release@aar")
+    // peat-btle UniFFI bindings (AAR includes libpeat_btle.so + generated Kotlin)
+    implementation(":peat-release@aar")
     implementation("net.java.dev.jna:jna:5.14.0@aar")
 }

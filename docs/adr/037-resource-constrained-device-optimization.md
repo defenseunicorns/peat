@@ -1,4 +1,4 @@
-# ADR-025: Resource-Constrained Device Optimization (HIVE Lite)
+# ADR-025: Resource-Constrained Device Optimization (PEAT Lite)
 
 **Status**: Proposed  
 **Date**: 2025-12-11  
@@ -9,7 +9,7 @@
 
 ### The Problem: Battery-Constrained Tactical Wearables
 
-Customer feedback from Ascent (Alex Gorsuch) identified a critical pain point: **current sync solutions (specifically Ditto) drain battery rapidly on Samsung watches running WearTAK**. This represents a broader class of resource-constrained devices that need HIVE connectivity without the overhead of full mesh participation.
+Customer feedback from Ascent (Alex Gorsuch) identified a critical pain point: **current sync solutions (specifically Ditto) drain battery rapidly on Samsung watches running WearTAK**. This represents a broader class of resource-constrained devices that need PEAT connectivity without the overhead of full mesh participation.
 
 The operational reality for wearables:
 
@@ -22,13 +22,13 @@ Samsung Galaxy Watch Running WearTAK:
 ├─ Target mission duration: 12-24 hours
 └─ Battery budget for sync: ~10% of total
 
-Full HIVE Node Power Profile:
+Full PEAT Node Power Profile:
 ├─ Continuous sync heartbeats: Radio active 20% of time
 ├─ CRDT merge operations: CPU spikes every sync
 ├─ Full mesh state: Memory pressure → swap → battery
 ├─ Result: 3-4 hour battery life (unacceptable)
 
-HIVE Lite Target Profile:
+PEAT Lite Target Profile:
 ├─ Burst sync on connection: Radio active 2% of time
 ├─ Minimal state: Only upstream parent + own data
 ├─ Aggregated heartbeats: 60-second batched updates
@@ -45,7 +45,7 @@ HIVE Lite Target Profile:
 | **Tactical EUD** | 4-8 cores, 2GHz | 4-8GB | 64-128GB | 4000-6000 mAh | Multi-band | ATAK phone |
 | **Edge Compute** | 8+ cores, 2GHz+ | 8-32GB | 256GB+ | AC/Vehicle | Full stack | Jetson, vehicle server |
 
-HIVE must support the full spectrum, with optimization profiles appropriate to each class.
+PEAT must support the full spectrum, with optimization profiles appropriate to each class.
 
 ### Why Ditto Drains Batteries
 
@@ -57,9 +57,9 @@ Based on analysis and customer feedback, Ditto's battery consumption stems from:
 4. **Monolithic Design**: Can't disable features for constrained devices
 5. **Background Activity**: Sync continues even when app is idle
 
-### HIVE's Architectural Advantages
+### PEAT's Architectural Advantages
 
-HIVE's hierarchical model enables natural optimization:
+PEAT's hierarchical model enables natural optimization:
 
 1. **Leaf Node Simplification**: Wearables are leaves, not mesh participants
 2. **Differential Sync**: Only changed data transmits (95-99% reduction)
@@ -69,9 +69,9 @@ HIVE's hierarchical model enables natural optimization:
 
 ## Decision
 
-### HIVE Lite: Resource-Constrained Device Profile
+### PEAT Lite: Resource-Constrained Device Profile
 
-We introduce **HIVE Lite** as a configuration profile (not a separate codebase) that optimizes HIVE for resource-constrained devices through:
+We introduce **PEAT Lite** as a configuration profile (not a separate codebase) that optimizes PEAT for resource-constrained devices through:
 
 1. **Leaf-Only Operation**: No mesh routing, single parent connection
 2. **Minimal CRDT State**: Only track own documents + immediate parent sync state
@@ -83,11 +83,11 @@ We introduce **HIVE Lite** as a configuration profile (not a separate codebase) 
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    HIVE Device Profiles                         │
+│                    PEAT Device Profiles                         │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
-│  │  HIVE Full  │  │ HIVE Edge   │  │ HIVE Lite   │             │
+│  │  PEAT Full  │  │ PEAT Edge   │  │ PEAT Lite   │             │
 │  │             │  │             │  │             │             │
 │  │ • Full mesh │  │ • Limited   │  │ • Leaf only │             │
 │  │ • All roles │  │   routing   │  │ • Single    │             │
@@ -104,11 +104,11 @@ We introduce **HIVE Lite** as a configuration profile (not a separate codebase) 
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### HIVE Lite Architecture
+### PEAT Lite Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                    HIVE Lite Node                            │
+│                    PEAT Lite Node                            │
 ├──────────────────────────────────────────────────────────────┤
 │                                                              │
 │  ┌────────────────────────────────────────────────────────┐  │
@@ -149,7 +149,7 @@ We introduce **HIVE Lite** as a configuration profile (not a separate codebase) 
 ### Sync Window Optimization
 
 ```rust
-/// HIVE Lite sync configuration
+/// PEAT Lite sync configuration
 pub struct LiteSyncConfig {
     /// Minimum interval between sync attempts (power saving)
     pub min_sync_interval: Duration,
@@ -362,11 +362,11 @@ impl PowerAwareSyncScheduler {
 
 ### WearTAK Integration Architecture
 
-**Note**: WearTAK integration depends on ADR-026 (Protocol-Level Format Transformation Primitives) for CoT ↔ HIVE transformation. See ADR-026 for the FormatAdapter framework, CoT-native mode, and parent-side bridging patterns.
+**Note**: WearTAK integration depends on ADR-026 (Protocol-Level Format Transformation Primitives) for CoT ↔ PEAT transformation. See ADR-026 for the FormatAdapter framework, CoT-native mode, and parent-side bridging patterns.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                 WearTAK + HIVE Lite Stack                       │
+│                 WearTAK + PEAT Lite Stack                       │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  Samsung Galaxy Watch                    ATAK Phone (Parent)    │
@@ -377,7 +377,7 @@ impl PowerAwareSyncScheduler {
 │  │  └──────────────┘   │                │  └──────────────┘   │ │
 │  │         │           │                │         │           │ │
 │  │  ┌──────────────┐   │    BLE Link    │  ┌──────────────┐   │ │
-│  │  │ HIVE Lite    │───┼────────────────┼──│ HIVE Edge    │   │ │
+│  │  │ PEAT Lite    │───┼────────────────┼──│ PEAT Edge    │   │ │
 │  │  │ (Leaf Node)  │   │   Batched      │  │ (Aggregator) │   │ │
 │  │  │              │   │   Updates      │  │              │   │ │
 │  │  └──────────────┘   │                │  └──────────────┘   │ │
@@ -397,16 +397,16 @@ impl PowerAwareSyncScheduler {
 
 Data Flow:
 1. Watch generates position/health updates
-2. HIVE Lite batches updates (60-second window)
+2. PEAT Lite batches updates (60-second window)
 3. BLE sync to phone on schedule
-4. Phone aggregates into HIVE mesh
+4. Phone aggregates into PEAT mesh
 5. CoT events flow to TAK Server as normal
 ```
 
 ### Minimal State Schema for Wearables
 
 ```protobuf
-// Minimal schema for HIVE Lite wearable nodes
+// Minimal schema for PEAT Lite wearable nodes
 message LiteNodeState {
   // Identity
   string node_id = 1;
@@ -569,7 +569,7 @@ pub struct PowerImprovement {
 
 ## Alternatives Considered
 
-### Alternative 1: Separate HIVE Lite Codebase
+### Alternative 1: Separate PEAT Lite Codebase
 
 Create a distinct minimal implementation for constrained devices.
 
@@ -585,7 +585,7 @@ Wearables only relay data through BLE, no local CRDT state.
 **Pros**: Minimal device complexity, near-zero state overhead
 **Cons**: No offline operation, loses CRDT benefits, single point of failure
 
-**Decision**: Partially adopted. Available as `StatelessRelay` mode for extremely constrained devices, but HIVE Lite retains minimal CRDT state for offline resilience.
+**Decision**: Partially adopted. Available as `StatelessRelay` mode for extremely constrained devices, but PEAT Lite retains minimal CRDT state for offline resilience.
 
 ### Alternative 3: Custom Lightweight CRDT
 
@@ -598,7 +598,7 @@ Design a custom minimal CRDT specifically for constrained devices.
 
 ## Implementation Plan
 
-### Phase 1: Core HIVE Lite Profile (Q1 2026)
+### Phase 1: Core PEAT Lite Profile (Q1 2026)
 1. Define device profile configuration system
 2. Implement batch accumulator
 3. Add sync interval controls
@@ -657,15 +657,15 @@ Design a custom minimal CRDT specifically for constrained devices.
 | Display | 100 mW | 0.5 mW | 20% | 20% |
 | Sensors | 15 mW | 1 mW | 50% | 50% |
 
-**Full HIVE**: ~85 mW average → ~4 hours on 350 mAh
-**HIVE Lite**: ~35 mW average → ~10 hours on 350 mAh (with display active)
-**HIVE Lite (display off)**: ~15 mW average → ~23 hours on 350 mAh
+**Full PEAT**: ~85 mW average → ~4 hours on 350 mAh
+**PEAT Lite**: ~35 mW average → ~10 hours on 350 mAh (with display active)
+**PEAT Lite (display off)**: ~15 mW average → ~23 hours on 350 mAh
 
 ### Sync Energy Comparison
 
 | Sync Type | Energy per Sync | Syncs per Hour | Energy per Hour |
 |-----------|----------------|----------------|-----------------|
 | Ditto Continuous | 0.5 mWh | 60+ | 30+ mWh |
-| HIVE Full | 0.3 mWh | 30 | 9 mWh |
-| HIVE Lite (scheduled) | 0.2 mWh | 6 | 1.2 mWh |
-| HIVE Lite (low battery) | 0.2 mWh | 2 | 0.4 mWh |
+| PEAT Full | 0.3 mWh | 30 | 9 mWh |
+| PEAT Lite (scheduled) | 0.2 mWh | 6 | 1.2 mWh |
+| PEAT Lite (low battery) | 0.2 mWh | 2 | 0.4 mWh |

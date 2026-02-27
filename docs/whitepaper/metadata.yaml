@@ -1,11 +1,11 @@
 # Whitepaper Metadata
 # Used by pandoc for document generation
 
-title: "HIVE Protocol: Breaking the 20-Node Wall"
+title: "PEAT Protocol: Breaking the 20-Node Wall"
 subtitle: "Open Coordination Architecture for Distributed Multi-Agent Systems"
 author:
-  - name: HIVE Protocol Contributors
-    affiliation: "HIVE Protocol Project"
+  - name: PEAT Protocol Contributors
+    affiliation: "PEAT Protocol Project"
 date: January 2026
 version: "1.0"
 
@@ -13,7 +13,7 @@ version: "1.0"
 abstract: |
   Distributed multi-agent systems consistently plateau at approximately
   20 nodes—not due to technology gaps, but architectural constraints rooted
-  in O(n²) scaling mathematics. HIVE Protocol breaks this barrier through
+  in O(n²) scaling mathematics. PEAT Protocol breaks this barrier through
   hierarchical CRDT-based coordination that achieves O(n log n) scaling,
   enabling 1,000+ node operations on bandwidth-constrained networks.
   Laboratory validation confirms 95-99% bandwidth reduction. This whitepaper
@@ -36,8 +36,8 @@ classification: PUBLIC
 distribution: Open Source
 
 # Publisher info
-publisher: "HIVE Protocol Project"
-website: https://github.com/kitplummer/hive
+publisher: "PEAT Protocol Project"
+website: https://github.com/kitplummer/peat
 license: Apache 2.0
 
 # PDF-specific settings
@@ -52,5 +52,5 @@ lang: en-US
 
 # Citation
 citation: |
-  HIVE Protocol Contributors. (2026). "HIVE Protocol: Breaking the 20-Node Wall."
-  HIVE Protocol Project. https://github.com/kitplummer/hive
+  PEAT Protocol Contributors. (2026). "PEAT Protocol: Breaking the 20-Node Wall."
+  PEAT Protocol Project. https://github.com/kitplummer/peat

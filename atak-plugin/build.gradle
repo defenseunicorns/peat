@@ -1,4 +1,4 @@
-// HIVE ATAK Plugin - Root Build Configuration
+// PEAT ATAK Plugin - Root Build Configuration
 // Based on ATAK-CIV SDK 5.6.0 plugintemplate-compose
 
 buildscript {
@@ -18,7 +18,7 @@ buildscript {
 
 allprojects {
     repositories {
-        mavenLocal()  // For hive-btle AAR
+        mavenLocal()  // For peat-btle AAR
         google()
         mavenCentral()
         flatDir {

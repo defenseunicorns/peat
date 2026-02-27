@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ============================================================================
-# HIVE Functional Test Suite Orchestrator
+# PEAT Functional Test Suite Orchestrator
 # ============================================================================
 # Runs all hardware/infrastructure functional tests from a single entry point:
 #
-#   1. rpi-rpi BLE      — Pi-to-Pi BLE discovery + GATT sync (hive-btle)
-#   2. rpi-android       — Dual-transport BLE + QUIC Pi-to-Android (hive)
-#   3. k8s cluster       — K8s multi-pod mesh via k3d (hive-mesh)
+#   1. rpi-rpi BLE      — Pi-to-Pi BLE discovery + GATT sync (peat-btle)
+#   2. rpi-android       — Dual-transport BLE + QUIC Pi-to-Android (peat)
+#   3. k8s cluster       — K8s multi-pod mesh via k3d (peat-mesh)
 #
 # Usage:
 #   ./scripts/functional-suite.sh              # Run all tests
@@ -16,28 +16,28 @@
 #   ./scripts/functional-suite.sh --skip-build # Skip build steps (reuse existing binaries)
 #
 # Environment:
-#   HIVE_BTLE_DIR     — Path to hive-btle repo  (default: ../hive-btle)
-#   HIVE_MESH_DIR     — Path to hive-mesh repo  (default: ../hive-mesh)
+#   PEAT_BTLE_DIR     — Path to peat-btle repo  (default: ../peat-btle)
+#   PEAT_MESH_DIR     — Path to peat-mesh repo  (default: ../peat-mesh)
 #   RESPONDER_HOST    — BLE responder Pi         (default: kit@rpi-ci)
 #   CLIENT_HOST       — BLE client Pi            (default: kit@rpi-ci2)
 #   BLE_TEST_PI       — Dual-transport Pi host   (default: rpi-ci)
 #   BLE_TEST_PI_IP    — Dual-transport Pi IP     (default: 192.168.228.13)
-#   K3D_CLUSTER       — k3d cluster name         (default: hive-test)
+#   K3D_CLUSTER       — k3d cluster name         (default: peat-test)
 # ============================================================================
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HIVE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+PEAT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Sibling repo paths
-HIVE_BTLE_DIR="${HIVE_BTLE_DIR:-$(cd "$HIVE_DIR/../hive-btle" 2>/dev/null && pwd || echo "")}"
-HIVE_MESH_DIR="${HIVE_MESH_DIR:-$(cd "$HIVE_DIR/../hive-mesh" 2>/dev/null && pwd || echo "")}"
+PEAT_BTLE_DIR="${PEAT_BTLE_DIR:-$(cd "$PEAT_DIR/../peat-btle" 2>/dev/null && pwd || echo "")}"
+PEAT_MESH_DIR="${PEAT_MESH_DIR:-$(cd "$PEAT_DIR/../peat-mesh" 2>/dev/null && pwd || echo "")}"
 
 # Pi infrastructure
 RESPONDER_HOST="${RESPONDER_HOST:-kit@rpi-ci}"
 CLIENT_HOST="${CLIENT_HOST:-kit@rpi-ci2}"
-REMOTE_BTLE_REPO="${REMOTE_BTLE_REPO:-/home/kit/hive-btle}"
+REMOTE_BTLE_REPO="${REMOTE_BTLE_REPO:-/home/kit/peat-btle}"
 
 # Dual-transport Pi
 BLE_TEST_PI="${BLE_TEST_PI:-rpi-ci}"
@@ -46,7 +46,7 @@ BLE_TEST_PI_IP="${BLE_TEST_PI_IP:-192.168.228.13}"
 IROH_TEST_PORT="${IROH_TEST_PORT:-42009}"
 
 # K8s
-K3D_CLUSTER="${K3D_CLUSTER:-hive-test}"
+K3D_CLUSTER="${K3D_CLUSTER:-peat-test}"
 
 # Parse flags
 RUN_BLE=true
@@ -103,15 +103,15 @@ ssh_ok() {
     ssh -o ConnectTimeout=10 -o BatchMode=yes "$1" "true" 2>/dev/null
 }
 
-# ── Test 1: rpi-rpi BLE (hive-btle) ───────────────────────────────────────
+# ── Test 1: rpi-rpi BLE (peat-btle) ───────────────────────────────────────
 
 run_ble_test() {
-    log_header "Test 1/3: rpi-rpi BLE (hive-btle)"
+    log_header "Test 1/3: rpi-rpi BLE (peat-btle)"
 
-    # Check hive-btle repo exists
-    if [ -z "$HIVE_BTLE_DIR" ] || [ ! -d "$HIVE_BTLE_DIR/src" ]; then
-        echo "Skipped: hive-btle repo not found at $HIVE_BTLE_DIR"
-        echo "  Set HIVE_BTLE_DIR to the hive-btle checkout"
+    # Check peat-btle repo exists
+    if [ -z "$PEAT_BTLE_DIR" ] || [ ! -d "$PEAT_BTLE_DIR/src" ]; then
+        echo "Skipped: peat-btle repo not found at $PEAT_BTLE_DIR"
+        echo "  Set PEAT_BTLE_DIR to the peat-btle checkout"
         return
     fi
 
@@ -137,16 +137,16 @@ run_ble_test() {
 
     if [ "$SKIP_BUILD" = false ]; then
         # Sync source to both Pis
-        echo "Syncing hive-btle source to Pis..."
+        echo "Syncing peat-btle source to Pis..."
         rsync -az --delete \
             --exclude 'target/' --exclude 'android/build/' \
             --exclude 'android/.gradle/' --exclude '.git/' \
-            "$HIVE_BTLE_DIR/" "$RESPONDER_HOST:$REMOTE_BTLE_REPO/" &
+            "$PEAT_BTLE_DIR/" "$RESPONDER_HOST:$REMOTE_BTLE_REPO/" &
         local RSYNC1=$!
         rsync -az --delete \
             --exclude 'target/' --exclude 'android/build/' \
             --exclude 'android/.gradle/' --exclude '.git/' \
-            "$HIVE_BTLE_DIR/" "$CLIENT_HOST:$REMOTE_BTLE_REPO/" &
+            "$PEAT_BTLE_DIR/" "$CLIENT_HOST:$REMOTE_BTLE_REPO/" &
         local RSYNC2=$!
         wait $RSYNC1 $RSYNC2
         echo "Source synced."
@@ -201,10 +201,10 @@ run_ble_test() {
     fi
 }
 
-# ── Test 2: rpi-android Dual-Transport (hive) ─────────────────────────────
+# ── Test 2: rpi-android Dual-Transport (peat) ─────────────────────────────
 
 run_android_test() {
-    log_header "Test 2/3: rpi-android Dual-Transport (hive)"
+    log_header "Test 2/3: rpi-android Dual-Transport (peat)"
 
     # Check Android device connected
     if ! command -v adb >/dev/null 2>&1; then
@@ -230,7 +230,7 @@ run_android_test() {
     # This avoids duplicating the complex dual-transport pipeline.
     echo "Running dual-transport test via Makefile..."
     local RESULT=0
-    make -C "$HIVE_DIR" dual-transport-test \
+    make -C "$PEAT_DIR" dual-transport-test \
         BLE_TEST_PI="$BLE_TEST_PI" \
         BLE_TEST_PI_USER="$BLE_TEST_PI_USER" \
         BLE_TEST_PI_IP="$BLE_TEST_PI_IP" \
@@ -244,15 +244,15 @@ run_android_test() {
     fi
 }
 
-# ── Test 3: k8s Cluster (hive-mesh) ───────────────────────────────────────
+# ── Test 3: k8s Cluster (peat-mesh) ───────────────────────────────────────
 
 run_k8s_test() {
-    log_header "Test 3/3: k8s Cluster (hive-mesh)"
+    log_header "Test 3/3: k8s Cluster (peat-mesh)"
 
-    # Check hive-mesh repo
-    if [ -z "$HIVE_MESH_DIR" ] || [ ! -d "$HIVE_MESH_DIR/src" ]; then
-        echo "Skipped: hive-mesh repo not found at $HIVE_MESH_DIR"
-        echo "  Set HIVE_MESH_DIR to the hive-mesh checkout"
+    # Check peat-mesh repo
+    if [ -z "$PEAT_MESH_DIR" ] || [ ! -d "$PEAT_MESH_DIR/src" ]; then
+        echo "Skipped: peat-mesh repo not found at $PEAT_MESH_DIR"
+        echo "  Set PEAT_MESH_DIR to the peat-mesh checkout"
         return
     fi
 
@@ -278,8 +278,8 @@ run_k8s_test() {
 
     if [ "$SKIP_BUILD" = false ]; then
         # Build Docker image
-        echo "Building hive-mesh-node Docker image..."
-        docker build -t hive-mesh-node:latest -f "$HIVE_MESH_DIR/deploy/Dockerfile" "$HIVE_MESH_DIR"
+        echo "Building peat-mesh-node Docker image..."
+        docker build -t peat-mesh-node:latest -f "$PEAT_MESH_DIR/deploy/Dockerfile" "$PEAT_MESH_DIR"
     fi
 
     # Create k3d cluster if it doesn't exist
@@ -293,22 +293,22 @@ run_k8s_test() {
 
     # Import image into k3d
     echo "Importing image into k3d..."
-    k3d image import hive-mesh-node:latest -c "$K3D_CLUSTER"
+    k3d image import peat-mesh-node:latest -c "$K3D_CLUSTER"
 
     # Deploy with Helm
     local FORMATION_SECRET
     FORMATION_SECRET=$(openssl rand -base64 32)
 
-    if helm status hive-mesh --kube-context "k3d-$K3D_CLUSTER" >/dev/null 2>&1; then
+    if helm status peat-mesh --kube-context "k3d-$K3D_CLUSTER" >/dev/null 2>&1; then
         echo "Upgrading existing Helm release..."
-        helm upgrade hive-mesh "$HIVE_MESH_DIR/deploy/helm/hive-mesh" \
+        helm upgrade peat-mesh "$PEAT_MESH_DIR/deploy/helm/peat-mesh" \
             --kube-context "k3d-$K3D_CLUSTER" \
             --set "formationSecret=$FORMATION_SECRET" \
             --set replicaCount=3 \
             --wait --timeout 120s
     else
         echo "Installing Helm release..."
-        helm install hive-mesh "$HIVE_MESH_DIR/deploy/helm/hive-mesh" \
+        helm install peat-mesh "$PEAT_MESH_DIR/deploy/helm/peat-mesh" \
             --kube-context "k3d-$K3D_CLUSTER" \
             --set "formationSecret=$FORMATION_SECRET" \
             --set replicaCount=3 \
@@ -320,7 +320,7 @@ run_k8s_test() {
     local READY=false
     for i in $(seq 1 60); do
         local RUNNING
-        RUNNING=$(kubectl get pods --context "k3d-$K3D_CLUSTER" -l app.kubernetes.io/name=hive-mesh \
+        RUNNING=$(kubectl get pods --context "k3d-$K3D_CLUSTER" -l app.kubernetes.io/name=peat-mesh \
             --no-headers 2>/dev/null | grep -c "Running" || echo 0)
         if [ "$RUNNING" -ge 3 ]; then
             READY=true
@@ -331,7 +331,7 @@ run_k8s_test() {
 
     if [ "$READY" = false ]; then
         echo "Pods did not reach Ready state within 120s"
-        kubectl get pods --context "k3d-$K3D_CLUSTER" -l app.kubernetes.io/name=hive-mesh 2>/dev/null || true
+        kubectl get pods --context "k3d-$K3D_CLUSTER" -l app.kubernetes.io/name=peat-mesh 2>/dev/null || true
         K8S_STATUS="FAIL"
         FAILURES=$((FAILURES + 1))
         k8s_cleanup "$CREATED_CLUSTER"
@@ -344,7 +344,7 @@ run_k8s_test() {
     echo "Checking health endpoints..."
     local ALL_HEALTHY=true
     for i in 0 1 2; do
-        local POD="hive-mesh-$i"
+        local POD="peat-mesh-$i"
         local HEALTH
         HEALTH=$(kubectl exec --context "k3d-$K3D_CLUSTER" "$POD" -- \
             curl -sf http://localhost:8081/api/v1/health 2>/dev/null || echo "FAIL")
@@ -363,7 +363,7 @@ run_k8s_test() {
     echo "Checking peer connectivity..."
     local DISCOVERY_OK=true
     for i in 0 1 2; do
-        local POD="hive-mesh-$i"
+        local POD="peat-mesh-$i"
         local PEERS
         PEERS=$(kubectl logs --context "k3d-$K3D_CLUSTER" "$POD" 2>/dev/null \
             | sed 's/\x1b\[[0-9;]*m//g' \
@@ -381,7 +381,7 @@ run_k8s_test() {
     echo "Checking for errors..."
     local HAS_ERRORS=false
     for i in 0 1 2; do
-        local POD="hive-mesh-$i"
+        local POD="peat-mesh-$i"
         local ERRORS
         ERRORS=$(kubectl logs --context "k3d-$K3D_CLUSTER" "$POD" 2>/dev/null \
             | sed 's/\x1b\[[0-9;]*m//g' \
@@ -418,7 +418,7 @@ run_k8s_test() {
 k8s_cleanup() {
     local CREATED_CLUSTER="$1"
     echo "Cleaning up k8s resources..."
-    helm uninstall hive-mesh --kube-context "k3d-$K3D_CLUSTER" 2>/dev/null || true
+    helm uninstall peat-mesh --kube-context "k3d-$K3D_CLUSTER" 2>/dev/null || true
     if [ "$CREATED_CLUSTER" = true ]; then
         echo "Deleting k3d cluster '$K3D_CLUSTER'..."
         k3d cluster delete "$K3D_CLUSTER" 2>/dev/null || true
@@ -428,14 +428,14 @@ k8s_cleanup() {
 # ── Main ───────────────────────────────────────────────────────────────────
 
 echo "╔════════════════════════════════════════════════════════════╗"
-echo "║  HIVE Functional Test Suite                                ║"
+echo "║  PEAT Functional Test Suite                                ║"
 echo "║  $(date '+%Y-%m-%d %H:%M:%S')                                       ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
 echo "Tests to run:"
-$RUN_BLE     && echo "  1. rpi-rpi BLE (hive-btle)" || echo "  1. rpi-rpi BLE (skipped)"
-$RUN_ANDROID && echo "  2. rpi-android dual-transport (hive)" || echo "  2. rpi-android (skipped)"
-$RUN_K8S     && echo "  3. k8s cluster (hive-mesh)" || echo "  3. k8s cluster (skipped)"
+$RUN_BLE     && echo "  1. rpi-rpi BLE (peat-btle)" || echo "  1. rpi-rpi BLE (skipped)"
+$RUN_ANDROID && echo "  2. rpi-android dual-transport (peat)" || echo "  2. rpi-android (skipped)"
+$RUN_K8S     && echo "  3. k8s cluster (peat-mesh)" || echo "  3. k8s cluster (skipped)"
 echo ""
 
 $RUN_BLE     && run_ble_test

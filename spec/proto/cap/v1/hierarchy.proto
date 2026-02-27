@@ -1,8 +1,8 @@
-// HIVE Protocol - Hierarchical Aggregation
+// PEAT Protocol - Hierarchical Aggregation
 // Specification Version: 0.1.0
 // License: CC0 1.0 Universal (Public Domain)
 //
-// This file defines hierarchical aggregation summaries for HIVE Protocol.
+// This file defines hierarchical aggregation summaries for PEAT Protocol.
 // These summaries enable O(n log n) message complexity by aggregating state
 // at each level of the hierarchy (squad -> platoon -> company).
 

@@ -1,6 +1,6 @@
-# HIVE Protocol Buffer Definitions
+# PEAT Protocol Buffer Definitions
 
-This directory contains the **normative** Protocol Buffer schema definitions for the HIVE Protocol.
+This directory contains the **normative** Protocol Buffer schema definitions for the PEAT Protocol.
 
 ## License
 

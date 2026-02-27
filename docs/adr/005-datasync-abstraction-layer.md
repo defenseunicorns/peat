@@ -7,7 +7,7 @@
 
 ## Context
 
-HIVE Protocol currently has a hard dependency on Ditto SDK for CRDT synchronization, peer discovery, and data persistence. While Ditto provides excellent P2P mesh capabilities, we've encountered several limitations:
+PEAT Protocol currently has a hard dependency on Ditto SDK for CRDT synchronization, peer discovery, and data persistence. While Ditto provides excellent P2P mesh capabilities, we've encountered several limitations:
 
 ### Issues with Current Ditto Integration
 
@@ -33,7 +33,7 @@ The new `crdt-edge` implementation plan (see `CAP_Rust_Implementation_Plan.md`) 
 
 ## Decision
 
-We will define a **Data Synchronization Abstraction Layer** consisting of four core traits that completely isolate HIVE Protocol business logic from the underlying sync engine:
+We will define a **Data Synchronization Abstraction Layer** consisting of four core traits that completely isolate PEAT Protocol business logic from the underlying sync engine:
 
 ### Core Abstraction Traits
 
@@ -172,7 +172,7 @@ pub struct TransportConfig {
 
 ### Phase 1: Refactor Existing Code to Use Abstraction (Week 1-2)
 
-1. **Create `hive-protocol/src/sync/` module** with trait definitions
+1. **Create `peat-protocol/src/sync/` module** with trait definitions
 2. **Implement `DittoBackend`** that wraps existing DittoStore
 3. **Update `CellStore` and `NodeStore`** to use trait instead of concrete DittoStore
 4. **No behavior changes** - pure refactoring for abstraction
@@ -444,7 +444,7 @@ async fn test_cell_sync_both_backends() {
 
 ### Milestone 1: Abstraction Layer (Weeks 1-2)
 
-- [ ] Define all abstraction traits in `hive-protocol/src/sync/traits.rs`
+- [ ] Define all abstraction traits in `peat-protocol/src/sync/traits.rs`
 - [ ] Implement `DittoBackend` wrapper
 - [ ] Refactor `CellStore` to be generic over `DataSyncBackend`
 - [ ] Refactor `NodeStore` to be generic over `DataSyncBackend`
@@ -484,7 +484,7 @@ Follow `CAP_Rust_Implementation_Plan.md` phases 1-3:
 ## References
 
 - [CAP_Rust_Implementation_Plan.md](../CAP_Rust_Implementation_Plan.md) - Detailed custom implementation design
-- [ADR-001](001-hive-protocol-poc.md) - Original Ditto integration decision
+- [ADR-001](001-peat-protocol-poc.md) - Original Ditto integration decision
 - [ADR-002](002-beacon-storage-architecture.md) - Current Ditto storage patterns
 - [Automerge Columnar Protocol](https://automerge.org/blog/2023/11/06/automerge-2/) - Wire format inspiration
 - [Ditto SDK Documentation](https://docs.ditto.live/) - Current backend reference

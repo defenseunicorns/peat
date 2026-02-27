@@ -1,6 +1,6 @@
 ## III. THE HIERARCHY INSIGHT
 
-**Thesis:** Hierarchy isn't bureaucratic overhead—it's evolved communication optimization. HIVE makes this pattern technical architecture.
+**Thesis:** Hierarchy isn't bureaucratic overhead—it's evolved communication optimization. PEAT makes this pattern technical architecture.
 
 ---
 
@@ -27,7 +27,7 @@ Hierarchy doesn't sacrifice capability for scale. It achieves scale through appr
 
 ### 3.2 Three Information Flows
 
-Hierarchy defines how information moves. HIVE implements all three flows.
+Hierarchy defines how information moves. PEAT implements all three flows.
 
 #### Upward: Aggregation
 
@@ -131,6 +131,6 @@ Humans occupy appropriate levels in the hierarchy—not above it, not beside it,
 
 ### Key Finding: Section III
 
-> "Hierarchy isn't the obstacle to coordination—it's the solution. The pattern reduces O(n²) to O(n log n) because it evolved to solve exactly this problem. HIVE implements hierarchy as technical architecture, enabling 1,000+ node coordination on networks that saturate at 50 with mesh approaches."
+> "Hierarchy isn't the obstacle to coordination—it's the solution. The pattern reduces O(n²) to O(n log n) because it evolved to solve exactly this problem. PEAT implements hierarchy as technical architecture, enabling 1,000+ node coordination on networks that saturate at 50 with mesh approaches."
 
 ---

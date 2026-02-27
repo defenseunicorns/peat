@@ -1,6 +1,6 @@
-# HIVE Protocol Governance
+# PEAT Protocol Governance
 
-This directory contains the governance documents for the HIVE Protocol project.
+This directory contains the governance documents for the PEAT Protocol project.
 
 ## Documents
 
@@ -16,7 +16,7 @@ This directory contains the governance documents for the HIVE Protocol project.
 
 - Read [CONTRIBUTING.md](CONTRIBUTING.md) to get started
 - Follow the [Code of Conduct](CHARTER.md#9-code-of-conduct)
-- Submit issues and PRs on [GitHub](https://github.com/kitplummer/hive)
+- Submit issues and PRs on [GitHub](https://github.com/defenseunicorns/peat)
 
 ### For Implementers
 
@@ -32,5 +32,5 @@ This directory contains the governance documents for the HIVE Protocol project.
 
 ## Contact
 
-- GitHub Issues: [github.com/kitplummer/hive/issues](https://github.com/kitplummer/hive/issues)
+- GitHub Issues: [github.com/defenseunicorns/peat/issues](https://github.com/defenseunicorns/peat/issues)
 - Email: kit@revolveteam.com

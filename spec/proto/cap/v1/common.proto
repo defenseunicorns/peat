@@ -1,8 +1,8 @@
-// HIVE Protocol - Common Types
+// PEAT Protocol - Common Types
 // Specification Version: 0.1.0
 // License: CC0 1.0 Universal (Public Domain)
 //
-// This file defines common message types used throughout the HIVE Protocol.
+// This file defines common message types used throughout the PEAT Protocol.
 // All implementations MUST support these types as the foundation for protocol messages.
 
 syntax = "proto3";
@@ -76,7 +76,7 @@ message Confidence {
 // - Keys SHOULD use lowercase with underscores (snake_case)
 // - Values MAY be any string (including JSON for complex data)
 // - Implementations MUST preserve unknown metadata during sync
-// - Reserved key prefixes: "hive_" (protocol use), "x_" (experimental)
+// - Reserved key prefixes: "peat_" (protocol use), "x_" (experimental)
 message Metadata {
   // Key-value pairs for extensible metadata.
   map<string, string> fields = 1;

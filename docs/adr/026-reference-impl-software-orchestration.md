@@ -8,14 +8,14 @@
 
 ## Document Classification
 
-> **⚠️ This is a REFERENCE IMPLEMENTATION guide, not a HIVE Protocol specification.**
+> **⚠️ This is a REFERENCE IMPLEMENTATION guide, not a PEAT Protocol specification.**
 >
-> This ADR demonstrates how to build a software orchestration system on top of HIVE Protocol primitives. The patterns, traits, and implementations shown here are examples that users MAY adopt, adapt, or replace entirely.
+> This ADR demonstrates how to build a software orchestration system on top of PEAT Protocol primitives. The patterns, traits, and implementations shown here are examples that users MAY adopt, adapt, or replace entirely.
 >
-> **HIVE Protocol primitives used:**
+> **PEAT Protocol primitives used:**
 > - `BlobStore` / `BlobRef` (ADR-025)
 > - `CapabilityAdvertisement` (ADR-012)
-> - `HiveEvent` with `AggregationPolicy` (ADR-012)
+> - `PeatEvent` with `AggregationPolicy` (ADR-012)
 > - `DeploymentDirective` (ADR-012)
 >
 > **Application-layer concerns defined here:**
@@ -26,25 +26,25 @@
 
 ## Context
 
-### Building on HIVE Primitives
+### Building on PEAT Primitives
 
-HIVE Protocol provides foundational primitives for distributed coordination:
+PEAT Protocol provides foundational primitives for distributed coordination:
 
-| HIVE Primitive | What It Does | ADR |
+| PEAT Primitive | What It Does | ADR |
 |----------------|--------------|-----|
 | BlobRef / BlobStore | Content-addressed binary transfer | ADR-025 |
 | CapabilityAdvertisement | Nodes advertise what they can do | ADR-012 |
-| HiveEvent | Typed events with routing policies | ADR-012 |
+| PeatEvent | Typed events with routing policies | ADR-012 |
 | DeploymentDirective | Commands flow through hierarchy | ADR-012 |
 | AggregationPolicy | Control event propagation | ADR-012 |
 
-**These primitives are runtime-agnostic** - HIVE doesn't know or care if you're deploying ONNX models, Docker containers, or configuration files.
+**These primitives are runtime-agnostic** - PEAT doesn't know or care if you're deploying ONNX models, Docker containers, or configuration files.
 
 This reference implementation shows **one way** to build a software orchestration system that:
 - Deploys multiple artifact types (models, containers, binaries)
-- Reports health and status through HIVE events
-- Produces outputs that flow through HIVE's event routing
-- Uses HIVE's blob transfer for artifact distribution
+- Reports health and status through PEAT events
+- Produces outputs that flow through PEAT's event routing
+- Uses PEAT's blob transfer for artifact distribution
 
 ### Why a Reference Implementation?
 
@@ -54,7 +54,7 @@ Different organizations will have different needs:
 - Military users may have specific runtime requirements (MOSA, certifications)
 
 By providing a reference implementation rather than mandating an approach, we:
-1. **Demonstrate** how to use HIVE primitives effectively
+1. **Demonstrate** how to use PEAT primitives effectively
 2. **Provide** working code that can be adopted or adapted
 3. **Avoid** constraining users to our specific choices
 4. **Enable** innovation in the application layer
@@ -87,12 +87,12 @@ By providing a reference implementation rather than mandating an approach, we:
 └──────────────────────────┬──────────────────────────────────────┘
                            │ uses
 ═══════════════════════════╪═══════════════════════════════════════
-         HIVE PROTOCOL BOUNDARY
+         PEAT PROTOCOL BOUNDARY
 ═══════════════════════════╪═══════════════════════════════════════
                            │
 ┌──────────────────────────┴──────────────────────────────────────┐
-│  HIVE PROTOCOL LAYER                                             │
-│  BlobStore, CapabilityAdvertisement, HiveEvent, DeploymentDir.  │
+│  PEAT PROTOCOL LAYER                                             │
+│  BlobStore, CapabilityAdvertisement, PeatEvent, DeploymentDir.  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -101,7 +101,7 @@ By providing a reference implementation rather than mandating an approach, we:
 **Artifact**: A deployable unit (blob) with type information
 ```rust
 struct Artifact {
-    blob_ref: BlobRef,           // HIVE primitive (ADR-025)
+    blob_ref: BlobRef,           // PEAT primitive (ADR-025)
     artifact_type: ArtifactType, // Application-defined
     config: serde_json::Value,   // Runtime-specific config
 }
@@ -120,8 +120,8 @@ trait RuntimeAdapter {
 **OrchestrationService**: Coordinates deployment lifecycle
 ```rust
 struct OrchestrationService {
-    blob_store: Arc<dyn BlobStore>,        // HIVE primitive
-    hive_events: Arc<dyn HiveEventPublisher>, // HIVE primitive  
+    blob_store: Arc<dyn BlobStore>,        // PEAT primitive
+    peat_events: Arc<dyn PeatEventPublisher>, // PEAT primitive  
     adapters: Vec<Arc<dyn RuntimeAdapter>>, // Application-defined
 }
 ```
@@ -232,7 +232,7 @@ pub struct RuntimeMetrics {
 
 /// Output product from software (detection, classification, etc.)
 /// 
-/// This wraps a HiveEvent payload with instance context.
+/// This wraps a PeatEvent payload with instance context.
 /// The actual payload is application-defined.
 #[derive(Clone, Debug)]
 pub struct ProductOutput {
@@ -243,10 +243,10 @@ pub struct ProductOutput {
     pub routing: RoutingHint,
 }
 
-/// Hint for how this product should be routed through HIVE
+/// Hint for how this product should be routed through PEAT
 #[derive(Clone, Debug, Default)]
 pub struct RoutingHint {
-    /// Map to HiveEvent.AggregationPolicy
+    /// Map to PeatEvent.AggregationPolicy
     pub propagate_full: bool,
     pub propagate_summary: bool,
     pub priority: EventPriority,
@@ -326,7 +326,7 @@ pub trait RuntimeAdapter: Send + Sync {
     /// Subscribe to product outputs from this instance
     ///
     /// Products are runtime-specific outputs (detections, classifications, etc.)
-    /// The orchestration service will route these through HIVE events.
+    /// The orchestration service will route these through PEAT events.
     async fn subscribe_products(
         &self,
         instance_id: &InstanceId,
@@ -386,7 +386,7 @@ struct InferenceMetrics {
 impl OnnxRuntimeAdapter {
     pub fn new() -> Result<Self> {
         let env = Environment::builder()
-            .with_name("hive_onnx")
+            .with_name("peat_onnx")
             .build()?;
         
         Ok(Self {
@@ -735,25 +735,25 @@ impl RuntimeAdapter for ContainerAdapter {
 
 ### OrchestrationService
 
-Coordinates deployment using HIVE primitives:
+Coordinates deployment using PEAT primitives:
 
 ```rust
 use crate::storage::{BlobStore, BlobRef};
-use crate::protocol::{HiveEventPublisher, CapabilityPublisher};
+use crate::protocol::{PeatEventPublisher, CapabilityPublisher};
 
 /// Orchestration service coordinating software lifecycle
 ///
 /// This is the main entry point for deploying and managing software.
-/// It uses HIVE primitives (BlobStore, Events) and delegates runtime
+/// It uses PEAT primitives (BlobStore, Events) and delegates runtime
 /// specifics to RuntimeAdapter implementations.
 pub struct OrchestrationService {
-    /// HIVE blob store for artifact retrieval
+    /// PEAT blob store for artifact retrieval
     blob_store: Arc<dyn BlobStore>,
     
-    /// HIVE event publisher for products/anomalies
-    event_publisher: Arc<dyn HiveEventPublisher>,
+    /// PEAT event publisher for products/anomalies
+    event_publisher: Arc<dyn PeatEventPublisher>,
     
-    /// HIVE capability publisher for status
+    /// PEAT capability publisher for status
     capability_publisher: Arc<dyn CapabilityPublisher>,
     
     /// Available runtime adapters
@@ -775,7 +775,7 @@ struct InstanceRecord {
 impl OrchestrationService {
     pub fn new(
         blob_store: Arc<dyn BlobStore>,
-        event_publisher: Arc<dyn HiveEventPublisher>,
+        event_publisher: Arc<dyn PeatEventPublisher>,
         capability_publisher: Arc<dyn CapabilityPublisher>,
     ) -> Self {
         Self {
@@ -794,11 +794,11 @@ impl OrchestrationService {
     
     /// Deploy an artifact locally
     ///
-    /// 1. Fetches blob via BlobStore (HIVE primitive)
+    /// 1. Fetches blob via BlobStore (PEAT primitive)
     /// 2. Selects appropriate RuntimeAdapter
     /// 3. Activates via adapter
     /// 4. Subscribes to products/anomalies
-    /// 5. Publishes capability advertisement (HIVE primitive)
+    /// 5. Publishes capability advertisement (PEAT primitive)
     pub async fn deploy(
         &self,
         blob_ref: BlobRef,
@@ -806,7 +806,7 @@ impl OrchestrationService {
         config: serde_json::Value,
         capabilities: Vec<String>,
     ) -> Result<InstanceId> {
-        // Step 1: Fetch blob (HIVE primitive)
+        // Step 1: Fetch blob (PEAT primitive)
         let local_blob = self.blob_store.fetch(&blob_ref, |progress| {
             // Could emit progress events here
             tracing::debug!(?progress, "Blob fetch progress");
@@ -830,7 +830,7 @@ impl OrchestrationService {
         // Step 4: Subscribe to outputs
         self.start_monitoring(&instance_id, &adapter).await?;
         
-        // Step 5: Publish capability (HIVE primitive)
+        // Step 5: Publish capability (PEAT primitive)
         self.publish_capability(&instance_id, &capabilities, InstanceState::Running).await?;
         
         // Record instance
@@ -883,15 +883,15 @@ impl OrchestrationService {
         instance_id: &InstanceId,
         adapter: &Arc<dyn RuntimeAdapter>,
     ) -> Result<()> {
-        // Subscribe to products and route through HIVE events
+        // Subscribe to products and route through PEAT events
         let mut products = adapter.subscribe_products(instance_id).await?;
         let event_pub = self.event_publisher.clone();
         let iid = instance_id.clone();
         
         tokio::spawn(async move {
             while let Ok(product) = products.recv().await {
-                // Convert ProductOutput to HiveEvent and publish
-                let hive_event = HiveEvent {
+                // Convert ProductOutput to PeatEvent and publish
+                let peat_event = PeatEvent {
                     event_class: EventClass::Product,
                     event_type: product.product_type.clone(),
                     source_instance_id: Some(iid.0.clone()),
@@ -900,18 +900,18 @@ impl OrchestrationService {
                         propagate_full: product.routing.propagate_full,
                         propagate_summary: product.routing.propagate_summary,
                         priority: match product.routing.priority {
-                            EventPriority::Critical => hive::EventPriority::Critical,
-                            EventPriority::High => hive::EventPriority::High,
-                            EventPriority::Normal => hive::EventPriority::Normal,
-                            EventPriority::Low => hive::EventPriority::Low,
-                            EventPriority::LocalOnly => hive::EventPriority::LocalOnly,
+                            EventPriority::Critical => peat::EventPriority::Critical,
+                            EventPriority::High => peat::EventPriority::High,
+                            EventPriority::Normal => peat::EventPriority::Normal,
+                            EventPriority::Low => peat::EventPriority::Low,
+                            EventPriority::LocalOnly => peat::EventPriority::LocalOnly,
                         },
                         ttl_seconds: product.routing.ttl_seconds,
                     },
                     ..Default::default()
                 };
                 
-                let _ = event_pub.publish(hive_event).await;
+                let _ = event_pub.publish(peat_event).await;
             }
         });
         
@@ -923,12 +923,12 @@ impl OrchestrationService {
         tokio::spawn(async move {
             while let Ok(anomaly) = anomalies.recv().await {
                 let priority = match anomaly.severity {
-                    AnomalySeverity::Critical => hive::EventPriority::Critical,
-                    AnomalySeverity::Error => hive::EventPriority::High,
-                    _ => hive::EventPriority::Normal,
+                    AnomalySeverity::Critical => peat::EventPriority::Critical,
+                    AnomalySeverity::Error => peat::EventPriority::High,
+                    _ => peat::EventPriority::Normal,
                 };
                 
-                let hive_event = HiveEvent {
+                let peat_event = PeatEvent {
                     event_class: EventClass::Anomaly,
                     event_type: anomaly.anomaly_type.clone(),
                     source_instance_id: Some(iid.0.clone()),
@@ -945,7 +945,7 @@ impl OrchestrationService {
                     ..Default::default()
                 };
                 
-                let _ = event_pub.publish(hive_event).await;
+                let _ = event_pub.publish(peat_event).await;
             }
         });
         
@@ -958,7 +958,7 @@ impl OrchestrationService {
         capabilities: &[String],
         state: InstanceState,
     ) -> Result<()> {
-        // Build HIVE CapabilityAdvertisement
+        // Build PEAT CapabilityAdvertisement
         let advertisement = CapabilityAdvertisement {
             capabilities: capabilities.iter().map(|c| Capability {
                 capability_type: "software".into(),
@@ -980,7 +980,7 @@ impl OrchestrationService {
 
 ## Application Schemas
 
-Define your own product schemas that flow through `HiveEvent.payload`:
+Define your own product schemas that flow through `PeatEvent.payload`:
 
 ```rust
 /// Detection product (example application schema)
@@ -1038,17 +1038,17 @@ pub struct Waypoint {
 }
 ```
 
-## Integration with HIVE Protocol
+## Integration with PEAT Protocol
 
-### Using HIVE Primitives
+### Using PEAT Primitives
 
 ```rust
-// Example: Full deployment flow using HIVE primitives
+// Example: Full deployment flow using PEAT primitives
 
 async fn deploy_model(
     orchestration: &OrchestrationService,
-    hive_storage: &dyn StorageBackend,  // HIVE document storage
-    blob_store: &dyn BlobStore,          // HIVE blob storage (ADR-025)
+    peat_storage: &dyn StorageBackend,  // PEAT document storage
+    blob_store: &dyn BlobStore,          // PEAT blob storage (ADR-025)
 ) -> Result<()> {
     // 1. Model blob already stored (maybe by C2 node)
     let model_ref = BlobRef {
@@ -1068,8 +1068,8 @@ async fn deploy_model(
         vec!["target_recognition".into()],
     ).await?;
     
-    // 3. Capability is automatically advertised via HIVE
-    // 4. Products/anomalies automatically flow via HiveEvent
+    // 3. Capability is automatically advertised via PEAT
+    // 4. Products/anomalies automatically flow via PeatEvent
     
     Ok(())
 }
@@ -1078,10 +1078,10 @@ async fn deploy_model(
 ### Receiving Deployment Commands
 
 ```rust
-// Example: Handling DeploymentDirective from HIVE
+// Example: Handling DeploymentDirective from PEAT
 
 async fn handle_deployment_directive(
-    directive: DeploymentDirective,  // HIVE protocol message
+    directive: DeploymentDirective,  // PEAT protocol message
     orchestration: &OrchestrationService,
 ) -> Result<()> {
     // Extract application-specific config from directive
@@ -1095,7 +1095,7 @@ async fn handle_deployment_directive(
     
     // Deploy using orchestration service
     orchestration.deploy(
-        directive.artifact,  // BlobRef from HIVE
+        directive.artifact,  // BlobRef from PEAT
         artifact_type,
         directive.config,
         capabilities,
@@ -1139,8 +1139,8 @@ These are valid extensions you may need - this reference focuses on the core lif
 
 ## References
 
-### HIVE Protocol ADRs
-- ADR-012: Schema Definition (CapabilityAdvertisement, HiveEvent)
+### PEAT Protocol ADRs
+- ADR-012: Schema Definition (CapabilityAdvertisement, PeatEvent)
 - ADR-025: Blob Transfer Protocol (BlobStore, BlobRef)
 
 ### Runtime Technologies
@@ -1154,4 +1154,4 @@ These are valid extensions you may need - this reference focuses on the core lif
 
 ---
 
-**This reference implementation demonstrates how to build software orchestration on HIVE Protocol primitives. Adopt, adapt, or replace as needed for your use case.**
+**This reference implementation demonstrates how to build software orchestration on PEAT Protocol primitives. Adopt, adapt, or replace as needed for your use case.**

@@ -1,6 +1,6 @@
-# HIVE Protocol Specification: Transport Layer
+# PEAT Protocol Specification: Transport Layer
 
-**Spec ID**: HIVE-SPEC-001
+**Spec ID**: PEAT-SPEC-001
 **Status**: Draft
 **Version**: 0.1.0
 **Date**: 2025-01-07
@@ -8,7 +8,7 @@
 
 ## Abstract
 
-This document specifies the transport layer for the HIVE Protocol. It defines wire formats, connection lifecycle, transport abstractions, and the UDP bypass channel for latency-critical applications.
+This document specifies the transport layer for the PEAT Protocol. It defines wire formats, connection lifecycle, transport abstractions, and the UDP bypass channel for latency-critical applications.
 
 ## Table of Contents
 
@@ -17,7 +17,7 @@ This document specifies the transport layer for the HIVE Protocol. It defines wi
 3. [Transport Abstraction](#3-transport-abstraction)
 4. [Primary Transport: QUIC/Iroh](#4-primary-transport-quiciroh)
 5. [UDP Bypass Channel](#5-udp-bypass-channel)
-6. [HIVE-Lite Protocol](#6-hive-lite-protocol)
+6. [PEAT-Lite Protocol](#6-peat-lite-protocol)
 7. [BLE Mesh Transport](#7-ble-mesh-transport)
 8. [Connection Lifecycle](#8-connection-lifecycle)
 9. [Wire Formats](#9-wire-formats)
@@ -30,7 +30,7 @@ This document specifies the transport layer for the HIVE Protocol. It defines wi
 
 ### 1.1 Purpose
 
-The HIVE transport layer provides reliable and unreliable message delivery across heterogeneous network environments. It abstracts multiple physical transports (QUIC, UDP, BLE) behind a common interface, enabling applications to function regardless of underlying connectivity.
+The PEAT transport layer provides reliable and unreliable message delivery across heterogeneous network environments. It abstracts multiple physical transports (QUIC, UDP, BLE) behind a common interface, enabling applications to function regardless of underlying connectivity.
 
 ### 1.2 Scope
 
@@ -38,7 +38,7 @@ This specification covers:
 - Transport trait abstraction
 - QUIC-based primary transport (via Iroh)
 - UDP bypass channel for low-latency data
-- HIVE-Lite protocol for constrained devices
+- PEAT-Lite protocol for constrained devices
 - BLE mesh transport for mobile/embedded devices
 - Connection establishment and teardown
 - Wire format encoding
@@ -53,7 +53,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 | Term | Definition |
 |------|------------|
-| **Node** | A HIVE-capable device with a unique identity |
+| **Node** | A PEAT-capable device with a unique identity |
 | **Peer** | A node with an established transport connection |
 | **Endpoint** | A network address (IP:port, BLE address, etc.) |
 | **Channel** | A logical stream within a transport connection |
@@ -66,7 +66,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ### 3.1 Transport Trait
 
-All HIVE transports MUST implement the following interface:
+All PEAT transports MUST implement the following interface:
 
 ```rust
 pub trait Transport: Send + Sync {
@@ -119,7 +119,7 @@ Implementations MUST use the first 32 bytes of the SHA-256 hash. The PeerId MUST
 
 ### 4.1 Overview
 
-The primary HIVE transport uses QUIC via the Iroh library. QUIC provides:
+The primary PEAT transport uses QUIC via the Iroh library. QUIC provides:
 - Multiplexed streams over a single connection
 - Built-in encryption (TLS 1.3)
 - Connection migration
@@ -134,10 +134,10 @@ The primary HIVE transport uses QUIC via the Iroh library. QUIC provides:
         |                                   |
         |<------- QUIC ServerHello ---------|
         |                                   |
-        |-------- HIVE Handshake ---------->|
+        |-------- PEAT Handshake ---------->|
         |  (DeviceId, FormationId, Nonce)   |
         |                                   |
-        |<------- HIVE HandshakeAck --------|
+        |<------- PEAT HandshakeAck --------|
         |  (DeviceId, Challenge)            |
         |                                   |
         |-------- ChallengeResponse ------->|
@@ -147,7 +147,7 @@ The primary HIVE transport uses QUIC via the Iroh library. QUIC provides:
         |                                   |
 ```
 
-### 4.3 HIVE Handshake Message
+### 4.3 PEAT Handshake Message
 
 ```
  0                   1                   2                   3
@@ -288,11 +288,11 @@ pub struct BypassCollectionConfig {
 
 ### 5.4 Multicast
 
-For broadcast scenarios, HIVE supports IP multicast:
+For broadcast scenarios, PEAT supports IP multicast:
 
 | Multicast Group | Purpose |
 |-----------------|---------|
-| `239.255.72.86` | Default HIVE multicast group |
+| `239.255.72.86` | Default PEAT multicast group |
 | `239.255.72.87` | Sensor data |
 | `239.255.72.88` | Control commands |
 
@@ -308,11 +308,11 @@ Nodes MUST join multicast groups using IGMP. The default TTL for multicast packe
 
 ---
 
-## 6. HIVE-Lite Protocol
+## 6. PEAT-Lite Protocol
 
 ### 6.1 Purpose
 
-HIVE-Lite is a lightweight UDP protocol for resource-constrained devices (ESP32, ARM Cortex-M) that cannot run the full QUIC stack.
+PEAT-Lite is a lightweight UDP protocol for resource-constrained devices (ESP32, ARM Cortex-M) that cannot run the full QUIC stack.
 
 ### 6.2 Message Format
 
@@ -346,7 +346,7 @@ HIVE-Lite is a lightweight UDP protocol for resource-constrained devices (ESP32,
 
 ### 6.3 Reliability
 
-HIVE-Lite uses a simple acknowledgment scheme:
+PEAT-Lite uses a simple acknowledgment scheme:
 - Sender transmits with sequence number (0-255, wraparound)
 - Receiver sends Ack/Nack within timeout (default: 100ms)
 - Sender retries up to 3 times before marking peer as failed
@@ -357,19 +357,19 @@ HIVE-Lite uses a simple acknowledgment scheme:
 
 ### 7.1 Overview
 
-The BLE mesh transport (`hive-btle`) enables HIVE communication over Bluetooth Low Energy for mobile and embedded devices.
+The BLE mesh transport (`peat-btle`) enables PEAT communication over Bluetooth Low Energy for mobile and embedded devices.
 
 ### 7.2 GATT Service
 
 | UUID | Name | Description |
 |------|------|-------------|
-| `0x1826` | HIVE Mesh Service | Primary service |
+| `0x1826` | PEAT Mesh Service | Primary service |
 | `0x2A6E` | Data Characteristic | Read/Write/Notify |
 | `0x2A6F` | Control Characteristic | Write only |
 
 ### 7.3 Advertising
 
-HIVE nodes advertise with:
+PEAT nodes advertise with:
 - Service UUID: `0x1826`
 - Manufacturer Data: 4-byte Formation ID + 2-byte Mesh ID
 
@@ -469,13 +469,13 @@ All multi-byte integers are encoded in **big-endian** (network byte order).
 |------|----------|---------|
 | 4433 | UDP | QUIC/Iroh primary transport |
 | 4434 | UDP | Bypass channel |
-| 4435 | UDP | HIVE-Lite |
+| 4435 | UDP | PEAT-Lite |
 
 ### 11.2 Multicast Groups
 
 | Group | Purpose |
 |-------|---------|
-| 239.255.72.86-88 | HIVE protocol multicast |
+| 239.255.72.86-88 | PEAT protocol multicast |
 
 ---
 

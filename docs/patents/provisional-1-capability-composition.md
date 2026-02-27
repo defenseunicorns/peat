@@ -81,9 +81,9 @@ The inventors acknowledge prior work in distributed autonomous systems coordinat
 **Concepts Potentially Derived from COD**:
 - **Prioritization**: Concept of priority-based data synchronization in bandwidth-constrained environments (not currently claimed in this application)
 
-### Differentiation: HIVE Protocol Innovations Beyond COD
+### Differentiation: PEAT Protocol Innovations Beyond COD
 
-The present invention (HIVE Protocol) was developed independently at (r)evolve LLC (2024-2025) and differs substantially from COD:
+The present invention (PEAT Protocol) was developed independently at (r)evolve LLC (2024-2025) and differs substantially from COD:
 
 **COD Approach** (Prior Art):
 - Flat peer-to-peer mesh networking without hierarchical organization
@@ -104,7 +104,7 @@ The present invention (HIVE Protocol) was developed independently at (r)evolve L
 
 ### Independent Development
 
-HIVE Protocol was developed independently at (r)evolve LLC using:
+PEAT Protocol was developed independently at (r)evolve LLC using:
 - Published CRDT literature (Shapiro et al., Automerge)
 - Military hierarchical command doctrine
 - Original composition algorithm design (2024-2025)

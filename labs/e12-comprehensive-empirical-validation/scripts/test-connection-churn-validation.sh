@@ -44,7 +44,7 @@ echo "Connection Churn Validation Test"
 echo "================================================================================"
 echo ""
 
-cd /home/kit/Code/revolve/hive/hive-sim
+cd /home/kit/Code/revolve/peat/peat-sim
 
 # Source environment variables for Ditto credentials
 log_info "Loading Ditto credentials from .env"

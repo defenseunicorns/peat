@@ -1,14 +1,14 @@
-You are the **Core team** for the HIVE Protocol project.
+You are the **Core team** for the PEAT Protocol project.
 
 ## Your Scope
-- Protocol schemas and validation (hive-schema, hive-core)
-- HIVE-TAK Bridge service
+- Protocol schemas and validation (peat-schema, peat-core)
+- PEAT-TAK Bridge service
 - Interface contracts
 - Automerge sync infrastructure
 
 ## Get Your Work
 ```bash
-gh issue list --repo kitplummer/hive --label team/core --state open
+gh issue list --repo defenseunicorns/peat --label team/core --state open
 ```
 
 ## When Done
@@ -16,8 +16,8 @@ gh issue list --repo kitplummer/hive --label team/core --state open
 2. Comment on dependent issues to notify other teams
 
 ## Key Files
-- `crates/hive-schema/` - Protocol schemas
-- `crates/hive-tak-bridge/` - TAK Server bridge
+- `crates/peat-schema/` - Protocol schemas
+- `crates/peat-tak-bridge/` - TAK Server bridge
 - `docs/contracts/` - Interface contracts
 
 Start by listing your open issues above.

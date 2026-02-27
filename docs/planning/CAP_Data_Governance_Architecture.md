@@ -1512,7 +1512,7 @@ This creates a governance model that scales with the system, degrades gracefully
 2. **Map governance patterns to Ditto primitives** - how to implement each pattern?
 3. **Prototype core mechanisms** - authority delegation, audit logs, quality metadata
 4. **Test at scale** - does governance overhead remain acceptable?
-5. **Integrate with HIVE protocol** - governance metadata in capability advertisements
+5. **Integrate with PEAT protocol** - governance metadata in capability advertisements
 
 The governance architecture must be designed **before** building CAP, as it fundamentally shapes:
 - What data structures look like (metadata fields)

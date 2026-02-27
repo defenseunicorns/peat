@@ -1,16 +1,16 @@
-# ADR-051: HIVE-SBD Satellite Transport Crate
+# ADR-051: PEAT-SBD Satellite Transport Crate
 
 **Status**: Proposed
 **Date**: 2025-02-10
 **Authors**: Kit Plummer, Claude
 **Organization**: (r)evolve - Revolve Team LLC (https://revolveteam.com)
-**Relates To**: ADR-032 (Pluggable Transport Abstraction), ADR-035 (HIVE-Lite Embedded Nodes), ADR-037 (Resource-Constrained Device Optimization), ADR-039 (HIVE-BTLE Mesh Transport), ADR-041 (Multi-Transport Embedded Integration)
+**Relates To**: ADR-032 (Pluggable Transport Abstraction), ADR-035 (PEAT-Lite Embedded Nodes), ADR-037 (Resource-Constrained Device Optimization), ADR-039 (PEAT-BTLE Mesh Transport), ADR-041 (Multi-Transport Embedded Integration)
 
 ---
 
 ## Executive Summary
 
-This ADR defines the architecture for `hive-sbd`, a Rust crate providing Iridium Short Burst Data (SBD) satellite transport for HIVE Protocol. The crate enables global, infrastructure-independent message exchange via the Iridium satellite constellation, targeting beyond-line-of-sight (BLOS) scenarios where no terrestrial network exists. It implements the ADR-032 `Transport` trait as an external transport extension, following the same pattern established by `hive-btle`.
+This ADR defines the architecture for `peat-sbd`, a Rust crate providing Iridium Short Burst Data (SBD) satellite transport for PEAT Protocol. The crate enables global, infrastructure-independent message exchange via the Iridium satellite constellation, targeting beyond-line-of-sight (BLOS) scenarios where no terrestrial network exists. It implements the ADR-032 `Transport` trait as an external transport extension, following the same pattern established by `peat-btle`.
 
 ---
 
@@ -18,9 +18,9 @@ This ADR defines the architecture for `hive-sbd`, a Rust crate providing Iridium
 
 ### The Satellite Communication Gap
 
-HIVE's current transport options—QUIC/Iroh (IP networks) and hive-btle (BLE mesh)—share a common limitation: they require terrestrial infrastructure or proximity between peers. Tactical edge operations frequently occur in environments where neither is available:
+PEAT's current transport options—QUIC/Iroh (IP networks) and peat-btle (BLE mesh)—share a common limitation: they require terrestrial infrastructure or proximity between peers. Tactical edge operations frequently occur in environments where neither is available:
 
-| Scenario | Gap | HIVE Use Case |
+| Scenario | Gap | PEAT Use Case |
 |----------|-----|---------------|
 | Maritime patrol | No cellular, no WiFi | Ship-to-shore PLI and status |
 | Remote overwatch | Beyond radio range of C2 | Forward observer position reports |
@@ -30,7 +30,7 @@ HIVE's current transport options—QUIC/Iroh (IP networks) and hive-btle (BLE me
 
 ### Why Iridium SBD?
 
-Iridium SBD is uniquely suited as a HIVE transport for several reasons:
+Iridium SBD is uniquely suited as a PEAT transport for several reasons:
 
 | Property | Iridium SBD | Starlink | Inmarsat BGAN |
 |----------|-------------|----------|---------------|
@@ -47,7 +47,7 @@ SBD's small message size, low power, tiny form factor, and true global coverage 
 
 ### Why a Dedicated Crate?
 
-Following the same rationale as `hive-btle` (ADR-039) and the pluggable transport architecture (ADR-032), SBD has fundamentally different semantics than stream-based transports:
+Following the same rationale as `peat-btle` (ADR-039) and the pluggable transport architecture (ADR-032), SBD has fundamentally different semantics than stream-based transports:
 
 1. **Store-and-Forward**: Messages are queued at the Iridium gateway, not delivered in real-time
 2. **Asymmetric Addressing**: Mobile-Originated (MO) goes to a gateway; Mobile-Terminated (MT) requires IMEI-based routing
@@ -59,18 +59,18 @@ Following the same rationale as `hive-btle` (ADR-039) and the pluggable transpor
 
 ### External Crate Pattern
 
-Like `hive-btle`, `hive-sbd` will be developed as an external crate hosted on Radicle, following the established pattern:
+Like `peat-btle`, `peat-sbd` will be developed as an external crate hosted on Radicle, following the established pattern:
 
 ```
-hive (main repo)
-├── hive-protocol/    ← Transport trait definitions (ADR-032)
-├── hive-ffi/         ← FFI bindings with SBD config
+peat (main repo)
+├── peat-protocol/    ← Transport trait definitions (ADR-032)
+├── peat-ffi/         ← FFI bindings with SBD config
 └── ...
 
-hive-btle (external) ← BLE mesh transport
+peat-btle (external) ← BLE mesh transport
     └── rad:z458mp9Um3AYNQQFMdHaNEUtmiohq
 
-hive-sbd (external)  ← SBD satellite transport [NEW]
+peat-sbd (external)  ← SBD satellite transport [NEW]
     └── rad:zXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ```
 
@@ -83,11 +83,11 @@ hive-sbd (external)  ← SBD satellite transport [NEW]
 1. **Global Coverage**: Operate anywhere on Earth with sky visibility
 2. **Low Power**: Suitable for battery-powered field devices (< 2W transmit)
 3. **Small Form Factor**: Integrate with man-portable and UAS platforms
-4. **HIVE Transport Trait**: Implement ADR-032 `Transport` trait for TransportManager integration
-5. **Message Efficiency**: Maximize HIVE data per SBD message given 1,960-byte limit
+4. **PEAT Transport Trait**: Implement ADR-032 `Transport` trait for TransportManager integration
+5. **Message Efficiency**: Maximize PEAT data per SBD message given 1,960-byte limit
 6. **Reliability**: Handle message queuing, retry, and confirmation
 7. **Security**: Application-layer encryption over SBD (per ADR-006)
-8. **Dual-Mode Operation**: Standalone (embedded gateway) or transport plugin (full HIVE node)
+8. **Dual-Mode Operation**: Standalone (embedded gateway) or transport plugin (full PEAT node)
 
 ### Constraints
 
@@ -106,12 +106,12 @@ hive-sbd (external)  ← SBD satellite transport [NEW]
 
 ### Architecture
 
-`hive-sbd` implements the ADR-032 `Transport` trait with SBD-specific adaptations for store-and-forward satellite communication.
+`peat-sbd` implements the ADR-032 `Transport` trait with SBD-specific adaptations for store-and-forward satellite communication.
 
 ### Crate Structure
 
 ```
-hive-sbd/
+peat-sbd/
 ├── src/
 │   ├── lib.rs              # Public API, re-exports
 │   ├── transport.rs         # Transport trait implementation (ADR-032)
@@ -123,14 +123,14 @@ hive-sbd/
 │   │   └── mock.rs          # Mock modem for testing
 │   ├── message/
 │   │   ├── mod.rs           # Message framing and types
-│   │   ├── encoding.rs      # Compact binary encoding (HIVE → SBD payload)
+│   │   ├── encoding.rs      # Compact binary encoding (PEAT → SBD payload)
 │   │   ├── fragmentation.rs # Multi-message fragmentation for >1960 byte payloads
 │   │   └── compression.rs   # Optional payload compression (LZ4/zstd)
 │   ├── gateway/
 │   │   ├── mod.rs           # Gateway relay abstraction
 │   │   ├── directip.rs      # DirectIP socket gateway client
 │   │   ├── email.rs         # Email-based gateway (SMTP/IMAP)
-│   │   └── relay.rs         # HIVE relay server (SBD ↔ HIVE mesh bridge)
+│   │   └── relay.rs         # PEAT relay server (SBD ↔ PEAT mesh bridge)
 │   ├── routing/
 │   │   ├── mod.rs           # Peer-to-IMEI routing
 │   │   └── imei_map.rs      # NodeId ↔ IMEI mapping table
@@ -206,8 +206,8 @@ pub enum GatewayConfig {
         imap_server: String,
         credentials: String, // Reference to credential store, not inline
     },
-    /// HIVE relay server (bridges SBD ↔ HIVE mesh)
-    HiveRelay {
+    /// PEAT relay server (bridges SBD ↔ PEAT mesh)
+    PeatRelay {
         relay_url: String,
     },
     /// No gateway (MO-only, fire-and-forget)
@@ -251,7 +251,7 @@ pub struct TransmitSchedule {
 ### Transport Trait Implementation
 
 ```rust
-pub struct HiveSbdTransport {
+pub struct PeatSbdTransport {
     config: SbdConfig,
     modem: Arc<Mutex<dyn SbdModem>>,
     outbound_queue: Arc<Mutex<PriorityQueue<SbdMessage>>>,
@@ -262,7 +262,7 @@ pub struct HiveSbdTransport {
 }
 
 #[async_trait]
-impl Transport for HiveSbdTransport {
+impl Transport for PeatSbdTransport {
     fn capabilities(&self) -> &TransportCapabilities {
         &self.capabilities
     }
@@ -282,11 +282,11 @@ impl Transport for HiveSbdTransport {
         // OR if gateway relay is configured (any peer reachable via mesh bridge)
         let peer_hex = hex::encode(peer_id);
         self.config.peer_imei_map.contains_key(&peer_hex)
-            || matches!(self.config.gateway, GatewayConfig::HiveRelay { .. })
+            || matches!(self.config.gateway, GatewayConfig::PeatRelay { .. })
     }
 }
 
-impl HiveSbdTransport {
+impl PeatSbdTransport {
     pub fn new(config: SbdConfig) -> Result<Self, SbdError> {
         let capabilities = TransportCapabilities {
             transport_type: TransportType::Satellite,
@@ -406,10 +406,10 @@ impl HiveSbdTransport {
 
 ### Compact Message Encoding
 
-Given the 1,960-byte constraint, efficient encoding is critical. HIVE messages must be packed tightly:
+Given the 1,960-byte constraint, efficient encoding is critical. PEAT messages must be packed tightly:
 
 ```rust
-/// Compact HIVE-over-SBD message format
+/// Compact PEAT-over-SBD message format
 ///
 /// Header (8 bytes):
 ///   [0]     Version + flags (1 byte)
@@ -419,7 +419,7 @@ Given the 1,960-byte constraint, efficient encoding is critical. HIVE messages m
 ///   [6-7]   CRC-16 of payload (2 bytes)
 ///
 /// Payload (up to 1,952 bytes):
-///   Encoded HIVE data (protobuf, CBOR, or raw)
+///   Encoded PEAT data (protobuf, CBOR, or raw)
 ///
 /// Total: max 1,960 bytes
 ///
@@ -442,7 +442,7 @@ pub enum SbdMessageType {
     /// Text message (compressed UTF-8)
     TextMessage = 0x03,
 
-    /// CRDT delta sync (for hive-lite state)
+    /// CRDT delta sync (for peat-lite state)
     CrdtDelta = 0x04,
 
     /// Fragmented message (part of larger payload)
@@ -541,7 +541,7 @@ pub fn fragment_message(data: &[u8], max_fragment_payload: usize) -> Result<Vec<
 
 ### Gateway Relay Architecture
 
-The key architectural decision is how SBD messages flow between isolated SBD-equipped nodes and the broader HIVE mesh:
+The key architectural decision is how SBD messages flow between isolated SBD-equipped nodes and the broader PEAT mesh:
 
 ```
                         Iridium Constellation
@@ -551,18 +551,18 @@ The key architectural decision is how SBD messages flow between isolated SBD-equ
 ┌──────────────────┐      /          \      ┌──────────────────┐
 │  Field Device A  │     /            \     │  Field Device B  │
 │  ┌─────────────┐ │    /              \    │ ┌─────────────┐  │
-│  │ HIVE Node   │ │   ▼                ▼   │ │ HIVE Node   │  │
-│  │ hive-sbd    │◄──► Iridium    Iridium ◄──►│ hive-sbd    │  │
+│  │ PEAT Node   │ │   ▼                ▼   │ │ PEAT Node   │  │
+│  │ peat-sbd    │◄──► Iridium    Iridium ◄──►│ peat-sbd    │  │
 │  │ (MO/MT)     │ │   Gateway    Gateway   │ │ (MO/MT)     │  │
 │  └─────────────┘ │      │            │    │ └─────────────┘  │
 └──────────────────┘      │            │    └──────────────────┘
                           ▼            ▼
                     ┌────────────────────────┐
-                    │   HIVE SBD Relay       │
+                    │   PEAT SBD Relay       │
                     │   (DirectIP server)    │
                     │                        │
-                    │   MO → HIVE mesh pub   │
-                    │   HIVE mesh sub → MT   │
+                    │   MO → PEAT mesh pub   │
+                    │   PEAT mesh sub → MT   │
                     │                        │
                     │   Peer IMEI registry   │
                     │   Message routing      │
@@ -570,45 +570,45 @@ The key architectural decision is how SBD messages flow between isolated SBD-equ
                     └───────────┬────────────┘
                                 │
                     ┌───────────▼────────────┐
-                    │   HIVE Mesh            │
+                    │   PEAT Mesh            │
                     │   (QUIC/Iroh)          │
                     │   Full CRDT sync       │
                     └────────────────────────┘
 ```
 
-**HIVE SBD Relay** is a server-side component that:
+**PEAT SBD Relay** is a server-side component that:
 1. Receives MO messages from the Iridium gateway via DirectIP
-2. Decodes HIVE-over-SBD frames
-3. Publishes decoded data into the HIVE mesh (as a full HIVE node)
-4. Subscribes to HIVE mesh data destined for SBD-connected peers
-5. Encodes HIVE data into SBD frames
+2. Decodes PEAT-over-SBD frames
+3. Publishes decoded data into the PEAT mesh (as a full PEAT node)
+4. Subscribes to PEAT mesh data destined for SBD-connected peers
+5. Encodes PEAT data into SBD frames
 6. Sends MT messages to field devices via the Iridium gateway
 
 ### Dual-Mode Operation
 
-Following `hive-btle`'s pattern:
+Following `peat-btle`'s pattern:
 
 ```
 ┌─────────────────────────────────┐
-│   Full HIVE (ATAK, CLI, etc.)   │
-│   TransportManager (PACE policy)│ ← hive-sbd is one transport option
+│   Full PEAT (ATAK, CLI, etc.)   │
+│   TransportManager (PACE policy)│ ← peat-sbd is one transport option
 └──────────┬──────────────────────┘
            │
 ┌──────────▼──────────────────────┐
-│      hive-sbd crate             │
+│      peat-sbd crate             │
 │ (Standalone OR transport plugin)│ ← Same protocol, dual modes
 └──────────┬──────────────────────┘
            │
 ┌──────────▼──────────────────────┐
 │  Embedded tracker               │
-│  (ESP32 + Iridium 9603)         │ ← Standalone hive-sbd
-│  Can't run full HIVE            │
+│  (ESP32 + Iridium 9603)         │ ← Standalone peat-sbd
+│  Can't run full PEAT            │
 └─────────────────────────────────┘
 ```
 
-**Mode 1 - Standalone**: Embedded devices (ESP32 + Iridium 9603, asset trackers) use hive-sbd directly to send compact PLI/status reports via satellite.
+**Mode 1 - Standalone**: Embedded devices (ESP32 + Iridium 9603, asset trackers) use peat-sbd directly to send compact PLI/status reports via satellite.
 
-**Mode 2 - Transport Plugin**: Full HIVE nodes wrap hive-sbd via `HiveSbdTransport` in `TransportManager`, using it as a contingency/emergency PACE transport.
+**Mode 2 - Transport Plugin**: Full PEAT nodes wrap peat-sbd via `PeatSbdTransport` in `TransportManager`, using it as a contingency/emergency PACE transport.
 
 ### PACE Integration
 
@@ -667,7 +667,7 @@ This allows the TransportManager to prefer free transports and only fall through
 
 ---
 
-## hive-ffi Integration
+## peat-ffi Integration
 
 Extend `TransportConfigFFI` (per ADR-050) to support SBD:
 
@@ -765,7 +765,7 @@ pub struct SbdSessionResult {
 
 ### Phase 3: Transport Trait & Queue
 
-- [ ] Implement `HiveSbdTransport` (ADR-032 `Transport` trait)
+- [ ] Implement `PeatSbdTransport` (ADR-032 `Transport` trait)
 - [ ] Priority-based outbound message queue
 - [ ] Cost budgeting and rate limiting
 - [ ] Power management (scheduled windows, on-demand)
@@ -776,7 +776,7 @@ pub struct SbdSessionResult {
 
 - [ ] DirectIP server for MO message reception
 - [ ] DirectIP client for MT message sending
-- [ ] HIVE mesh bridge (full HIVE node that relays SBD ↔ mesh)
+- [ ] PEAT mesh bridge (full PEAT node that relays SBD ↔ mesh)
 - [ ] Peer IMEI registry and routing table
 - [ ] Fragment reassembly at gateway
 - [ ] End-to-end integration tests
@@ -796,7 +796,7 @@ pub struct SbdSessionResult {
 
 - [ ] Send MO SBD message via Iridium 9603 modem
 - [ ] Receive MT SBD message from gateway
-- [ ] Round-trip message through gateway relay into HIVE mesh
+- [ ] Round-trip message through gateway relay into PEAT mesh
 - [ ] Fragment and reassemble messages exceeding 1,960 bytes
 - [ ] Compress payloads to maximize data per message
 - [ ] Implement ADR-032 `Transport` trait for TransportManager
@@ -814,7 +814,7 @@ pub struct SbdSessionResult {
 - [ ] Unit tests with mock modem (no hardware required)
 - [ ] Integration tests with mock gateway (DirectIP server)
 - [ ] Hardware-in-the-loop tests with Iridium 9603 + RockBLOCK developer kit
-- [ ] End-to-end test: field device → SBD → gateway → HIVE mesh → response → SBD → field device
+- [ ] End-to-end test: field device → SBD → gateway → PEAT mesh → response → SBD → field device
 
 ---
 
@@ -822,12 +822,12 @@ pub struct SbdSessionResult {
 
 ### Positive
 
-- **True global reach**: HIVE nodes can communicate from anywhere with sky visibility
+- **True global reach**: PEAT nodes can communicate from anywhere with sky visibility
 - **PACE completeness**: Provides a genuine emergency transport when all terrestrial options fail
 - **Low power**: Iridium 9603 draws ~1.5W transmit, suitable for battery-powered platforms
 - **Small form factor**: 9603 module is 32×30×12mm, embeddable in almost anything
 - **Proven infrastructure**: Iridium constellation has been operational since 1998 with 99.9% uptime
-- **Dual-mode flexibility**: Same crate works standalone on embedded or as transport plugin on full HIVE
+- **Dual-mode flexibility**: Same crate works standalone on embedded or as transport plugin on full PEAT
 
 ### Negative
 
@@ -857,10 +857,10 @@ pub struct SbdSessionResult {
 **Cons**: Large terminal, high power (~100W), limited coverage (no polar), expensive
 **Decision**: Starlink is better served as an IP transport via Iroh (ADR-032 QUIC), not a dedicated crate. SBD serves a fundamentally different niche (low-power, tiny terminal, global).
 
-### Option 2: Integrate SBD into hive-protocol Directly
+### Option 2: Integrate SBD into peat-protocol Directly
 **Pros**: Simpler dependency graph, no external crate
 **Cons**: Adds serial/modem code to core protocol crate, platform-specific dependencies pollute core, harder to test independently
-**Decision**: External crate follows established pattern (hive-btle) and keeps core clean.
+**Decision**: External crate follows established pattern (peat-btle) and keeps core clean.
 
 ### Option 3: Use Existing Rust SBD Libraries
 **Pros**: Faster initial development
@@ -881,9 +881,9 @@ pub struct SbdSessionResult {
 3. [Iridium 9603 Transceiver](https://www.iridium.com/products/iridium-9603/) - Primary target hardware
 4. [RockBLOCK Developer Kit](https://www.groundcontrol.com/products/iridium/rockblock/) - Development hardware
 5. ADR-032: Pluggable Transport Abstraction
-6. ADR-039: HIVE-BTLE Mesh Transport Crate
+6. ADR-039: PEAT-BTLE Mesh Transport Crate
 7. ADR-041: Multi-Transport Embedded Integration
-8. [hive-btle on Radicle](https://app.radicle.xyz/nodes/rosa.radicle.xyz/rad%3Az458mp9Um3AYNQQFMdHaNEUtmiohq) - External transport crate pattern
+8. [peat-btle on Radicle](https://app.radicle.xyz/nodes/rosa.radicle.xyz/rad%3Az458mp9Um3AYNQQFMdHaNEUtmiohq) - External transport crate pattern
 
 ---
 
@@ -893,16 +893,16 @@ pub struct SbdSessionResult {
 |------|----------|-----------|
 | 2025-02-10 | Proposed ADR-051 | Need BLOS transport for expeditionary and maritime PACE scenarios |
 | 2025-02-10 | Chose Iridium SBD over Certus | SBD's low power, tiny terminal, and store-and-forward model fit emergency/contingency PACE role |
-| 2025-02-10 | External crate pattern | Follows hive-btle precedent; keeps modem/serial code out of core |
+| 2025-02-10 | External crate pattern | Follows peat-btle precedent; keeps modem/serial code out of core |
 
 ---
 
 **Next Steps:**
 1. Review and approve ADR
-2. Create `hive-sbd` Radicle repository
+2. Create `peat-sbd` Radicle repository
 3. Phase 1: Modem driver with mock testing
 4. Acquire RockBLOCK developer kit for hardware-in-the-loop testing
-5. Phase 4: Gateway relay for bidirectional SBD ↔ HIVE mesh bridging
+5. Phase 4: Gateway relay for bidirectional SBD ↔ PEAT mesh bridging
 
 **Radicle:**
-- Create `rad:z...` for hive-sbd (pending approval)
+- Create `rad:z...` for peat-sbd (pending approval)

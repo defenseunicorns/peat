@@ -23,7 +23,7 @@ Based on ADR-011 ("Ditto vs Automerge+Iroh") and experiments team feedback, we r
 ## Experiments Team Recommendation (ENDORSED)
 
 > "The protocol team should finish Mode 3/4 validation with Ditto first, then add Automerge as a
-> pluggable backend. HIVE Protocol should be backend-agnostic anyway - the capability filtering
+> pluggable backend. PEAT Protocol should be backend-agnostic anyway - the capability filtering
 > and hierarchical aggregation logic shouldn't depend on which CRDT library is used."
 
 **This is the correct approach.** Here's why:
@@ -43,7 +43,7 @@ Based on ADR-011 ("Ditto vs Automerge+Iroh") and experiments team feedback, we r
 
 **What to Do:**
 1. Use DittoStore for all Mode 3 experiments
-2. Follow `hive-protocol/src/storage/HIERARCHICAL_SUMMARIES.md`
+2. Follow `peat-protocol/src/storage/HIERARCHICAL_SUMMARIES.md`
 3. Validate:
    - Squad-level aggregation (members → leader)
    - Platoon-level aggregation (squad leaders → platoon leader)
@@ -155,7 +155,7 @@ Based on ADR-011 ("Ditto vs Automerge+Iroh") and experiments team feedback, we r
 ### For Experiments Team (Now)
 
 1. **Use Ditto for Mode 3/4 validation** - it's production-ready
-2. **Reference the hierarchical summaries guide** - `hive-protocol/src/storage/HIERARCHICAL_SUMMARIES.md`
+2. **Reference the hierarchical summaries guide** - `peat-protocol/src/storage/HIERARCHICAL_SUMMARIES.md`
 3. **Run E2E tests** - `make test-e2e` validates hierarchical scenarios
 4. **Collect measurements** - message counts, bandwidth usage
 
@@ -186,7 +186,7 @@ Based on ADR-011 ("Ditto vs Automerge+Iroh") and experiments team feedback, we r
 **Problem**: More Mode 3/4 work with Ditto creates more code to migrate
 
 **Mitigation**:
-- HIVE Protocol logic is **already backend-agnostic** ✅
+- PEAT Protocol logic is **already backend-agnostic** ✅
 - Storage layer follows interface-based design ✅
 - Migration path is clear (swap DittoStore → AutomergeStore + Iroh)
 

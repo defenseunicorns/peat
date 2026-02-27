@@ -253,7 +253,7 @@ Validation proceeds through four phases:
 
 ### 6.2 Practical Contributions
 
-**Reference Implementation:** The HIVE Protocol demonstrates the feasibility of 1000+ agent coordination with connectivity-contingent emergence—a capability currently unavailable in operational systems. The implementation provides patterns for integration with existing coordination standards enabling incremental adoption.
+**Reference Implementation:** The PEAT Protocol demonstrates the feasibility of 1000+ agent coordination with connectivity-contingent emergence—a capability currently unavailable in operational systems. The implementation provides patterns for integration with existing coordination standards enabling incremental adoption.
 
 **Empirical Validation:** Comparative evaluation across architectures using the decision-relevant convergence metric, including specific measurement of partition healing and capability reformation dynamics.
 
@@ -284,9 +284,9 @@ The framework addresses coordination challenges across any domain requiring hete
 
 ## 8. Researcher Background
 
-Kit Plummer brings extensive experience in large-scale distributed systems and coordination challenges directly relevant to this research. As Founder and CEO of (r)evolve - Revolve Team LLC, he has led HIVE Protocol development from concept through TRL 4-5 laboratory validation. Prior experience includes work on distributed coordination systems in defense contexts, participation in multinational interoperability initiatives, and direct observation of the O(n²) scaling failures motivating this research.
+Kit Plummer brings extensive experience in large-scale distributed systems and coordination challenges directly relevant to this research. As Founder and CEO of (r)evolve - Revolve Team LLC, he has led PEAT Protocol development from concept through TRL 4-5 laboratory validation. Prior experience includes work on distributed coordination systems in defense contexts, participation in multinational interoperability initiatives, and direct observation of the O(n²) scaling failures motivating this research.
 
-Technical expertise spans distributed systems architecture, interoperability standards, and human-machine teaming research. The HIVE Protocol codebase (17,000+ lines of Rust, 330+ tests) demonstrates the ability to translate theoretical concepts into operational software. Active engagement with academic institutions (Georgia Tech Research Institute, Arizona State University), industry partners, and standards bodies provides pathways for research validation and technology transition.
+Technical expertise spans distributed systems architecture, interoperability standards, and human-machine teaming research. The PEAT Protocol codebase (17,000+ lines of Rust, 330+ tests) demonstrates the ability to translate theoretical concepts into operational software. Active engagement with academic institutions (Georgia Tech Research Institute, Arizona State University), industry partners, and standards bodies provides pathways for research validation and technology transition.
 
 Previous academic work at Georgia Tech in Human-Centered Computing under Dr. Karen Feigh provides the human factors foundation essential to the trust calibration and cognitive load aspects of this research.
 

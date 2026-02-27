@@ -45,7 +45,7 @@ Traditional baseline with UPDATE_FREQUENCY=0.5s (500ms broadcast interval):
 - Server → Client: ~1ms (measured)
 - **Total P50: ~252ms** (250× higher than measured!)
 
-### Why This Matters for HIVE Comparison
+### Why This Matters for PEAT Comparison
 
 We're building hierarchical CRDT to improve on traditional client-server. But our comparison is unfair:
 
@@ -247,11 +247,11 @@ Could add additional metrics:
 - **ServerQueuingDelay**: Time between receive and broadcast
 - **MultiHopPropagation**: Track propagation through multiple tiers
 
-This creates a comprehensive latency measurement framework for all HIVE architectures.
+This creates a comprehensive latency measurement framework for all PEAT architectures.
 
 ## References
 
-- Traditional baseline test results: `hive-sim/traditional-baseline-20251121-211945/`
-- Current analysis (broadcast only): `hive-sim/traditional-baseline-20251121-211945/ANALYSIS.md`
+- Traditional baseline test results: `peat-sim/traditional-baseline-20251121-211945/`
+- Current analysis (broadcast only): `peat-sim/traditional-baseline-20251121-211945/ANALYSIS.md`
 - ADR-015: Hierarchical aggregation validation requirements
 - ADR-011: Ditto vs Automerge backend comparison

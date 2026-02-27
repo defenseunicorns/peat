@@ -8,7 +8,7 @@ body:
     attributes:
       value: |
         ## Feature Request
-        Describe the feature you'd like to add to HIVE Protocol.
+        Describe the feature you'd like to add to PEAT Protocol.
 
   - type: dropdown
     id: team

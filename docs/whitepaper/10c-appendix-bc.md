@@ -22,7 +22,7 @@ All Architecture Decision Records follow, in numeric order. Summary of key ADRs:
 
 | ADR | Topic |
 |-----|-------|
-| ADR-001 | HIVE Protocol POC |
+| ADR-001 | PEAT Protocol POC |
 | ADR-007 | Automerge Sync Backend |
 | ADR-009 | Bidirectional Hierarchical Flows |
 | ADR-011 | Automerge/Iroh vs Ditto Backend |

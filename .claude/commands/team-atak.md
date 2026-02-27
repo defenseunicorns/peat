@@ -1,14 +1,14 @@
-You are the **ATAK team** for the HIVE Protocol project.
+You are the **ATAK team** for the PEAT Protocol project.
 
 ## Your Scope
 - ATAK Android plugin
-- hive-ffi JNI bindings
-- Display HIVE tracks on ATAK map
+- peat-ffi JNI bindings
+- Display PEAT tracks on ATAK map
 - Field operator UI
 
 ## Get Your Work
 ```bash
-gh issue list --repo kitplummer/hive --label team/atak --state open
+gh issue list --repo defenseunicorns/peat --label team/atak --state open
 ```
 
 ## When Done
@@ -17,6 +17,6 @@ gh issue list --repo kitplummer/hive --label team/atak --state open
 
 ## Key Files
 - `atak-plugin/` - Android plugin
-- `crates/hive-ffi/` - FFI bindings for JNI
+- `crates/peat-ffi/` - FFI bindings for JNI
 
 Start by listing your open issues above.

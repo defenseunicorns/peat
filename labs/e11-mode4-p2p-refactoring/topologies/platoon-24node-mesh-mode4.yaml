@@ -30,7 +30,7 @@ topology:
     # Platoon Leader - aggregates squad summaries via P2P mesh
     platoon-leader:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: platoon-leader
         ROLE: platoon_leader
@@ -54,7 +54,7 @@ topology:
 
     squad-alpha-leader:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: squad-alpha-leader
         ROLE: squad_leader
@@ -72,7 +72,7 @@ topology:
 
     alpha-soldier-1:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: alpha-soldier-1
         ROLE: rifleman
@@ -89,7 +89,7 @@ topology:
 
     alpha-soldier-2:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: alpha-soldier-2
         ROLE: grenadier
@@ -106,7 +106,7 @@ topology:
 
     alpha-soldier-3:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: alpha-soldier-3
         ROLE: automatic_rifleman
@@ -123,7 +123,7 @@ topology:
 
     alpha-soldier-4:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: alpha-soldier-4
         ROLE: rifleman
@@ -140,7 +140,7 @@ topology:
 
     alpha-uav-1:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: alpha-uav-1
         ROLE: reconnaissance
@@ -157,7 +157,7 @@ topology:
 
     alpha-ugv-1:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: alpha-ugv-1
         ROLE: resupply_isr
@@ -178,7 +178,7 @@ topology:
 
     squad-bravo-leader:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: squad-bravo-leader
         ROLE: squad_leader
@@ -196,7 +196,7 @@ topology:
 
     bravo-soldier-1:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: bravo-soldier-1
         ROLE: rifleman
@@ -213,7 +213,7 @@ topology:
 
     bravo-soldier-2:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: bravo-soldier-2
         ROLE: grenadier
@@ -230,7 +230,7 @@ topology:
 
     bravo-soldier-3:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: bravo-soldier-3
         ROLE: automatic_rifleman
@@ -247,7 +247,7 @@ topology:
 
     bravo-soldier-4:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: bravo-soldier-4
         ROLE: team_leader
@@ -264,7 +264,7 @@ topology:
 
     bravo-soldier-5:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: bravo-soldier-5
         ROLE: rifleman
@@ -281,7 +281,7 @@ topology:
 
     bravo-uav-1:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: bravo-uav-1
         ROLE: reconnaissance
@@ -298,7 +298,7 @@ topology:
 
     bravo-ugv-1:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: bravo-ugv-1
         ROLE: resupply_isr
@@ -319,7 +319,7 @@ topology:
 
     squad-charlie-leader:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: squad-charlie-leader
         ROLE: squad_leader
@@ -337,7 +337,7 @@ topology:
 
     charlie-soldier-1:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: charlie-soldier-1
         ROLE: rifleman
@@ -354,7 +354,7 @@ topology:
 
     charlie-soldier-2:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: charlie-soldier-2
         ROLE: grenadier
@@ -371,7 +371,7 @@ topology:
 
     charlie-soldier-3:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: charlie-soldier-3
         ROLE: automatic_rifleman
@@ -388,7 +388,7 @@ topology:
 
     charlie-soldier-4:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: charlie-soldier-4
         ROLE: team_leader
@@ -405,7 +405,7 @@ topology:
 
     charlie-soldier-5:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: charlie-soldier-5
         ROLE: rifleman
@@ -422,7 +422,7 @@ topology:
 
     charlie-uav-1:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: charlie-uav-1
         ROLE: reconnaissance
@@ -439,7 +439,7 @@ topology:
 
     charlie-ugv-1:
       kind: linux
-      image: hive-sim-node:latest
+      image: peat-sim-node:latest
       env:
         NODE_ID: charlie-ugv-1
         ROLE: resupply_isr

@@ -24,13 +24,13 @@ The inventors acknowledge prior work in distributed autonomous systems coordinat
 **Concepts Derived from COD**:
 - **Prioritization**: Concept of priority-based data synchronization in bandwidth-constrained environments
   - COD demonstrated prioritizing critical mission data over routine telemetry
-  - HIVE Protocol may incorporate similar prioritization concepts (not currently claimed in this application)
+  - PEAT Protocol may incorporate similar prioritization concepts (not currently claimed in this application)
 
 **Note**: Prioritization concepts are **NOT claimed** in the present patent applications. If future patent applications include prioritization, they will explicitly cite COD as prior art and claim only novel improvements.
 
-### Differentiation: HIVE Protocol Innovations
+### Differentiation: PEAT Protocol Innovations
 
-The present invention (HIVE Protocol) was developed independently at (r)evolve LLC (2024-2025) and differs substantially from COD in the following critical ways:
+The present invention (PEAT Protocol) was developed independently at (r)evolve LLC (2024-2025) and differs substantially from COD in the following critical ways:
 
 #### Innovation 1: Hierarchical Capability Composition (Not in COD)
 
@@ -89,7 +89,7 @@ The present invention (HIVE Protocol) was developed independently at (r)evolve L
 
 ### Independent Development at (r)evolve LLC
 
-HIVE Protocol was developed independently at (r)evolve LLC using:
+PEAT Protocol was developed independently at (r)evolve LLC using:
 
 1. **Public Knowledge**:
    - Published CRDT literature (Shapiro et al., Automerge project)
@@ -103,14 +103,14 @@ HIVE Protocol was developed independently at (r)evolve LLC using:
    - CRDT-based composition engine (implemented 2024-2025)
 
 3. **Clean-Room Implementation**:
-   - HIVE Protocol codebase written from scratch at (r)evolve
+   - PEAT Protocol codebase written from scratch at (r)evolve
    - No COD source code incorporated
    - No Ditto proprietary algorithms used beyond publicly documented CRDT patterns
 
 ### Coordination with DIU
 
 The inventors have proactively coordinated with the Defense Innovation Unit program manager for COD to:
-- Ensure transparency about HIVE Protocol development
+- Ensure transparency about PEAT Protocol development
 - Confirm that CAP innovations extend beyond COD scope
 - Maintain good faith with government sponsors
 
@@ -123,8 +123,8 @@ The inventors have proactively coordinated with the Defense Innovation Unit prog
 - Government can use, modify, and share COD with contractors for government purposes
 - Ditto Technologies retains commercial rights to COD
 
-**HIVE Protocol Government Rights**:
-- No government funding for HIVE Protocol development to date
+**PEAT Protocol Government Rights**:
+- No government funding for PEAT Protocol development to date
 - If future SBIR/STTR funding received, government rights will be disclosed per FAR 52.227-11
 - (r)evolve LLC retains full commercial rights to CAP innovations
 
@@ -149,7 +149,7 @@ The present patent applications claim:
 
 ### Conclusion
 
-While the inventors gained valuable domain expertise through COD participation, **the core HIVE Protocol innovations (hierarchical composition and graduated authority control) are independent and novel contributions** developed at (r)evolve LLC. This disclosure ensures transparency with USPTO and acknowledges prior art while clearly delineating CAP's novel contributions.
+While the inventors gained valuable domain expertise through COD participation, **the core PEAT Protocol innovations (hierarchical composition and graduated authority control) are independent and novel contributions** developed at (r)evolve LLC. This disclosure ensures transparency with USPTO and acknowledges prior art while clearly delineating CAP's novel contributions.
 
 ---
 

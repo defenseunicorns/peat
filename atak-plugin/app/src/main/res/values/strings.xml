@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Plugin Identity -->
-    <string name="app_name">HIVE</string>
-    <string name="app_desc">HIVE Protocol - Hierarchical Intelligence for Versatile Entities</string>
+    <string name="app_name">PEAT</string>
+    <string name="app_desc">PEAT Protocol - Hierarchical Intelligence for Versatile Entities</string>
 </resources>

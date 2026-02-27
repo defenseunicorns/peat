@@ -7,7 +7,7 @@
 
 ## Context
 
-HIVE requires peer discovery mechanisms to enable nodes to find and connect to each other in the P2P mesh network. Discovery needs vary by operational scale:
+PEAT requires peer discovery mechanisms to enable nodes to find and connect to each other in the P2P mesh network. Discovery needs vary by operational scale:
 
 ### Tactical/Local Scale (meters to kilometers)
 - Squad members discovering squad leader
@@ -162,12 +162,12 @@ DHT uses **XOR distance** (logical), not **geographic distance**:
 
 ### Current (Phase 1)
 ```
-hive-mesh/src/beacon/
+peat-mesh/src/beacon/
 ├── broadcaster.rs      # Periodic beacon broadcasts
 ├── observer.rs         # Local beacon filtering
 └── storage.rs          # In-memory/persistent storage
 
-hive-mesh/src/topology/
+peat-mesh/src/topology/
 ├── selection.rs        # PeerSelector (geographic + hierarchy)
 ├── builder.rs          # TopologyBuilder (peer selection events)
 └── manager.rs          # TopologyManager (connection lifecycle)
@@ -175,7 +175,7 @@ hive-mesh/src/topology/
 
 ### Future (Phase 2 - Optional)
 ```
-hive-mesh/src/discovery/
+peat-mesh/src/discovery/
 ├── mod.rs              # PeerDiscovery trait (abstraction)
 ├── beacon.rs           # BeaconDiscovery (Tier 1)
 └── dht.rs              # DhtDiscovery (Tier 2, optional)
@@ -203,7 +203,7 @@ hive-mesh/src/discovery/
 - **Ethereum**: Kademlia DHT for global node discovery
 - **Polkadot**: libp2p-kad + mDNS
 
-HIVE follows similar pattern: **Local discovery (beacons) + optional global discovery (DHT)**.
+PEAT follows similar pattern: **Local discovery (beacons) + optional global discovery (DHT)**.
 
 ## References
 
