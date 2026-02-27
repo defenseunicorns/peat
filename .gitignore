@@ -24,7 +24,6 @@ peat-protocol/.ditto*
 .env.kit
 
 # Codex
-Codex.md
 .mcp.json
 
 # Testing
