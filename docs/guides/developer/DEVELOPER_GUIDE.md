@@ -195,8 +195,6 @@ peat/
 ├── peat-ffi/                  # Mobile bindings (Kotlin/Swift)
 ├── peat-inference/            # Edge AI/ML pipeline
 ├── peat-sim/                  # Network simulator
-├── peat-commander/            # TUI application
-│
 ├── docs/                      # Documentation
 │   ├── adr/                  # Architecture Decision Records
 │   ├── guides/               # User & developer guides
@@ -218,7 +216,7 @@ peat/
 │                                                                              │
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
 │  │                        Application Layer                             │    │
-│  │   peat-sim    peat-commander    peat-transport    peat-inference    │    │
+│  │   peat-sim    peat-transport    peat-inference                      │    │
 │  └────────────────────────────┬────────────────────────────────────────┘    │
 │                               │                                              │
 │  ┌────────────────────────────▼────────────────────────────────────────┐    │

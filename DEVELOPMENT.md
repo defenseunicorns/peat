@@ -7,26 +7,38 @@ This repository contains the Hierarchical Intelligence for Versatile Entities (P
 ## Repository Structure
 
 ```
-cap/
-├── peat-protocol/          # Core protocol library
-│   ├── src/
-│   │   ├── discovery/     # Phase 1: Bootstrap
-│   │   ├── cell/         # Phase 2: Cell Formation
-│   │   ├── hierarchy/     # Phase 3: Hierarchical Operations
-│   │   ├── composition/   # Capability composition engine
-│   │   ├── delta/         # Differential update system
-│   │   ├── network/       # Network simulation layer
-│   │   ├── models/        # Data structures
-│   │   ├── storage/       # Ditto CRDT integration
-│   │   └── traits.rs      # Core trait definitions
-│   └── Cargo.toml
-├── peat-sim/               # Reference application & simulator
-│   ├── src/
-│   │   └── main.rs        # Simulation harness
-│   └── Cargo.toml
-├── docs/                  # Architecture & project docs
-├── .github/workflows/     # CI/CD pipelines
-└── Cargo.toml            # Workspace configuration
+peat/
+├── Cargo.toml                 # Workspace configuration
+├── Makefile                   # Development commands
+│
+├── peat-schema/               # Protobuf message definitions
+├── peat-protocol/             # Core protocol library
+│   └── src/
+│       ├── cell/             # Phase 2: Cell Formation
+│       ├── command/          # Bidirectional commands
+│       ├── composition/      # Capability composition engine
+│       ├── discovery/        # Phase 1: Bootstrap
+│       ├── hierarchy/        # Phase 3: Hierarchical Operations
+│       ├── models/           # Core data structures
+│       ├── security/         # Auth, encryption
+│       ├── storage/          # CRDT backends (Ditto/Automerge)
+│       ├── sync/             # Sync abstraction
+│       └── transport/        # Mesh transport
+├── peat-transport/            # HTTP/REST API layer
+├── peat-persistence/          # Storage backends
+├── peat-discovery/            # Peer discovery (mDNS, static)
+├── peat-ffi/                  # Mobile bindings (UniFFI)
+├── peat-inference/            # Edge AI/ML pipeline
+├── peat-tak-bridge/           # TAK/CoT bridge
+├── peat-sim/                  # Network simulator
+├── peat-ble-test/             # BLE integration test harness
+│
+├── docs/                      # Architecture & project docs
+│   ├── adr/                  # Architecture Decision Records
+│   ├── guides/               # Developer & operator guides
+│   └── spec/                 # Protocol specification
+├── .github/workflows/         # CI/CD pipelines
+└── examples/                  # Embedded examples (ESP32)
 ```
 
 ## Prerequisites
@@ -62,7 +74,7 @@ cap/
 ### 1. Setup
 
 ```bash
-cd cap
+cd peat
 ```
 
 ### 2. Build the Project
@@ -200,10 +212,10 @@ Use `RUST_LOG` environment variable:
 RUST_LOG=debug cargo run
 
 # Specific module
-RUST_LOG=cap_protocol::discovery=trace cargo run
+RUST_LOG=peat_protocol::discovery=trace cargo run
 
 # Multiple modules
-RUST_LOG=cap_protocol=debug,cap_sim=info cargo run
+RUST_LOG=peat_protocol=debug,peat_sim=info cargo run
 ```
 
 ### Tracing

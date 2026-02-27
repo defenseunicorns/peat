@@ -1,7 +1,9 @@
 # ADR-031: PEAT Commander - Tactical Capability RPG
 
 ## Status
-Proposed (TUI prototype complete)
+**Superseded** — peat-commander has been removed from the workspace and will be redeveloped as an external repository. This ADR is retained for historical context.
+
+*Previously: Proposed (TUI prototype complete)*
 
 ## Context
 
