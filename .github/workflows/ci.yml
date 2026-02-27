@@ -85,9 +85,9 @@ jobs:
 
       - name: Run unit & integration tests
         env:
-          PEAT_APP_ID: ${{ secrets.PEAT_APP_ID }}
-          PEAT_SHARED_KEY: ${{ secrets.PEAT_SHARED_KEY }}
-          PEAT_OFFLINE_TOKEN: ${{ secrets.PEAT_OFFLINE_TOKEN }}
+          PEAT_APP_ID: ${{ secrets.HIVE_APP_ID }}
+          PEAT_SHARED_KEY: ${{ secrets.HIVE_SHARED_KEY }}
+          PEAT_OFFLINE_TOKEN: ${{ secrets.HIVE_OFFLINE_TOKEN }}
         run: |
           cargo nextest run --all-features --workspace --exclude peat-ffi --exclude peat-inference -E 'not test(e2e)'
           cargo nextest run -p peat-inference -E 'not test(e2e)'
@@ -121,8 +121,8 @@ jobs:
 
       - name: Run E2E tests
         env:
-          PEAT_APP_ID: ${{ secrets.PEAT_APP_ID }}
-          PEAT_SHARED_KEY: ${{ secrets.PEAT_SHARED_KEY }}
-          PEAT_OFFLINE_TOKEN: ${{ secrets.PEAT_OFFLINE_TOKEN }}
+          PEAT_APP_ID: ${{ secrets.HIVE_APP_ID }}
+          PEAT_SHARED_KEY: ${{ secrets.HIVE_SHARED_KEY }}
+          PEAT_OFFLINE_TOKEN: ${{ secrets.HIVE_OFFLINE_TOKEN }}
         run: |
           cargo nextest run --all-features --workspace --exclude peat-ffi --exclude peat-inference -E 'test(e2e)'
