@@ -1,10 +1,10 @@
-# hive-sim-node: HIVE Protocol Reference Implementation
+# peat-sim-node: PEAT Protocol Reference Implementation
 #
 # Multi-stage build for minimal runtime image
-# This Docker image runs the HIVE Protocol simulation node with Ditto CRDT backend
+# This Docker image runs the PEAT Protocol simulation node
 
 # ============================================================================
-# Stage 1: Builder - Build the hive-sim binary
+# Stage 1: Builder - Build the peat-sim binary
 # ============================================================================
 FROM rust:1.89-bookworm AS builder
 
@@ -25,14 +25,14 @@ WORKDIR /build
 # Copy entire workspace (needed for workspace dependencies)
 COPY . .
 
-# Build the hive-sim binary with both backends enabled, traditional baseline, and producer-only baseline
+# Build the peat-sim binary with both backends enabled, traditional baseline, and producer-only baseline
 # Always build with automerge-backend feature for maximum flexibility
-# Note: We only build hive-sim (protocol-based) and baseline examples
+# Note: We only build peat-sim (protocol-based) and baseline examples
 # The hierarchical_sim_node examples are Ditto-specific and should not be used
-RUN cargo build --release -p hive-sim --features automerge-backend && \
-    cargo build --release --example traditional_baseline -p hive-protocol && \
-    cargo build --release --example producer_only_baseline -p hive-protocol && \
-    cargo build --release --example p2p_mesh_baseline -p hive-protocol
+RUN cargo build --release -p peat-sim --features automerge-backend && \
+    cargo build --release --example traditional_baseline -p peat-protocol && \
+    cargo build --release --example producer_only_baseline -p peat-protocol && \
+    cargo build --release --example p2p_mesh_baseline -p peat-protocol
 
 # ============================================================================
 # Stage 2: Runtime - Minimal runtime image
@@ -58,17 +58,17 @@ RUN apt-get update && apt-get install -y \
 RUN mkdir -p /data/ditto
 
 # Copy the compiled binaries from builder stage
-COPY --from=builder /build/target/release/hive-sim /usr/local/bin/hive-sim
+COPY --from=builder /build/target/release/peat-sim /usr/local/bin/peat-sim
 COPY --from=builder /build/target/release/examples/traditional_baseline /usr/local/bin/traditional_baseline
 COPY --from=builder /build/target/release/examples/producer_only_baseline /usr/local/bin/producer_only_baseline
 COPY --from=builder /build/target/release/examples/p2p_mesh_baseline /usr/local/bin/p2p_mesh_baseline
 
 # Copy entrypoint script (relative to build context which is parent dir)
-COPY hive-sim/entrypoint.sh /entrypoint.sh
+COPY peat-sim/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Default environment variables (can be overridden in containerlab topology)
-# Note: Secrets (HIVE_SHARED_KEY, HIVE_SECRET_KEY) should be passed at runtime
+# Note: Secrets (PEAT_SHARED_KEY, PEAT_SECRET_KEY) should be passed at runtime
 # via docker run -e or containerlab env, not baked into image
 ENV NODE_ID="node1" \
     MODE="reader" \
@@ -78,5 +78,5 @@ ENV NODE_ID="node1" \
 EXPOSE 12345
 
 # Use tini as init process to handle signals properly
-# This ensures SIGTERM is forwarded to hive-sim and containers stop cleanly
+# This ensures SIGTERM is forwarded to peat-sim and containers stop cleanly
 ENTRYPOINT ["/usr/bin/tini", "--", "/entrypoint.sh"]
