@@ -193,7 +193,6 @@ cargo build --release
 
 # Binaries located at:
 # - target/release/peat-sim
-# - target/release/peat-commander (if available)
 ```
 
 #### Build with Automerge Backend (Pure OSS)
