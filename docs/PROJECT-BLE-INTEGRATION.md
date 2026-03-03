@@ -241,7 +241,7 @@ Final cleanup and documentation.
 ## Dependencies
 
 ### External
-- peat-btle v0.1.1 (crates.io / Maven Central `com.revolveteam:peat:0.1.1`)
+- peat-btle v0.1.1 (crates.io / Maven Central `com.defenseunicorns:peat:0.1.1`)
 - peat-lite (path: `../peat-lite`)
 
 ### Hardware
