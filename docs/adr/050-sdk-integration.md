@@ -335,7 +335,7 @@ if __name__ == "__main__":
 ```kotlin
 // PeatSDK.kt
 
-package com.revolveteam.peat
+package com.defenseunicorns.peat
 
 import kotlinx.coroutines.flow.Flow
 

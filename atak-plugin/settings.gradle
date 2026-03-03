@@ -4,6 +4,6 @@ include ':app'
 // Use local peat-btle repo for development
 includeBuild('../../peat-btle/android') {
     dependencySubstitution {
-        substitute(module('com.revolveteam:peat')).using(project(':'))
+        substitute(module('com.defenseunicorns:peat')).using(project(':'))
     }
 }

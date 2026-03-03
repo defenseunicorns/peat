@@ -159,7 +159,7 @@ dependencies {
 
     // PEAT BLE mesh transport (for WearTAK sync)
     // 0.0.10 adds field-level delta sync for bandwidth efficiency
-    implementation("com.revolveteam:peat:0.0.10")
+    implementation("com.defenseunicorns:peat:0.0.10")
 
     // PEAT-Lite for canned message encoding/decoding (Kotlin bindings copied directly)
     // Native libs in libs/arm64-v8a, libs/armeabi-v7a, libs/x86_64
