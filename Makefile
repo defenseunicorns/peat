@@ -669,7 +669,7 @@ dual-test-peer-logs:
 # Functional Test Suite (all hardware tests)
 # ============================================
 # Orchestrates all functional/hardware tests from one entry point.
-# Tests: rpi-rpi BLE (peat-btle), rpi-android dual-transport (hive),
+# Tests: rpi-rpi BLE (peat-btle), rpi-android dual-transport (peat),
 #        k8s cluster (peat-mesh)
 
 functional-suite:

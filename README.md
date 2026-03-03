@@ -66,8 +66,8 @@ peat/
 
 | Crate | Description | Repo |
 |-------|-------------|------|
-| [peat-mesh](https://crates.io/crates/peat-mesh) | P2P topology, Iroh/QUIC transport, Automerge sync | [defenseunicorns/eche-mesh](https://github.com/defenseunicorns/eche-mesh) |
-| [peat-btle](https://crates.io/crates/peat-btle) | BLE GATT mesh for Android/iOS/Linux/ESP32 | [defenseunicorns/hive-btle](https://github.com/defenseunicorns/hive-btle) |
+| [peat-mesh](https://crates.io/crates/peat-mesh) | P2P topology, Iroh/QUIC transport, Automerge sync | [defenseunicorns/peat-mesh](https://github.com/defenseunicorns/peat-mesh) |
+| [peat-btle](https://crates.io/crates/peat-btle) | BLE GATT mesh for Android/iOS/Linux/ESP32 | [defenseunicorns/peat-btle](https://github.com/defenseunicorns/peat-btle) |
 | [peat-lite](https://crates.io/crates/peat-lite) | Embedded UDP protocol + wire format (no_std) | [defenseunicorns/peat-lite](https://github.com/defenseunicorns/peat-lite) |
 
 ## Three-Phase Protocol
