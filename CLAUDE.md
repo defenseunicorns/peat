@@ -124,8 +124,8 @@ Toggle in `peat-protocol/Cargo.toml` features.
 | `docs/adr/005-datasync-abstraction-layer.md` | Sync abstraction |
 | `docs/adr/011-ditto-vs-automerge-iroh.md` | Backend selection |
 | `docs/adr/032-pluggable-transport-abstraction.md` | Transport layer |
-| `docs/adr/035-hive-lite-embedded-nodes.md` | Embedded wire protocol |
-| `docs/adr/049-hive-mesh-extraction.md` | peat-mesh standalone design |
+| `docs/adr/035-peat-lite-embedded-nodes.md` | Embedded wire protocol |
+| `docs/adr/049-peat-mesh-extraction.md` | peat-mesh standalone design |
 
 ## CI Workflows
 
@@ -151,6 +151,6 @@ Toggle in `peat-protocol/Cargo.toml` features.
 
 ## Related Repositories
 
-- **peat-mesh** (`../hive-mesh/`): Standalone mesh networking — topology, sync, K8s, broker
-- **peat-btle** (`../hive-btle/`): BLE mesh transport — multi-platform, GATT sync
-- **peat-lite** (`../hive-lite/`): Embedded CRDT primitives — no_std, wire protocol, ESP32 firmware
+- **peat-mesh** (`../peat-mesh/`): Standalone mesh networking — topology, sync, K8s, broker
+- **peat-btle** (`../peat-btle/`): BLE mesh transport — multi-platform, GATT sync
+- **peat-lite** (`../peat-lite/`): Embedded CRDT primitives — no_std, wire protocol, ESP32 firmware
