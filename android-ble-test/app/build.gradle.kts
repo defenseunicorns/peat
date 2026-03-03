@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.revolveteam.peat.test"
+    namespace = "com.defenseunicorns.peat.test"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.revolveteam.peat.test"
+        applicationId = "com.defenseunicorns.peat.test"
         minSdk = 26
         targetSdk = 34
         versionCode = 1

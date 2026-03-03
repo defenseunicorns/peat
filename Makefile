@@ -486,7 +486,7 @@ deploy-ble-test-app:
 	@adb devices | grep -q 'device$$' || { echo "Error: No Android device connected"; exit 1; }
 	adb install -r android-ble-test/app/build/outputs/apk/debug/app-debug.apk
 	@echo "✓ Deployed to device"
-	@echo "Launch with: adb shell am start -n com.revolveteam.hive.test/.MainActivity"
+	@echo "Launch with: adb shell am start -n com.defenseunicorns.peat.test/.MainActivity"
 
 # Full BLE test pipeline: build everything, deploy, start dual_test_peer (BLE-only mode)
 ble-test: deploy-dual-test-peer build-ble-test-app deploy-ble-test-app start-dual-test-peer
@@ -503,7 +503,7 @@ ble-test: deploy-dual-test-peer build-ble-test-app deploy-ble-test-app start-dua
 	@echo "║    make ble-test-logs        (Android logcat)             ║"
 	@echo "║    make dual-test-peer-logs  (Pi peer log)                ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
-	adb shell am start -n com.revolveteam.hive.test/.MainActivity \
+	adb shell am start -n com.defenseunicorns.peat.test/.MainActivity \
 		--ez auto_run true
 
 # Show Android logcat for BLE test
@@ -594,7 +594,7 @@ dual-transport-test: deploy-dual-test-peer build-ble-test-app deploy-ble-test-ap
 	for attempt in 1 2 3; do \
 		echo ""; \
 		echo "--- Android attempt $$attempt/3 ---"; \
-		adb shell am force-stop com.revolveteam.hive.test 2>/dev/null || true; \
+		adb shell am force-stop com.defenseunicorns.peat.test 2>/dev/null || true; \
 		adb logcat -c 2>/dev/null || true; \
 		if [ $$attempt -gt 1 ]; then \
 			echo "Resetting Pi BLE adapter and restarting dual_test_peer..."; \
@@ -607,7 +607,7 @@ dual-transport-test: deploy-dual-test-peer build-ble-test-app deploy-ble-test-ap
 		adb shell cmd bluetooth_manager enable 2>/dev/null || true; \
 		adb shell cmd bluetooth_manager wait-for-state:STATE_ON 2>/dev/null; \
 		sleep 5; \
-		adb shell am start -n com.revolveteam.hive.test/.MainActivity \
+		adb shell am start -n com.defenseunicorns.peat.test/.MainActivity \
 			--es quic_node_id "$(QUIC_NODE_ID)" \
 			--es quic_address "$(BLE_TEST_PI_IP):$(IROH_TEST_PORT)" \
 			--ez auto_run true; \
