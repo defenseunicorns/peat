@@ -92,7 +92,7 @@ def supportedFlavors =
 
 android {
     compileSdk 36
-    namespace 'com.revolveteam.atak.peat'
+    namespace 'com.defenseunicorns.atak.peat'
 
     dexOptions {
         jumboMode = true
@@ -224,7 +224,7 @@ dependencies {
 
     // PEAT BLE mesh transport (for WearTAK sync)
     // Use Maven dependency so composite build substitution works
-    implementation 'com.revolveteam:peat:0.0.10'
+    implementation 'com.defenseunicorns:peat:0.0.10'
 
     // CompileOnly dependencies - needed for compilation but provided by ATAK at runtime
     // These are excluded from packaging to avoid conflicts with ATAK's bundled versions

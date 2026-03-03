@@ -227,7 +227,7 @@ Create a test client that implements the same phases as the Android `TestRunner.
 - Print a summary line: `RESULT: N/N PASSED`
 - Exit with code 0 on success, 1 on failure
 
-**Reference implementation**: `android-ble-test/app/src/main/java/com/revolveteam/peat/test/TestRunner.kt`
+**Reference implementation**: `android-ble-test/app/src/main/java/com/defenseunicorns/peat/test/TestRunner.kt`
 
 **Platform-specific concerns:**
 
