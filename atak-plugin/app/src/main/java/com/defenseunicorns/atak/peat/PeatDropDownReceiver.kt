@@ -246,7 +246,7 @@ class PeatDropDownReceiver(
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
         val title = TextView(pluginContext).apply {
-            text = if (selectedCellId != null) "Cell: $selectedCellName" else "PEAT Manager"
+            text = if (selectedCellId != null) "Cell: $selectedCellName" else "Peat Manager"
             textSize = 20f
             setTextColor(Color.WHITE)
         }
@@ -360,7 +360,7 @@ class PeatDropDownReceiver(
         if (selectedCellId == null) {
             val meshMarkers = mapComponent.markers.values.toList()
             val markersTitle = TextView(pluginContext).apply {
-                text = "PEAT Markers (${meshMarkers.size})"
+                text = "Peat Markers (${meshMarkers.size})"
                 textSize = 16f
                 setTextColor(Color.WHITE)
             }

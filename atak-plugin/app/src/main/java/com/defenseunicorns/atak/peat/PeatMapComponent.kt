@@ -508,8 +508,8 @@ class PeatMapComponent : DropDownMapComponent() {
 
             // Add to map group
             val rootGroup = mapView.rootGroup
-            val peatGroup = rootGroup?.findMapGroup("PEAT Markers")
-                ?: rootGroup?.addGroup("PEAT Markers")
+            val peatGroup = rootGroup?.findMapGroup("Peat Markers")
+                ?: rootGroup?.addGroup("Peat Markers")
 
             // Remove existing marker with same UID if present
             peatGroup?.items?.filterIsInstance<com.atakmap.android.maps.Marker>()

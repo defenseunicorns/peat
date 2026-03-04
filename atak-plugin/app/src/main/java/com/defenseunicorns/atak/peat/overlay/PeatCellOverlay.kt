@@ -41,7 +41,7 @@ class PeatCellOverlay(private val mapView: MapView) {
 
     companion object {
         private const val TAG = "PeatCellOverlay"
-        private const val GROUP_NAME = "PEAT Cells"
+        private const val GROUP_NAME = "Peat Cells"
         private const val MIN_RADIUS_METERS = 100.0 // Minimum circle radius
         private const val PADDING_FACTOR = 1.2 // 20% padding around platforms
     }
