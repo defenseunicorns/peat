@@ -28,7 +28,7 @@ class PeatPlatformOverlay(private val mapView: MapView) {
 
     companion object {
         private const val TAG = "PeatPlatformOverlay"
-        private const val GROUP_NAME = "PEAT Platforms"
+        private const val GROUP_NAME = "Peat Platforms"
         private const val STALE_THRESHOLD_MS = 5 * 60 * 1000L // 5 minutes
 
         // Emergency color - bright red for SOS alerts

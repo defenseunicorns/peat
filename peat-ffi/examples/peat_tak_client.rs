@@ -58,7 +58,7 @@ enum PatternType {
 }
 
 fn main() {
-    println!("=== PEAT TAK Test Client - Atlanta Flight Patterns ===\n");
+    println!("=== Peat TAK Test Client - Atlanta Flight Patterns ===\n");
 
     // Use TEST-ONLY formation by default to avoid polluting production deployments
     // Set PEAT_APP_ID=default-atak-formation to test with real ATAK plugin
