@@ -27,7 +27,7 @@ class PeatTrackOverlay(private val mapView: MapView) {
 
     companion object {
         private const val TAG = "PeatTrackOverlay"
-        private const val GROUP_NAME = "PEAT Tracks"
+        private const val GROUP_NAME = "Peat Tracks"
         private const val STALE_THRESHOLD_MS = 5 * 60 * 1000L // 5 minutes
     }
 

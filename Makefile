@@ -5,11 +5,11 @@
        functional-suite functional-ble functional-android functional-k8s
 
 # ============================================
-# PEAT Protocol Development Makefile
+# Peat Protocol Development Makefile
 # ============================================
 
 help:
-	@echo "PEAT Protocol Development & Testing"
+	@echo "Peat Protocol Development & Testing"
 	@echo ""
 	@echo "Development:"
 	@echo "  build        - Build all crates"
@@ -33,7 +33,7 @@ help:
 	@echo "Architecture Comparison (O(n²) vs O(n log n)):"
 	@echo "  baseline-client-server    - Traditional hub-spoke (all node counts)"
 	@echo "  baseline-mesh             - Traditional P2P mesh (all node counts)"
-	@echo "  peat-hierarchical         - PEAT hierarchical (all node counts)"
+	@echo "  peat-hierarchical         - Peat hierarchical (all node counts)"
 	@echo "  compare-architectures     - Run all 3 architectures for comparison"
 	@echo ""
 	@echo "Bandwidth Testing:"
@@ -83,7 +83,7 @@ help:
 	@echo "  functional-k8s           - Run only k8s cluster test"
 	@echo ""
 	@echo "Legacy E-Series Tests (for reference):"
-	@echo "  e11-modes                - Test PEAT modes (legacy)"
+	@echo "  e11-modes                - Test Peat modes (legacy)"
 	@echo "  e12-comprehensive        - Full validation suite (legacy)"
 
 # ============================================

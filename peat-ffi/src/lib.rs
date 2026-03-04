@@ -1960,7 +1960,7 @@ mod tests {
 ///
 /// Kotlin signature: external fun peatVersion(): String
 #[no_mangle]
-pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_peatVersion(
+pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_peatVersion(
     mut env: JNIEnv,
     _class: JClass,
 ) -> jstring {
@@ -1974,7 +1974,7 @@ pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_peatVersion(
 ///
 /// Kotlin signature: external fun testJni(): String
 #[no_mangle]
-pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_testJni(
+pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_testJni(
     mut env: JNIEnv,
     _class: JClass,
 ) -> jstring {
@@ -1989,7 +1989,7 @@ pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_testJni(
 /// Kotlin signature: external fun createNodeJni(appId: String, sharedKey: String, storagePath: String): Long
 #[cfg(feature = "sync")]
 #[no_mangle]
-pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_createNodeJni(
+pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_createNodeJni(
     mut env: JNIEnv,
     _class: JClass,
     app_id: JString,
@@ -2067,7 +2067,7 @@ pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_createNodeJni(
 /// ```
 #[cfg(feature = "sync")]
 #[no_mangle]
-pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_createNodeWithConfigJni(
+pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_createNodeWithConfigJni(
     mut env: JNIEnv,
     _class: JClass,
     app_id: JString,
@@ -2160,7 +2160,7 @@ pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_createNodeWithConf
 /// Kotlin signature: external fun getGlobalNodeHandleJni(): Long
 #[cfg(feature = "sync")]
 #[no_mangle]
-pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_getGlobalNodeHandleJni(
+pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_getGlobalNodeHandleJni(
     _env: JNIEnv,
     _class: JClass,
 ) -> i64 {
@@ -2180,7 +2180,7 @@ pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_getGlobalNodeHandl
 /// Kotlin signature: external fun nodeIdJni(handle: Long): String
 #[cfg(feature = "sync")]
 #[no_mangle]
-pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_nodeIdJni(
+pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_nodeIdJni(
     mut env: JNIEnv,
     _class: JClass,
     handle: i64,
@@ -2208,7 +2208,7 @@ pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_nodeIdJni(
 /// Kotlin signature: external fun peerCountJni(handle: Long): Int
 #[cfg(feature = "sync")]
 #[no_mangle]
-pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_peerCountJni(
+pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_peerCountJni(
     _env: JNIEnv,
     _class: JClass,
     handle: i64,
@@ -2232,7 +2232,7 @@ pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_peerCountJni(
 /// Returns JSON array of hex-encoded peer IDs, or "[]" on error
 #[cfg(feature = "sync")]
 #[no_mangle]
-pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_connectedPeersJni(
+pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_connectedPeersJni(
     mut env: JNIEnv,
     _class: JClass,
     handle: i64,
@@ -2261,7 +2261,7 @@ pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_connectedPeersJni(
 /// Kotlin signature: external fun startSyncJni(handle: Long): Boolean
 #[cfg(feature = "sync")]
 #[no_mangle]
-pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_startSyncJni(
+pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_startSyncJni(
     _env: JNIEnv,
     _class: JClass,
     handle: i64,
@@ -2306,7 +2306,7 @@ pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_startSyncJni(
 /// Kotlin signature: external fun freeNodeJni(handle: Long)
 #[cfg(feature = "sync")]
 #[no_mangle]
-pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_freeNodeJni(
+pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_freeNodeJni(
     _env: JNIEnv,
     _class: JClass,
     handle: i64,
@@ -2354,7 +2354,7 @@ pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_freeNodeJni(
 /// Kotlin signature: external fun bleSetStartedJni(handle: Long, started: Boolean)
 #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
 #[no_mangle]
-pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_bleSetStartedJni(
+pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_bleSetStartedJni(
     _env: JNIEnv,
     _class: JClass,
     handle: i64,
@@ -2399,7 +2399,7 @@ pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_bleSetStartedJni(
 /// Kotlin signature: external fun bleAddPeerJni(handle: Long, peerId: String)
 #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
 #[no_mangle]
-pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_bleAddPeerJni(
+pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_bleAddPeerJni(
     mut env: JNIEnv,
     _class: JClass,
     handle: i64,
@@ -2437,7 +2437,7 @@ pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_bleAddPeerJni(
 /// Kotlin signature: external fun bleRemovePeerJni(handle: Long, peerId: String)
 #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
 #[no_mangle]
-pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_bleRemovePeerJni(
+pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_bleRemovePeerJni(
     mut env: JNIEnv,
     _class: JClass,
     handle: i64,
@@ -2475,7 +2475,7 @@ pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_bleRemovePeerJni(
 /// Kotlin signature: external fun bleIsAvailableJni(handle: Long): Boolean
 #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
 #[no_mangle]
-pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_bleIsAvailableJni(
+pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_bleIsAvailableJni(
     _env: JNIEnv,
     _class: JClass,
     handle: i64,
@@ -2511,7 +2511,7 @@ pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_bleIsAvailableJni(
 /// Kotlin signature: external fun blePeerCountJni(handle: Long): Int
 #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
 #[no_mangle]
-pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_blePeerCountJni(
+pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_blePeerCountJni(
     _env: JNIEnv,
     _class: JClass,
     handle: i64,
@@ -2537,7 +2537,7 @@ pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_blePeerCountJni(
 /// Returns JSON array of cell objects, or "[]" on error
 #[cfg(feature = "sync")]
 #[no_mangle]
-pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_getCellsJni(
+pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_getCellsJni(
     mut env: JNIEnv,
     _class: JClass,
     handle: i64,
@@ -2588,7 +2588,7 @@ pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_getCellsJni(
 /// Returns JSON array of track objects, or "[]" on error
 #[cfg(feature = "sync")]
 #[no_mangle]
-pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_getTracksJni(
+pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_getTracksJni(
     mut env: JNIEnv,
     _class: JClass,
     handle: i64,
@@ -2644,7 +2644,7 @@ pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_getTracksJni(
 /// Returns JSON array of platform objects, or "[]" on error
 #[cfg(feature = "sync")]
 #[no_mangle]
-pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_getPlatformsJni(
+pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_getPlatformsJni(
     mut env: JNIEnv,
     _class: JClass,
     handle: i64,
@@ -2714,7 +2714,7 @@ pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_getPlatformsJni(
 /// ```
 #[cfg(feature = "sync")]
 #[no_mangle]
-pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_publishPlatformJni(
+pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_publishPlatformJni(
     mut env: JNIEnv,
     _class: JClass,
     handle: i64,
@@ -2817,7 +2817,7 @@ pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_publishPlatformJni
 /// when mDNS is unreliable.
 #[cfg(feature = "sync")]
 #[no_mangle]
-pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_connectPeerJni(
+pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_connectPeerJni(
     mut env: JNIEnv,
     _class: JClass,
     handle: i64,
@@ -2903,7 +2903,7 @@ pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_connectPeerJni(
 /// }
 /// ```
 #[no_mangle]
-pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_nativeInit(
+pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_nativeInit(
     mut env: JNIEnv,
     class: JClass,
 ) {
@@ -2913,121 +2913,123 @@ pub extern "system" fn Java_com_revolveteam_atak_peat_PeatJni_nativeInit(
         NativeMethod {
             name: "peatVersion".into(),
             sig: "()Ljava/lang/String;".into(),
-            fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_peatVersion as *mut c_void,
+            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_peatVersion as *mut c_void,
         },
         NativeMethod {
             name: "testJni".into(),
             sig: "()Ljava/lang/String;".into(),
-            fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_testJni as *mut c_void,
+            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_testJni as *mut c_void,
         },
         #[cfg(feature = "sync")]
         NativeMethod {
             name: "createNodeJni".into(),
             sig: "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)J".into(),
-            fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_createNodeJni as *mut c_void,
+            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_createNodeJni as *mut c_void,
         },
         #[cfg(feature = "sync")]
         NativeMethod {
             name: "getGlobalNodeHandleJni".into(),
             sig: "()J".into(),
-            fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_getGlobalNodeHandleJni as *mut c_void,
+            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_getGlobalNodeHandleJni
+                as *mut c_void,
         },
         #[cfg(feature = "sync")]
         NativeMethod {
             name: "nodeIdJni".into(),
             sig: "(J)Ljava/lang/String;".into(),
-            fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_nodeIdJni as *mut c_void,
+            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_nodeIdJni as *mut c_void,
         },
         #[cfg(feature = "sync")]
         NativeMethod {
             name: "peerCountJni".into(),
             sig: "(J)I".into(),
-            fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_peerCountJni as *mut c_void,
+            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_peerCountJni as *mut c_void,
         },
         #[cfg(feature = "sync")]
         NativeMethod {
             name: "connectedPeersJni".into(),
             sig: "(J)Ljava/lang/String;".into(),
-            fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_connectedPeersJni as *mut c_void,
+            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_connectedPeersJni as *mut c_void,
         },
         #[cfg(feature = "sync")]
         NativeMethod {
             name: "startSyncJni".into(),
             sig: "(J)Z".into(),
-            fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_startSyncJni as *mut c_void,
+            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_startSyncJni as *mut c_void,
         },
         #[cfg(feature = "sync")]
         NativeMethod {
             name: "freeNodeJni".into(),
             sig: "(J)V".into(),
-            fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_freeNodeJni as *mut c_void,
+            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_freeNodeJni as *mut c_void,
         },
         #[cfg(feature = "sync")]
         NativeMethod {
             name: "getCellsJni".into(),
             sig: "(J)Ljava/lang/String;".into(),
-            fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_getCellsJni as *mut c_void,
+            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_getCellsJni as *mut c_void,
         },
         #[cfg(feature = "sync")]
         NativeMethod {
             name: "getTracksJni".into(),
             sig: "(J)Ljava/lang/String;".into(),
-            fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_getTracksJni as *mut c_void,
+            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_getTracksJni as *mut c_void,
         },
         #[cfg(feature = "sync")]
         NativeMethod {
             name: "getPlatformsJni".into(),
             sig: "(J)Ljava/lang/String;".into(),
-            fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_getPlatformsJni as *mut c_void,
+            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_getPlatformsJni as *mut c_void,
         },
         #[cfg(feature = "sync")]
         NativeMethod {
             name: "publishPlatformJni".into(),
             sig: "(JLjava/lang/String;)Z".into(),
-            fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_publishPlatformJni as *mut c_void,
+            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_publishPlatformJni as *mut c_void,
         },
         #[cfg(feature = "sync")]
         NativeMethod {
             name: "connectPeerJni".into(),
             sig: "(JLjava/lang/String;Ljava/lang/String;)Z".into(),
-            fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_connectPeerJni as *mut c_void,
+            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_connectPeerJni as *mut c_void,
         },
         #[cfg(feature = "sync")]
         NativeMethod {
             name: "createNodeWithConfigJni".into(),
             sig: "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;)J"
                 .into(),
-            fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_createNodeWithConfigJni as *mut c_void,
+            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_createNodeWithConfigJni
+                as *mut c_void,
         },
         #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
         NativeMethod {
             name: "bleSetStartedJni".into(),
             sig: "(JZ)V".into(),
-            fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_bleSetStartedJni as *mut c_void,
+            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_bleSetStartedJni as *mut c_void,
         },
         #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
         NativeMethod {
             name: "bleAddPeerJni".into(),
             sig: "(JLjava/lang/String;)V".into(),
-            fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_bleAddPeerJni as *mut c_void,
+            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_bleAddPeerJni as *mut c_void,
         },
         #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
         NativeMethod {
             name: "bleRemovePeerJni".into(),
             sig: "(JLjava/lang/String;)V".into(),
-            fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_bleRemovePeerJni as *mut c_void,
+            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_bleRemovePeerJni as *mut c_void,
         },
         #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
         NativeMethod {
             name: "bleIsAvailableJni".into(),
             sig: "(J)Z".into(),
-            fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_bleIsAvailableJni as *mut c_void,
+            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_bleIsAvailableJni as *mut c_void,
         },
         #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
         NativeMethod {
             name: "blePeerCountJni".into(),
             sig: "(J)I".into(),
-            fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_blePeerCountJni as *mut c_void,
+            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_blePeerCountJni as *mut c_void,
         },
     ];
 
@@ -3093,7 +3095,7 @@ pub extern "C" fn JNI_OnLoad(vm: *mut JavaVM, _reserved: *mut c_void) -> jint {
     };
 
     // Try to find PeerEventManager class and store global reference for callbacks
-    let peer_event_manager_class = "com/revolveteam/atak/peat/PeerEventManager";
+    let peer_event_manager_class = "com/defenseunicorns/atak/peat/PeerEventManager";
     match env.find_class(peer_event_manager_class) {
         Ok(class) => match env.new_global_ref(class) {
             Ok(global_ref) => {
@@ -3118,7 +3120,7 @@ pub extern "C" fn JNI_OnLoad(vm: *mut JavaVM, _reserved: *mut c_void) -> jint {
     android_log("JNI_OnLoad: Got JNIEnv, looking for PeatJni class...");
 
     // Try to find the PeatJni class and register natives
-    let class_name = "com/revolveteam/atak/peat/PeatJni";
+    let class_name = "com/defenseunicorns/atak/peat/PeatJni";
     match env.find_class(class_name) {
         Ok(class) => {
             #[cfg(target_os = "android")]
@@ -3130,129 +3132,129 @@ pub extern "C" fn JNI_OnLoad(vm: *mut JavaVM, _reserved: *mut c_void) -> jint {
                 NativeMethod {
                     name: "nativeInit".into(),
                     sig: "()V".into(),
-                    fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_nativeInit as *mut c_void,
+                    fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_nativeInit as *mut c_void,
                 },
                 NativeMethod {
                     name: "peatVersion".into(),
                     sig: "()Ljava/lang/String;".into(),
-                    fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_peatVersion as *mut c_void,
+                    fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_peatVersion as *mut c_void,
                 },
                 NativeMethod {
                     name: "testJni".into(),
                     sig: "()Ljava/lang/String;".into(),
-                    fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_testJni as *mut c_void,
+                    fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_testJni as *mut c_void,
                 },
                 #[cfg(feature = "sync")]
                 NativeMethod {
                     name: "createNodeJni".into(),
                     sig: "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)J".into(),
-                    fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_createNodeJni as *mut c_void,
+                    fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_createNodeJni as *mut c_void,
                 },
                 #[cfg(feature = "sync")]
                 NativeMethod {
                     name: "getGlobalNodeHandleJni".into(),
                     sig: "()J".into(),
-                    fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_getGlobalNodeHandleJni
+                    fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_getGlobalNodeHandleJni
                         as *mut c_void,
                 },
                 #[cfg(feature = "sync")]
                 NativeMethod {
                     name: "nodeIdJni".into(),
                     sig: "(J)Ljava/lang/String;".into(),
-                    fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_nodeIdJni as *mut c_void,
+                    fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_nodeIdJni as *mut c_void,
                 },
                 #[cfg(feature = "sync")]
                 NativeMethod {
                     name: "peerCountJni".into(),
                     sig: "(J)I".into(),
-                    fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_peerCountJni as *mut c_void,
+                    fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_peerCountJni as *mut c_void,
                 },
                 #[cfg(feature = "sync")]
                 NativeMethod {
                     name: "connectedPeersJni".into(),
                     sig: "(J)Ljava/lang/String;".into(),
-                    fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_connectedPeersJni as *mut c_void,
+                    fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_connectedPeersJni as *mut c_void,
                 },
                 #[cfg(feature = "sync")]
                 NativeMethod {
                     name: "startSyncJni".into(),
                     sig: "(J)Z".into(),
-                    fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_startSyncJni as *mut c_void,
+                    fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_startSyncJni as *mut c_void,
                 },
                 #[cfg(feature = "sync")]
                 NativeMethod {
                     name: "freeNodeJni".into(),
                     sig: "(J)V".into(),
-                    fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_freeNodeJni as *mut c_void,
+                    fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_freeNodeJni as *mut c_void,
                 },
                 #[cfg(feature = "sync")]
                 NativeMethod {
                     name: "getCellsJni".into(),
                     sig: "(J)Ljava/lang/String;".into(),
-                    fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_getCellsJni as *mut c_void,
+                    fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_getCellsJni as *mut c_void,
                 },
                 #[cfg(feature = "sync")]
                 NativeMethod {
                     name: "getTracksJni".into(),
                     sig: "(J)Ljava/lang/String;".into(),
-                    fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_getTracksJni as *mut c_void,
+                    fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_getTracksJni as *mut c_void,
                 },
                 #[cfg(feature = "sync")]
                 NativeMethod {
                     name: "getPlatformsJni".into(),
                     sig: "(J)Ljava/lang/String;".into(),
-                    fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_getPlatformsJni as *mut c_void,
+                    fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_getPlatformsJni as *mut c_void,
                 },
                 #[cfg(feature = "sync")]
                 NativeMethod {
                     name: "publishPlatformJni".into(),
                     sig: "(JLjava/lang/String;)Z".into(),
-                    fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_publishPlatformJni
+                    fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_publishPlatformJni
                         as *mut c_void,
                 },
                 #[cfg(feature = "sync")]
                 NativeMethod {
                     name: "connectPeerJni".into(),
                     sig: "(JLjava/lang/String;Ljava/lang/String;)Z".into(),
-                    fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_connectPeerJni as *mut c_void,
+                    fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_connectPeerJni as *mut c_void,
                 },
                 #[cfg(feature = "sync")]
                 NativeMethod {
                     name: "createNodeWithConfigJni".into(),
                     sig: "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;)J"
                         .into(),
-                    fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_createNodeWithConfigJni
+                    fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_createNodeWithConfigJni
                         as *mut c_void,
                 },
                 #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
                 NativeMethod {
                     name: "bleSetStartedJni".into(),
                     sig: "(JZ)V".into(),
-                    fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_bleSetStartedJni as *mut c_void,
+                    fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_bleSetStartedJni as *mut c_void,
                 },
                 #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
                 NativeMethod {
                     name: "bleAddPeerJni".into(),
                     sig: "(JLjava/lang/String;)V".into(),
-                    fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_bleAddPeerJni as *mut c_void,
+                    fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_bleAddPeerJni as *mut c_void,
                 },
                 #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
                 NativeMethod {
                     name: "bleRemovePeerJni".into(),
                     sig: "(JLjava/lang/String;)V".into(),
-                    fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_bleRemovePeerJni as *mut c_void,
+                    fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_bleRemovePeerJni as *mut c_void,
                 },
                 #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
                 NativeMethod {
                     name: "bleIsAvailableJni".into(),
                     sig: "(J)Z".into(),
-                    fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_bleIsAvailableJni as *mut c_void,
+                    fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_bleIsAvailableJni as *mut c_void,
                 },
                 #[cfg(all(feature = "sync", feature = "bluetooth", target_os = "android"))]
                 NativeMethod {
                     name: "blePeerCountJni".into(),
                     sig: "(J)I".into(),
-                    fn_ptr: Java_com_revolveteam_atak_peat_PeatJni_blePeerCountJni as *mut c_void,
+                    fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_blePeerCountJni as *mut c_void,
                 },
             ];
 
@@ -3334,7 +3336,7 @@ fn notify_peer_event(method_name: &str, peer_id: &str, reason: Option<&str>) {
 
         // Attach current thread to get env for class lookup
         if let Ok(mut env) = java_vm.attach_current_thread() {
-            let peer_event_manager_class = "com/revolveteam/atak/peat/PeerEventManager";
+            let peer_event_manager_class = "com/defenseunicorns/atak/peat/PeerEventManager";
             if let Ok(class) = env.find_class(peer_event_manager_class) {
                 if let Ok(global_ref) = env.new_global_ref(class) {
                     *class_guard = Some(global_ref);
