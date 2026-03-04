@@ -2,7 +2,7 @@ rootProject.name = 'peat-atak-plugin'
 include ':app'
 
 // Use local peat-btle repo for development
-includeBuild('../../peat-btle/android') {
+includeBuild('../../hive-btle/android') {
     dependencySubstitution {
         substitute(module('com.defenseunicorns:peat')).using(project(':'))
     }
