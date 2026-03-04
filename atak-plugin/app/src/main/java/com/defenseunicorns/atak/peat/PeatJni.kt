@@ -185,6 +185,18 @@ object PeatJni {
     @JvmStatic
     external fun publishPlatformJni(handle: Long, platformJson: String): Boolean
 
+    /**
+     * Connect to a known peer by node ID and address (bypasses mDNS).
+     * Used by the dual-transport test to connect Android to rpi-ci2 over QUIC
+     * when mDNS is unreliable.
+     * @param handle Node handle from createNodeJni
+     * @param nodeId Hex-encoded node ID of the peer
+     * @param address Address string (e.g. "192.168.1.100:12345")
+     * @return true if connection initiated successfully
+     */
+    @JvmStatic
+    external fun connectPeerJni(handle: Long, nodeId: String, address: String): Boolean
+
     // ========================================================================
     // BLE Transport JNI Methods (ADR-047 Android Bootstrap)
     // ========================================================================
