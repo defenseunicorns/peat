@@ -23,7 +23,7 @@ import uniffi.peat_btle.PeerConnectionState
 import uniffi.peat_btle.StateCountSummary
 import uniffi.peat_btle.DeviceIdentity
 import uniffi.peat_btle.decodeMeshGenesis
-import uniffi.peat_btle.CannedMessageInfo
+
 import uniffi.peat_lite_android.CannedMessageAckEventData
 import uniffi.peat_lite_android.CannedMessageType
 import uniffi.peat_lite_android.createCannedMessageAckEvent
@@ -459,11 +459,7 @@ class PeatBleManager(
         cannedMessageDocs[key] = event
         updateCannedMessagesObservable()
 
-        // Store in mesh for CRDT sync (convert List<UByte> to ByteArray)
-        val bytes = ByteArray(encoded.size) { encoded[it].toByte() }
-        val stored = peatBtle?.storeCannedMessageDocument(bytes) ?: false
-
-        Log.i(TAG, "Sent canned message: ${messageType.name} from ${String.format("%08X", nodeId)} stored=$stored (${encoded.size} bytes)")
+        Log.i(TAG, "Sent canned message: ${messageType.name} from ${String.format("%08X", nodeId)} (${encoded.size} bytes)")
 
         // Notify callback
         cannedMessageCallback?.invoke(event)
@@ -545,47 +541,7 @@ class PeatBleManager(
      * don't come through onDecryptedData callback.
      */
     private fun pollCannedMessagesFromDeltaSync() {
-        val btle = peatBtle ?: return
-
-        try {
-            val allMessages = btle.getAllCannedMessages()
-            if (allMessages.isEmpty()) return
-
-            var updated = false
-            for (msgInfo in allMessages) {
-                val key = "${msgInfo.sourceNode}:${msgInfo.timestamp}"
-
-                // Decode the CannedMessageAckEvent from bytes
-                val incoming = decodeCannedMessageAckEvent(msgInfo.encodedBytes)
-                if (incoming == null) {
-                    Log.w(TAG, "[DELTA-POLL] Failed to decode CannedMessageAckEvent")
-                    continue
-                }
-
-                // Check if this is new or has more ACKs than what we have
-                val existing = cannedMessageDocs[key]
-                if (existing == null) {
-                    // New message from delta sync
-                    Log.i(TAG, "[DELTA-POLL] NEW message from delta sync: $key, type=${incoming.message}, ACKs=${incoming.acks.size}")
-                    cannedMessageDocs[key] = incoming
-                    cannedMessageCallback?.invoke(incoming)
-                    updated = true
-                } else if (incoming.acks.size > existing.acks.size) {
-                    // Has more ACKs - merge them
-                    val merged = cannedMessageAckEventMerge(existing, incoming)
-                    Log.i(TAG, "[DELTA-POLL] Merged ACKs for $key: ${existing.acks.size} -> ${merged.acks.size}")
-                    cannedMessageDocs[key] = merged
-                    cannedMessageCallback?.invoke(merged)
-                    updated = true
-                }
-            }
-
-            if (updated) {
-                updateCannedMessagesObservable()
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "[DELTA-POLL] Error polling canned messages: ${e.message}", e)
-        }
+        // TODO: Re-enable when getAllCannedMessages/storeCannedMessageDocument land in peat-btle
     }
 
     override fun onMarkerSynced(peer: PeatPeer, marker: PeatMarker) {

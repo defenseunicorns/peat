@@ -155,7 +155,7 @@ android {
     }
 
     bundle {
-        storeArcpeat {
+        storeArchive {
             enable = false
         }
     }
@@ -170,7 +170,7 @@ android {
 
     sourceSets {
         main {
-            setProperty("arcpeatsBaseName", "ATAK-Plugin-PEAT-" + PLUGIN_VERSION + "-" + getVersionName() + "-" + ATAK_VERSION)
+            setProperty("archivesBaseName", "ATAK-Plugin-PEAT-" + PLUGIN_VERSION + "-" + getVersionName() + "-" + ATAK_VERSION)
             defaultConfig.versionCode = getVersionCode()
             defaultConfig.versionName = PLUGIN_VERSION + " (" + getVersionName() + ") - [" + ATAK_VERSION + "]"
 

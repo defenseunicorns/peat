@@ -12,7 +12,7 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
         flatDir {
-            dirs("${rootDir}/../../peat-btle/android/build/outputs/aar")
+            dirs("${rootDir}/../../hive-btle/android/build/outputs/aar")
         }
     }
 }
