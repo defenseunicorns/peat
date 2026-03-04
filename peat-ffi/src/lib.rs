@@ -73,7 +73,7 @@ use peat_protocol::sync::{BackendConfig, DataSyncBackend, TransportConfig};
 use peat_protocol::transport::btle::PeatBleTransport;
 #[cfg(feature = "sync")]
 use peat_protocol::transport::{
-    iroh::IrohMeshTransport, CollectionRouteTable, MeshTransport, Transport, TransportCapabilities,
+    iroh::IrohMeshTransport, CollectionRouteTable, Transport, TransportCapabilities,
     TransportInstance, TransportManager, TransportManagerConfig, TransportPolicy, TransportType,
 };
 #[cfg(feature = "sync")]
