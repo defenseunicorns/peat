@@ -1,0 +1,60 @@
+[package]
+name = "peat-registry"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "OCI registry synchronization control plane for DDIL environments"
+
+[[bin]]
+name = "peat-registry"
+path = "src/main.rs"
+
+[dependencies]
+# Peat Protocol with AutomergeIroh backend
+peat-protocol = { path = "../peat-protocol", default-features = false, features = ["automerge-backend"] }
+# PEAT Schema - proto-generated types
+peat-schema = { path = "../peat-schema" }
+# Protobuf support
+prost = "0.13"
+
+# OCI registry client
+oci-client = "0.16"
+futures = "0.3"
+http = "1"
+
+# Checkpoint persistence
+redb = "2.4"
+
+# Async runtime
+tokio.workspace = true
+async-trait.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Utilities
+uuid.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+chrono.workspace = true
+bytes = "1"
+hex = "0.4"
+sha2 = "0.10"
+
+# Logging
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+
+# Config
+toml = "0.8"
+
+[dev-dependencies]
+wiremock = "0.6"
+tempfile = "3.10"
+tokio = { version = "1", features = ["full", "test-util"] }

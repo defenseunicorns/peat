@@ -1,0 +1,109 @@
+// OCI Registry Synchronization types for DDIL environments (ADR-054)
+// Version: 1.0.0
+
+syntax = "proto3";
+
+package cap.registry.v1;
+
+import "common.proto";
+
+// Declarative sync request from operator or formation leader.
+message SyncIntent {
+  string intent_id = 1;
+  string source = 2;
+  repeated string targets = 3;
+  repeated string repositories = 4;
+  DdilPolicyClass policy_class = 5;
+  SyncPriority priority = 6;
+  uint32 wave = 7;
+  repeated string require_referrers = 8;
+  repeated string pin_digests = 9;
+  cap.common.v1.Timestamp created_at = 10;
+}
+
+// OCI registry endpoint with tier and auth configuration.
+message RegistryTargetProto {
+  string id = 1;
+  string endpoint = 2;
+  RegistryTier tier = 3;
+  map<string, string> metadata = 4;
+}
+
+// Per-target convergence state for a sync intent.
+message TargetConvergenceStateProto {
+  string target_id = 1;
+  string intent_id = 2;
+  ConvergenceStatusEnum status = 3;
+  uint64 remaining_bytes = 4;
+  uint32 remaining_items = 5;
+  string active_checkpoint = 6;
+  repeated ConvergenceBlockerProto blockers = 7;
+  cap.common.v1.Timestamp last_updated = 8;
+}
+
+// A blocker preventing convergence.
+message ConvergenceBlockerProto {
+  string target_id = 1;
+  ConvergenceBlockerReasonEnum reason = 2;
+  cap.common.v1.Timestamp since = 3;
+  optional string details = 4;
+}
+
+// Aggregated sync status across all targets for an intent.
+message SyncStatus {
+  string intent_id = 1;
+  uint32 total_targets = 2;
+  uint32 converged = 3;
+  uint32 in_progress = 4;
+  uint32 pending = 5;
+  uint32 failed = 6;
+  uint32 drifted = 7;
+}
+
+// DDIL policy class — maps to QoSClass and TransferPriority.
+enum DdilPolicyClass {
+  DDIL_POLICY_CLASS_UNSPECIFIED = 0;
+  DDIL_POLICY_CLASS_MISSION_CRITICAL = 1;
+  DDIL_POLICY_CLASS_MISSION_SUPPORT = 2;
+  DDIL_POLICY_CLASS_BACKGROUND = 3;
+}
+
+// Sync priority — ordering within a policy class.
+enum SyncPriority {
+  SYNC_PRIORITY_UNSPECIFIED = 0;
+  SYNC_PRIORITY_LOW = 1;
+  SYNC_PRIORITY_NORMAL = 2;
+  SYNC_PRIORITY_HIGH = 3;
+  SYNC_PRIORITY_CRITICAL = 4;
+}
+
+// Topology tier for registry targets.
+enum RegistryTier {
+  REGISTRY_TIER_UNSPECIFIED = 0;
+  REGISTRY_TIER_ENTERPRISE = 1;
+  REGISTRY_TIER_REGIONAL = 2;
+  REGISTRY_TIER_TACTICAL = 3;
+  REGISTRY_TIER_EDGE = 4;
+}
+
+// Convergence status state machine.
+enum ConvergenceStatusEnum {
+  CONVERGENCE_STATUS_UNKNOWN = 0;
+  CONVERGENCE_STATUS_PENDING = 1;
+  CONVERGENCE_STATUS_IN_PROGRESS = 2;
+  CONVERGENCE_STATUS_CONTENT_COMPLETE = 3;
+  CONVERGENCE_STATUS_CONVERGED = 4;
+  CONVERGENCE_STATUS_DRIFTED = 5;
+  CONVERGENCE_STATUS_FAILED = 6;
+}
+
+// Typed reason for convergence being blocked.
+enum ConvergenceBlockerReasonEnum {
+  CONVERGENCE_BLOCKER_REASON_UNSPECIFIED = 0;
+  CONVERGENCE_BLOCKER_REASON_NETWORK_UNAVAILABLE = 1;
+  CONVERGENCE_BLOCKER_REASON_TRANSFER_FAILED = 2;
+  CONVERGENCE_BLOCKER_REASON_REFERRER_MISSING = 3;
+  CONVERGENCE_BLOCKER_REASON_TARGET_REJECTED = 4;
+  CONVERGENCE_BLOCKER_REASON_BUDGET_EXHAUSTED = 5;
+  CONVERGENCE_BLOCKER_REASON_WAVE_NOT_ACTIVE = 6;
+}
