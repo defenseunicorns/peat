@@ -147,7 +147,6 @@ pub fn compute_delta_from_sets(source: &DigestSet, target: &DigestSet) -> Digest
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
 
     #[test]
     fn test_compute_delta_from_sets_empty() {

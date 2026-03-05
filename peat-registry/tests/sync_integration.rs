@@ -24,14 +24,17 @@ use peat_registry::types::*;
 
 // ---------- Mock Registry Client ----------
 
+/// tag name → manifest digest, grouped by repo
+type TagMap = HashMap<String, Vec<(String, String)>>;
+
 #[derive(Clone)]
 struct MockRegistryClient {
     /// digest → (data, media_type)
     blobs: Arc<RwLock<HashMap<String, Bytes>>>,
     /// digest → (content, media_type, layers, config)
     manifests: Arc<RwLock<HashMap<String, MockManifest>>>,
-    /// repo → list of tags
-    tags: Arc<RwLock<HashMap<String, Vec<(String, String)>>>>,
+    /// repo → list of (tag, digest)
+    tags: Arc<RwLock<TagMap>>,
     /// subject_digest → list of referrers
     referrers: Arc<RwLock<HashMap<String, Vec<ReferrerInfo>>>>,
 }
