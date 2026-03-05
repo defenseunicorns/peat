@@ -21,6 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "proto/product.proto",
         "proto/tasking.proto",
         "proto/event.proto",
+        "proto/registry.proto",
     ];
 
     // Configure prost to generate Rust code from .proto files

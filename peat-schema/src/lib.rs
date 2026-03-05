@@ -177,6 +177,13 @@ pub mod cap {
             include!(concat!(env!("OUT_DIR"), "/cap.event.v1.rs"));
         }
     }
+
+    #[allow(clippy::enum_variant_names)]
+    pub mod registry {
+        pub mod v1 {
+            include!(concat!(env!("OUT_DIR"), "/cap.registry.v1.rs"));
+        }
+    }
 }
 
 // Re-export for convenience
