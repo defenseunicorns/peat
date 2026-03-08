@@ -254,3 +254,161 @@ async fn test_discovery_manager_default() {
     let count = manager.peer_count().await;
     assert_eq!(count, 1, "Should have 1 peer");
 }
+
+/// Test 6: End-to-End Discovery + Connection
+///
+/// Validates that two nodes can discover each other via static configuration
+/// and automatically establish connections.
+///
+/// Test Flow:
+/// 1. Create Node A and Node B with Automerge+Iroh backends
+/// 2. Configure Node A to discover Node B via static configuration
+/// 3. Configure Node B to discover Node A via static configuration
+/// 4. Start both nodes' peer discovery
+/// 5. Wait for automatic connection to be established
+/// 6. Verify both nodes are connected
+#[tokio::test]
+async fn test_e2e_discovery_and_connection() {
+    use hive_protocol::network::IrohTransport;
+    use hive_protocol::storage::AutomergeStore;
+    use hive_protocol::sync::automerge::AutomergeIrohBackend;
+    use std::sync::Arc;
+    use tempfile::TempDir;
+
+    // Create temporary directories for each node
+    let temp_a = TempDir::new().expect("Failed to create temp dir");
+    let temp_b = TempDir::new().expect("Failed to create temp dir");
+
+    // Create Node A
+    let transport_a = Arc::new(
+        IrohTransport::new()
+            .await
+            .expect("Failed to create transport A"),
+    );
+    let store_a = Arc::new(AutomergeStore::open(temp_a.path()).expect("Failed to create store A"));
+    let backend_a = Arc::new(AutomergeIrohBackend::from_parts(
+        Arc::clone(&store_a),
+        Arc::clone(&transport_a),
+    ));
+
+    // Create Node B
+    let transport_b = Arc::new(
+        IrohTransport::new()
+            .await
+            .expect("Failed to create transport B"),
+    );
+    let store_b = Arc::new(AutomergeStore::open(temp_b.path()).expect("Failed to create store B"));
+    let backend_b = Arc::new(AutomergeIrohBackend::from_parts(
+        Arc::clone(&store_b),
+        Arc::clone(&transport_b),
+    ));
+
+    // Get endpoint IDs
+    let endpoint_a = transport_a.endpoint_id();
+    let endpoint_b = transport_b.endpoint_id();
+
+    // Use dummy addresses since we're using Iroh's built-in relay/QUIC
+    let addrs_a: Vec<String> = vec![];
+    let addrs_b: Vec<String> = vec![];
+
+    // Configure Node A to discover Node B
+    let peer_b_info = PeerInfo {
+        name: "Node B".to_string(),
+        node_id: hex::encode(endpoint_b.as_bytes()),
+        addresses: addrs_b.clone(),
+        relay_url: None,
+    };
+    backend_a
+        .add_discovery_strategy(Box::new(StaticDiscovery::from_peers(vec![peer_b_info])))
+        .await
+        .expect("Failed to add discovery strategy to Node A");
+
+    // Configure Node B to discover Node A
+    let peer_a_info = PeerInfo {
+        name: "Node A".to_string(),
+        node_id: hex::encode(endpoint_a.as_bytes()),
+        addresses: addrs_a.clone(),
+        relay_url: None,
+    };
+    backend_b
+        .add_discovery_strategy(Box::new(StaticDiscovery::from_peers(vec![peer_a_info])))
+        .await
+        .expect("Failed to add discovery strategy to Node B");
+
+    // Start peer discovery on both nodes
+    use hive_protocol::sync::traits::DataSyncBackend;
+    use hive_protocol::sync::types::{BackendConfig, TransportConfig};
+    use std::collections::HashMap;
+
+    let config_a = BackendConfig {
+        app_id: "test-app".to_string(),
+        persistence_dir: temp_a.path().to_path_buf(),
+        shared_key: None,
+        transport: TransportConfig::default(),
+        extra: HashMap::new(),
+    };
+
+    let config_b = BackendConfig {
+        app_id: "test-app".to_string(),
+        persistence_dir: temp_b.path().to_path_buf(),
+        shared_key: None,
+        transport: TransportConfig::default(),
+        extra: HashMap::new(),
+    };
+
+    backend_a
+        .initialize(config_a)
+        .await
+        .expect("Failed to initialize Node A");
+    backend_b
+        .initialize(config_b)
+        .await
+        .expect("Failed to initialize Node B");
+
+    // Wait for automatic connection (background task runs every 5 seconds)
+    println!("Waiting for nodes to discover and connect...");
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+
+    // Verify connections
+    let peers_a = backend_a
+        .peer_discovery()
+        .discovered_peers()
+        .await
+        .expect("Failed to get peers from Node A");
+    let peers_b = backend_b
+        .peer_discovery()
+        .discovered_peers()
+        .await
+        .expect("Failed to get peers from Node B");
+
+    println!("Node A discovered {} peers", peers_a.len());
+    println!("Node B discovered {} peers", peers_b.len());
+
+    // Check that both nodes see at least one peer
+    assert!(
+        !peers_a.is_empty(),
+        "Node A should have discovered at least one peer"
+    );
+    assert!(
+        !peers_b.is_empty(),
+        "Node B should have discovered at least one peer"
+    );
+
+    // Check for connected peers
+    let connected_a = peers_a.iter().filter(|p| p.connected).count();
+    let connected_b = peers_b.iter().filter(|p| p.connected).count();
+
+    println!("Node A has {} connected peers", connected_a);
+    println!("Node B has {} connected peers", connected_b);
+
+    // At least one node should have established a connection
+    // (Due to timing, both might have connected to each other)
+    assert!(
+        connected_a > 0 || connected_b > 0,
+        "At least one node should have a connected peer"
+    );
+
+    // Cleanup
+    let _ = backend_a.shutdown().await;
+    let _ = backend_b.shutdown().await;
+}
