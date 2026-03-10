@@ -4692,9 +4692,9 @@ dependencies = [
 
 [[package]]
 name = "peat-mesh"
-version = "0.3.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a45f1e87cb7536785e3d1bce1d290a2c46f073077f29e311f6eecec6dd605fa2"
+checksum = "747a936001deca6bbaea8d585493d4009c40ac24d09d75a62bb9f121f275b6f2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4726,6 +4726,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tokio-stream",
+ "tokio-util",
  "toml 0.8.23",
  "tracing",
  "uuid",
