@@ -307,7 +307,7 @@ impl MetricsReport {
 
         // Bandwidth comparison
         s.push_str("\nBANDWIDTH COMPARISON\n");
-        s.push_str("  Message Type          PEAT        Traditional (Video)\n");
+        s.push_str("  Message Type          Peat        Traditional (Video)\n");
         s.push_str("  ─────────────────────────────────────────────────────\n");
 
         let track_bytes = self

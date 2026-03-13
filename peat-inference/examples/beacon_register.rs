@@ -1,6 +1,6 @@
-//! PEAT Beacon Registration Example
+//! Peat Beacon Registration Example
 //!
-//! Demonstrates registering an edge device with the PEAT network,
+//! Demonstrates registering an edge device with the Peat network,
 //! advertising real camera and AI model capabilities.
 //!
 //! Usage:
@@ -55,7 +55,7 @@ async fn main() -> anyhow::Result<()> {
 
     let output_json = args.iter().any(|arg| arg == "--json");
 
-    println!("PEAT Beacon Registration");
+    println!("Peat Beacon Registration");
     println!("========================");
     println!();
 
@@ -246,7 +246,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     println!();
-    println!("Beacon ready for PEAT network integration!");
+    println!("Beacon ready for Peat network integration!");
     println!();
     println!("Next steps:");
     println!("  1. Connect to Peat mesh using AutomergeIrohBackend");

@@ -1,6 +1,6 @@
-//! # PEAT Credentials - Backend-Agnostic Credential Management
+//! # Peat Credentials - Backend-Agnostic Credential Management
 //!
-//! Provides unified credential handling for PEAT backends, abstracting
+//! Provides unified credential handling for Peat backends, abstracting
 //! away backend-specific naming (e.g., Ditto's app_id/shared_key).
 //!
 //! ## Environment Variables
@@ -30,7 +30,7 @@
 
 use std::env;
 
-/// PEAT credentials for backend authentication
+/// Peat credentials for backend authentication
 ///
 /// Provides a backend-agnostic interface to credentials, with automatic
 /// fallback to legacy Ditto environment variable names.

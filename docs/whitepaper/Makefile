@@ -1,4 +1,4 @@
-# HIVE Whitepaper Build System
+# Peat Whitepaper Build System
 # Requires: pandoc, typst (for PDF)
 #
 # Usage:
@@ -11,7 +11,7 @@
 
 # Configuration
 OUTPUT_DIR = build
-OUTPUT_NAME = HIVE_Whitepaper
+OUTPUT_NAME = Peat_Whitepaper
 METADATA = metadata.yaml
 
 # Source files in order (for HTML build)
@@ -92,8 +92,8 @@ pdf: $(OUTPUT_DIR)
 	@# Process main content + Appendix A header
 	@pandoc --from markdown --to typst \
 		$(SOURCES_MAIN) >> $(OUTPUT_DIR)/$(OUTPUT_NAME).typ
-	@# Process spec content: Spec titles (# HIVE Protocol Specification) -> #### (in TOC under Appendix A)
-	@sed -E 's/^#### /###### /; s/^### /###### /; s/^## /##### /; s/^# (HIVE Protocol Specification)/#### \1/; s/^# /##### /' 10b-spec-appendix.md | \
+	@# Process spec content: Spec titles (# Peat Protocol Specification) -> #### (in TOC under Appendix A)
+	@sed -E 's/^#### /###### /; s/^### /###### /; s/^## /##### /; s/^# (Peat Protocol Specification)/#### \1/; s/^# /##### /' 10b-spec-appendix.md | \
 		pandoc --from markdown --to typst >> $(OUTPUT_DIR)/$(OUTPUT_NAME).typ
 	@# Process Appendix B content + Appendix C header
 	@pandoc --from markdown --to typst 10c-appendix-bc.md >> $(OUTPUT_DIR)/$(OUTPUT_NAME).typ
@@ -105,6 +105,21 @@ pdf: $(OUTPUT_DIR)
 	@echo "Compiling Typst to PDF..."
 	@typst compile $(OUTPUT_DIR)/$(OUTPUT_NAME).typ $(OUTPUT_DIR)/$(OUTPUT_NAME).pdf
 	@echo "Built: $(OUTPUT_DIR)/$(OUTPUT_NAME).pdf (via Typst)"
+
+# Build PDF without ADR appendix
+.PHONY: pdf-no-adr
+pdf-no-adr: $(OUTPUT_DIR)
+	@echo "Converting Markdown to Typst (no ADRs)..."
+	@cat templates/preamble.typ > $(OUTPUT_DIR)/$(OUTPUT_NAME).typ
+	@pandoc --from markdown --to typst \
+		$(SOURCES_MAIN) >> $(OUTPUT_DIR)/$(OUTPUT_NAME).typ
+	@sed -E 's/^#### /###### /; s/^### /###### /; s/^## /##### /; s/^# (Peat Protocol Specification)/#### \1/; s/^# /##### /' 10b-spec-appendix.md | \
+		pandoc --from markdown --to typst >> $(OUTPUT_DIR)/$(OUTPUT_NAME).typ
+	@pandoc --from markdown --to typst 10c-appendix-bc.md >> $(OUTPUT_DIR)/$(OUTPUT_NAME).typ
+	@pandoc --from markdown --to typst 12-glossary.md >> $(OUTPUT_DIR)/$(OUTPUT_NAME).typ
+	@echo "Compiling Typst to PDF..."
+	@typst compile $(OUTPUT_DIR)/$(OUTPUT_NAME).typ $(OUTPUT_DIR)/$(OUTPUT_NAME).pdf
+	@echo "Built: $(OUTPUT_DIR)/$(OUTPUT_NAME).pdf (without ADRs)"
 
 # Build PDF via LaTeX (legacy)
 .PHONY: pdf-latex
@@ -120,6 +135,20 @@ docx: $(OUTPUT_DIR)
 		--reference-doc=templates/reference.docx \
 		-o $(OUTPUT_DIR)/$(OUTPUT_NAME).docx $(SOURCES)
 	@echo "Built: $(OUTPUT_DIR)/$(OUTPUT_NAME).docx"
+
+# Source ADR directory
+ADR_DIR = ../adr
+
+# Regenerate ADR appendix from source ADR files
+.PHONY: adr-appendix
+adr-appendix:
+	@echo "Generating ADR appendix from $(ADR_DIR)..."
+	@: > 11-adr-appendix.md
+	@for f in $(ADR_DIR)/0*.md; do \
+		cat "$$f" >> 11-adr-appendix.md; \
+		printf '\n\n' >> 11-adr-appendix.md; \
+	done
+	@echo "Generated 11-adr-appendix.md ($$(grep -c '^# ADR' 11-adr-appendix.md) ADRs)"
 
 # Clean generated files
 .PHONY: clean
@@ -163,7 +192,7 @@ wordcount:
 # Help
 .PHONY: help
 help:
-	@echo "HIVE Whitepaper Build System"
+	@echo "Peat Whitepaper Build System"
 	@echo ""
 	@echo "Targets:"
 	@echo "  make all        - Build HTML and PDF versions"

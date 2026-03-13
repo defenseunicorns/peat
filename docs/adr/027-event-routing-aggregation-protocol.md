@@ -9,7 +9,7 @@
 
 ### The Event Flow Problem
 
-PEAT Protocol enables distributed autonomous systems to coordinate through hierarchical state synchronization. ADR-012 defines the **schemas** for events, capabilities, and commands. This ADR defines the **protocol behavior** - how events flow through the hierarchy and how aggregation policies are enforced.
+Peat Protocol enables distributed autonomous systems to coordinate through hierarchical state synchronization. ADR-012 defines the **schemas** for events, capabilities, and commands. This ADR defines the **protocol behavior** - how events flow through the hierarchy and how aggregation policies are enforced.
 
 **Core Challenge:**
 
@@ -24,9 +24,9 @@ In a 1000-node company formation with 4 echelons (platform → squad → platoon
 - Operators overwhelmed with undifferentiated data
 - Higher echelons have no situational awareness
 
-**PEAT's Solution:**
+**Peat's Solution:**
 
-Events carry `AggregationPolicy` metadata that tells PEAT *how* to route them:
+Events carry `AggregationPolicy` metadata that tells Peat *how* to route them:
 - **Critical anomalies**: Immediate propagation, preempt other traffic
 - **Routine detections**: Aggregate into summaries at squad level
 - **Telemetry**: Store locally, respond to queries
@@ -45,7 +45,7 @@ This ADR specifies the protocol behavior that enforces these policies.
 
 ### Design Principles
 
-1. **Policy-Driven**: Event producers declare routing intent; PEAT enforces
+1. **Policy-Driven**: Event producers declare routing intent; Peat enforces
 2. **Hierarchical**: Events flow through formation structure, not arbitrary mesh
 3. **Bandwidth-Aware**: Aggregation reduces traffic at each echelon
 4. **Priority-Respecting**: Critical events preempt routine traffic
@@ -560,7 +560,7 @@ impl EventTTLEnforcer {
 
 ### Wire Protocol
 
-Events are transmitted using the standard PEAT transport (ADR-010):
+Events are transmitted using the standard Peat transport (ADR-010):
 
 ```protobuf
 syntax = "proto3";
@@ -753,7 +753,7 @@ Capability summaries are generated at each echelon using `FormationCapabilitySum
 - ADR-012: Schema Definition (PeatEvent, AggregationPolicy schemas)
 - ADR-009: Bidirectional Hierarchical Flows
 - ADR-019: QoS and Data Prioritization
-- ADR-001: PEAT Protocol PoC
+- ADR-001: Peat Protocol PoC
 
 ### Algorithms
 - Weighted Fair Queuing (WFQ)
@@ -767,4 +767,4 @@ Capability summaries are generated at each echelon using `FormationCapabilitySum
 
 ---
 
-**This ADR specifies how PEAT Protocol routes events through the hierarchy, enforces aggregation policies, and enables bandwidth-efficient distributed coordination.**
+**This ADR specifies how Peat Protocol routes events through the hierarchy, enforces aggregation policies, and enables bandwidth-efficient distributed coordination.**

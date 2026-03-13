@@ -8,7 +8,7 @@
 
 ## Summary
 
-Lab 3b implementation is **functionally complete and validated**. All 24 tests passed successfully, demonstrating that the flat mesh PEAT CRDT mode works correctly. The FlatMeshCoordinator has been properly implemented in the peat-mesh core library, and peat-sim correctly uses it without reimplementing functionality or directly integrating with Ditto.
+Lab 3b implementation is **functionally complete and validated**. All 24 tests passed successfully, demonstrating that the flat mesh Peat CRDT mode works correctly. The FlatMeshCoordinator has been properly implemented in the peat-mesh core library, and peat-sim correctly uses it without reimplementing functionality or directly integrating with Ditto.
 
 ---
 
@@ -158,7 +158,7 @@ The implementation is:
 - ✅ Well documented
 
 The missing metrics instrumentation is a minor enhancement that can be added later if needed. It doesn't block this commit because:
-1. The core goal is achieved: flat mesh with PEAT CRDT works
+1. The core goal is achieved: flat mesh with Peat CRDT works
 2. Tests validate functional correctness
 3. The architecture is clean and maintainable
 
@@ -169,7 +169,7 @@ The missing metrics instrumentation is a minor enhancement that can be added lat
 1. **Tag commit**: Lab 3b milestone
 2. **Update Epic #132**: Mark Lab 3b complete
 3. **Future enhancement** (optional): Add CRDT latency instrumentation
-4. **Proceed to Lab 4**: Hierarchical PEAT CRDT (Squad → Platoon → Company)
+4. **Proceed to Lab 4**: Hierarchical Peat CRDT (Squad → Platoon → Company)
 
 ---
 

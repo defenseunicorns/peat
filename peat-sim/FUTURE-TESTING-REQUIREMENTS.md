@@ -1,14 +1,14 @@
-# Future Testing Requirements for PEAT Protocol
+# Future Testing Requirements for Peat Protocol
 
 **Status:** Lab Testing Roadmap
 **Last Updated:** 2025-11-07
-**Purpose:** Document testing requirements to demonstrate PEAT Protocol's differential update benefits and performance characteristics
+**Purpose:** Document testing requirements to demonstrate Peat Protocol's differential update benefits and performance characteristics
 
 ---
 
 ## Executive Summary
 
-Current E8 testing infrastructure successfully measures PEAT Protocol's authorization overhead but **cannot demonstrate differential update benefits** due to simple test scenarios (1 document, all nodes need it). This document outlines requirements for future lab testing to demonstrate CAP's full value proposition.
+Current E8 testing infrastructure successfully measures Peat Protocol's authorization overhead but **cannot demonstrate differential update benefits** due to simple test scenarios (1 document, all nodes need it). This document outlines requirements for future lab testing to demonstrate CAP's full value proposition.
 
 ## Current Testing Status (E8)
 

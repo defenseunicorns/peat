@@ -1,8 +1,8 @@
-# PEAT Protocol Testing Strategy
+# Peat Protocol Testing Strategy
 
 ## Critical Value of Testing
 
-The PEAT Protocol is designed for **autonomous multi-agent systems** operating in dynamic, real-world environments. Testing is not just about code correctness—it's about **mission assurance** in scenarios where:
+The Peat Protocol is designed for **autonomous multi-agent systems** operating in dynamic, real-world environments. Testing is not just about code correctness—it's about **mission assurance** in scenarios where:
 
 - **Human lives depend on system reliability**
 - **Autonomous agents must coordinate without human intervention**
@@ -601,4 +601,4 @@ async fn test_node_sync_across_peers() {
 
 **Last Updated**: 2025-10-31
 **Status**: Living Document
-**Owner**: PEAT Protocol Team
+**Owner**: Peat Protocol Team

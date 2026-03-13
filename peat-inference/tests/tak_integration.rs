@@ -1,6 +1,6 @@
 //! TAK Integration Tests (Issue #330)
 //!
-//! End-to-end integration testing for the Jetson → PEAT → TAK pipeline.
+//! End-to-end integration testing for the Jetson → Peat → TAK pipeline.
 //!
 //! These tests validate:
 //! 1. Capability Advertisement Flow
@@ -234,7 +234,7 @@ async fn test_capability_sync_between_nodes() {
 // Test 2: Live Detection → Track Flow
 // ============================================================================
 
-/// Test the detection → track → PEAT sync flow
+/// Test the detection → track → Peat sync flow
 #[tokio::test]
 async fn test_detection_to_track_flow() {
     use peat_inference::inference::BoundingBox;

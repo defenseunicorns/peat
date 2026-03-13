@@ -1,6 +1,6 @@
-//! Ditto Baseline - Pure Ditto Performance Without PEAT Protocol
+//! Ditto Baseline - Pure Ditto Performance Without Peat Protocol
 //!
-//! This binary provides baseline Ditto performance metrics without PEAT Protocol overhead.
+//! This binary provides baseline Ditto performance metrics without Peat Protocol overhead.
 //! Used for comparison testing to measure CAP's performance impact.
 //!
 //! # What This Tests
@@ -8,14 +8,14 @@
 //! - Pure Ditto SDK performance (no CAP overhead)
 //! - Document creation and replication baseline
 //! - CRDT sync performance without capability checks
-//! - Baseline metrics for PEAT Protocol comparison
+//! - Baseline metrics for Peat Protocol comparison
 //!
 //! # Architecture
 //!
 //! ContainerLab runs multiple instances of this binary:
 //! - Writer nodes: Create test documents
 //! - Reader nodes: Wait to receive documents
-//! - Uses raw Ditto SDK without PEAT Protocol layer
+//! - Uses raw Ditto SDK without Peat Protocol layer
 //!
 //! # Success Criteria
 //!

@@ -9,7 +9,7 @@
 
 ## Overview
 
-This project plan tracks the integration of peat-btle and peat-lite into the PEAT framework and ATAK plugin, implementing ADR-047 (Android BLE Hybrid Integration).
+This project plan tracks the integration of peat-btle and peat-lite into the Peat framework and ATAK plugin, implementing ADR-047 (Android BLE Hybrid Integration).
 
 ---
 
@@ -73,7 +73,7 @@ Create the Kotlin-side BLE implementation that handles Android radio operations.
 |------|--------|-------|
 | Create `peat-btle/android/` module structure | EXISTS | Already has Gradle setup |
 | Create `AndroidBleDelegate.kt` | DONE | 700+ lines, full implementation |
-| Implement BLE scanning with PEAT filter | DONE | ScanCallback with service UUID filter |
+| Implement BLE scanning with Peat filter | DONE | ScanCallback with service UUID filter |
 | Implement BLE advertising with beacon data | DONE | AdvertiseCallback |
 | Implement GATT server (sync_state characteristic) | DONE | BluetoothGattServerCallback |
 | Implement GATT client (connect, read, write) | DONE | BluetoothGattCallback |
@@ -81,7 +81,7 @@ Create the Kotlin-side BLE implementation that handles Android radio operations.
 | Test on Android device | TODO | Manual testing (requires device) |
 
 **Deliverables**:
-- [x] `AndroidBleDelegate` scans and discovers PEAT nodes
+- [x] `AndroidBleDelegate` scans and discovers Peat nodes
 - [x] GATT server accepts connections
 - [ ] Data exchange works with Pi responder (requires testing)
 
@@ -253,9 +253,9 @@ Final cleanup and documentation.
 
 ## References
 
-- [ADR-039: PEAT-BTLE Mesh Transport](adr/039-peat-btle-mesh-transport.md)
+- [ADR-039: Peat-BTLE Mesh Transport](adr/039-peat-btle-mesh-transport.md)
 - [ADR-047: Android BLE Hybrid Integration](adr/047-android-ble-hybrid-integration.md)
 - [ADR-049: peat-mesh Extraction](adr/049-peat-mesh-extraction.md) - Transport layer refactor
-- [ROADMAP.md](../ROADMAP.md) - High-level PEAT Protocol roadmap
+- [ROADMAP.md](../ROADMAP.md) - High-level Peat Protocol roadmap
 - [peat-btle on crates.io](https://crates.io/crates/peat-btle)
 - [peat-btle on Radicle](https://app.radicle.xyz/nodes/rosa.radicle.xyz/rad:z458mp9Um3AYNQQFMdHaNEUtmiohq)

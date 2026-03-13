@@ -1,13 +1,13 @@
 //! Data type classification for QoS (ADR-019)
 //!
-//! Maps PEAT data types to their default QoS classes, enabling
+//! Maps Peat data types to their default QoS classes, enabling
 //! automatic priority assignment based on data semantics.
 
 use super::{QoSClass, QoSPolicy};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-/// PEAT Protocol data types for QoS classification
+/// Peat Protocol data types for QoS classification
 ///
 /// Represents the semantic categories of data flowing through the mesh.
 /// Each type has a default QoS class and policy.

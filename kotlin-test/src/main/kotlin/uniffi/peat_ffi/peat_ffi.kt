@@ -1470,7 +1470,7 @@ private class JavaLangRefCleanable(
     override fun clean() = cleanable.clean()
 }
 /**
- * A PEAT network node with P2P sync capabilities
+ * A Peat network node with P2P sync capabilities
  *
  * Wraps AutomergeBackend + IrohTransport for document sync.
  */
@@ -1566,7 +1566,7 @@ public interface PeatNodeInterface {
 }
 
 /**
- * A PEAT network node with P2P sync capabilities
+ * A Peat network node with P2P sync capabilities
  *
  * Wraps AutomergeBackend + IrohTransport for document sync.
  */
@@ -3040,7 +3040,7 @@ public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.Str
     
 
         /**
-         * Get the PEAT library version
+         * Get the Peat library version
          */ fun `peatVersion`(): kotlin.String {
             return FfiConverterString.lift(
     uniffiRustCall() { _status ->

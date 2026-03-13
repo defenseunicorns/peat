@@ -1,4 +1,4 @@
-//! Message aggregation for PEAT-TAK bridge
+//! Message aggregation for Peat-TAK bridge
 
 use std::collections::HashMap;
 use std::sync::RwLock;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ * Copyright (c) 2026 Defense Unicorns.  All rights reserved.
  */
 
 package com.defenseunicorns.atak.peat
@@ -14,9 +14,9 @@ import gov.tak.api.plugin.IServiceController
 import java.io.File
 
 /**
- * PEAT Plugin Lifecycle Manager
+ * Peat Plugin Lifecycle Manager
  *
- * Main entry point for the PEAT ATAK plugin. Extends AbstractPlugin
+ * Main entry point for the Peat ATAK plugin. Extends AbstractPlugin
  * as per ATAK SDK 5.6 pattern.
  *
  * Uses direct JNI bindings to bypass JNA/UniFFI symbol lookup issues
@@ -81,9 +81,9 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
                 if (PeatJni.test()) {
                     peatFfiInitialized = true
                     val version = PeatJni.peatVersion()
-                    Log.i(TAG, "PEAT JNI bindings working! Version: $version")
+                    Log.i(TAG, "Peat JNI bindings working! Version: $version")
 
-                    // Create PEAT node for P2P sync
+                    // Create Peat node for P2P sync
                     createPeatNodeJni(pluginContext)
                 } else {
                     Log.e(TAG, "JNI bindings test failed")
@@ -101,7 +101,7 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
             peatFfiInitialized = false
         }
 
-        Log.i(TAG, "PEAT Plugin initialized (FFI: $peatFfiInitialized)")
+        Log.i(TAG, "Peat Plugin initialized (FFI: $peatFfiInitialized)")
 
         // Initialize BLE mesh for WearTAK sync
         initBleManager(pluginContext)
@@ -135,7 +135,7 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
 
             if (peatBleManager?.hasPermissions() == true) {
                 val started = peatBleManager?.start() ?: false
-                Log.i(TAG, "PEAT BLE mesh started (fallback): $started [unified BLE requested: $unifiedBleEnabled]")
+                Log.i(TAG, "Peat BLE mesh started (fallback): $started [unified BLE requested: $unifiedBleEnabled]")
 
                 // Bridge BLE peer discovery to Rust TransportManager (ADR-047)
                 // This makes PACE routing aware of BLE-reachable peers
@@ -168,7 +168,7 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
             // IMPORTANT: Clean up any existing node before creating a new one.
             // This prevents database lock issues when plugin reloads without ATAK restart.
             if (peatNodeJni != null) {
-                Log.i(TAG, "Destroying existing PEAT node before creating new one")
+                Log.i(TAG, "Destroying existing Peat node before creating new one")
                 try {
                     peatNodeJni?.close()
                 } catch (e: Exception) {
@@ -177,7 +177,7 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
                 peatNodeJni = null
             }
 
-            // Create storage directory for PEAT data
+            // Create storage directory for Peat data
             // CRITICAL: redb uses mmap which DOES NOT work on Android's FUSE-mounted
             // external storage (/storage/emulated/0/). We MUST use internal app storage.
 
@@ -189,10 +189,10 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
                 Log.d(TAG, "Created ATAK internal files/peat dir: $created")
             }
 
-            Log.d(TAG, "PEAT dir: ${peatDir.absolutePath}")
-            Log.d(TAG, "PEAT dir exists: ${peatDir.exists()}, writable: ${peatDir.canWrite()}, readable: ${peatDir.canRead()}")
+            Log.d(TAG, "Peat dir: ${peatDir.absolutePath}")
+            Log.d(TAG, "Peat dir exists: ${peatDir.exists()}, writable: ${peatDir.canWrite()}, readable: ${peatDir.canRead()}")
 
-            // Get PEAT formation credentials from system properties or defaults
+            // Get Peat formation credentials from system properties or defaults
             val appId = System.getProperty("peat.app_id")
                 ?: System.getenv("PEAT_APP_ID")
                 ?: "default-atak-formation"
@@ -206,8 +206,8 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
             val enableBle = prefs.getBoolean("enable_ble", true) // Enable BLE by default (ADR-039)
             val blePowerProfile = prefs.getString("ble_power_profile", "balanced")
 
-            Log.d(TAG, "Using PEAT formation: $appId")
-            Log.d(TAG, "Creating PEAT node with storage: ${peatDir.absolutePath}, BLE: $enableBle")
+            Log.d(TAG, "Using Peat formation: $appId")
+            Log.d(TAG, "Creating Peat node with storage: ${peatDir.absolutePath}, BLE: $enableBle")
 
             // Use unified transport with BLE enabled (ADR-039, #558)
             // This integrates BLE as a transport within peat-ffi rather than running
@@ -222,7 +222,7 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
 
             if (peatNodeJni != null) {
                 val nodeId = peatNodeJni?.nodeId() ?: "unknown"
-                Log.i(TAG, "PEAT node created - ID: ${nodeId.take(16)}... (unified transport, BLE: $enableBle)")
+                Log.i(TAG, "Peat node created - ID: ${nodeId.take(16)}... (unified transport, BLE: $enableBle)")
 
                 // Signal BLE transport as started if BLE is enabled (ADR-047)
                 if (enableBle) {
@@ -236,12 +236,12 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
 
                 // Start sync
                 val syncStarted = peatNodeJni?.startSync() ?: false
-                Log.i(TAG, "PEAT sync started: $syncStarted, peer count: ${peatNodeJni?.peerCount() ?: 0}")
+                Log.i(TAG, "Peat sync started: $syncStarted, peer count: ${peatNodeJni?.peerCount() ?: 0}")
             } else {
-                Log.e(TAG, "Failed to create PEAT node (returned null)")
+                Log.e(TAG, "Failed to create Peat node (returned null)")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to create PEAT node: ${e.message}", e)
+            Log.e(TAG, "Failed to create Peat node: ${e.message}", e)
         }
     }
 
@@ -257,14 +257,14 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
         try {
             val recovered = PeatNodeJni.getInstance()
             if (recovered != null) {
-                Log.i(TAG, "Recovered PEAT node from global singleton")
+                Log.i(TAG, "Recovered Peat node from global singleton")
                 peatNodeJni = recovered
             }
         } catch (e: UnsatisfiedLinkError) {
             // Native library not loaded - peat-ffi not available
-            Log.d(TAG, "PEAT FFI native library not available")
+            Log.d(TAG, "Peat FFI native library not available")
         } catch (e: Exception) {
-            Log.w(TAG, "Error recovering PEAT node: ${e.message}")
+            Log.w(TAG, "Error recovering Peat node: ${e.message}")
         }
         return peatNodeJni
     }
@@ -368,7 +368,7 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
         }
     }
 
-    // ==================== PEAT Configuration Settings ====================
+    // ==================== Peat Configuration Settings ====================
 
     /**
      * Get the canned message document TTL in seconds.

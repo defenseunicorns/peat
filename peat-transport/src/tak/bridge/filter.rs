@@ -1,4 +1,4 @@
-//! Message filtering for PEAT-TAK bridge
+//! Message filtering for Peat-TAK bridge
 
 use super::config::{AggregationPolicy, BridgeConfig, GeoFilterConfig};
 use super::PeatMessage;

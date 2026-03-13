@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-This lab validates the Mode 4 (Hierarchical Aggregation) P2P refactoring and comprehensive bandwidth testing across all PEAT protocol modes. The refactoring moved Mode 4 from a client-server polling architecture to a pure P2P mesh with event-driven aggregation.
+This lab validates the Mode 4 (Hierarchical Aggregation) P2P refactoring and comprehensive bandwidth testing across all Peat protocol modes. The refactoring moved Mode 4 from a client-server polling architecture to a pure P2P mesh with event-driven aggregation.
 
 ### Key Results
 

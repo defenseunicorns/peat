@@ -1,4 +1,4 @@
-# Lab 4: Hierarchical PEAT CRDT - lab4-hierarchical-1000n-1mbps
+# Lab 4: Hierarchical Peat CRDT - lab4-hierarchical-1000n-1mbps
 # Target nodes: 1000, Actual: 1192
 # Structure: 8 companies × 4 platoons × 4 squads × 8 soldiers
 # Bandwidth: 1mbps

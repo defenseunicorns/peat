@@ -4,13 +4,13 @@
 #![allow(clippy::enum_variant_names)]
 #![allow(dead_code)]
 
-//! PEAT M1 POC - Object Tracking Across Distributed Human-Machine-AI Teams
+//! Peat M1 POC - Object Tracking Across Distributed Human-Machine-AI Teams
 //!
 //! This crate implements the M1 vignette demonstrating:
 //! - Capability-based operations with upward aggregation
 //! - Bidirectional hierarchical flows (tracks up, models down)
 //! - Cross-network coordination via bridge nodes
-//! - TAK integration through PEAT-TAK Bridge
+//! - TAK integration through Peat-TAK Bridge
 //!
 //! ## Inference Pipeline
 //!
@@ -20,7 +20,7 @@
 //! - TrackUpdate message generation
 //! - Performance metrics collection
 //!
-//! ## PEAT Sync Integration
+//! ## Peat Sync Integration
 //!
 //! The `sync` module connects inference to Peat protocol:
 //! - Publish TrackUpdates via Automerge CRDT
@@ -63,13 +63,13 @@ pub use inference::{
     Scenario, SimulatedDetector, SimulatedTracker, Track, Tracker, VideoFrame,
 };
 
-// PEAT sync integration
+// Peat sync integration
 pub use sync::{
     ConnectedPipeline, ConnectedPipelineWithChipouts, PeatSyncClient, PipelineOutputWithChipouts,
     SyncConfig, SyncStats,
 };
 
-// PEAT beacon (edge device registration)
+// Peat beacon (edge device registration)
 pub use beacon::{BeaconConfig, CameraSpec, ComputeSpec, ModelSpec, PeatBeacon};
 
 // Model registry (Issue #107 EPIC 4)

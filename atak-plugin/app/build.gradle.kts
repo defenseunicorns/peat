@@ -153,15 +153,15 @@ dependencies {
     // ATAK Compose helper library
     implementation("com.dittofederal:atak-compose:0.0.4")
 
-    // PEAT FFI Kotlin bindings (copy from kotlin-test or generate)
+    // Peat FFI Kotlin bindings (copy from kotlin-test or generate)
     // The bindings and native .so files will be copied to this module
     // implementation(project(":peat-bindings"))
 
-    // PEAT BLE mesh transport (for WearTAK sync)
+    // Peat BLE mesh transport (for WearTAK sync)
     // 0.0.10 adds field-level delta sync for bandwidth efficiency
     implementation("com.defenseunicorns:peat:0.0.10")
 
-    // PEAT-Lite for canned message encoding/decoding (Kotlin bindings copied directly)
+    // Peat-Lite for canned message encoding/decoding (Kotlin bindings copied directly)
     // Native libs in libs/arm64-v8a, libs/armeabi-v7a, libs/x86_64
     implementation("net.java.dev.jna:jna:5.14.0@aar")  // Required by UniFFI
 

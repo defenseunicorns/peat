@@ -1,4 +1,4 @@
-//! PEAT-TAK Bridge
+//! Peat-TAK Bridge
 //!
 //! Bidirectional bridge between Peat mesh network and TAK ecosystem.
 //! Implements hierarchical filtering, aggregation policies, and QoS integration.
@@ -7,7 +7,7 @@
 //!
 //! ```text
 //! ┌─────────────────────────────────────────────────────────────────┐
-//! │                        PEAT Mesh Network                        │
+//! │                        Peat Mesh Network                        │
 //! │   (Nodes, Cells, Formations with CRDT-synced state)            │
 //! └────────────────────────────┬────────────────────────────────────┘
 //!                              │
@@ -47,7 +47,7 @@ use tracing::debug;
 use super::error::TakError;
 use super::traits::{Priority, TakTransport};
 
-/// PEAT message that can be bridged to TAK
+/// Peat message that can be bridged to TAK
 #[derive(Debug, Clone)]
 pub enum PeatMessage {
     /// Track/platform position update
@@ -101,7 +101,7 @@ impl PeatMessage {
 /// Bridge metrics
 #[derive(Debug, Default)]
 pub struct BridgeMetrics {
-    /// Messages received from PEAT
+    /// Messages received from Peat
     pub messages_received: AtomicU64,
     /// Messages published to TAK
     pub messages_published: AtomicU64,
@@ -160,7 +160,7 @@ pub enum PublishResult {
     TransportError(String),
 }
 
-/// PEAT-TAK Bridge
+/// Peat-TAK Bridge
 ///
 /// Connects Peat mesh network to TAK ecosystem with:
 /// - Hierarchical filtering based on echelon
@@ -209,7 +209,7 @@ impl<T: TakTransport> PeatTakBridge<T> {
         &mut self.encoder
     }
 
-    /// Publish a PEAT message to TAK
+    /// Publish a Peat message to TAK
     ///
     /// Applies filtering and aggregation based on configuration.
     /// Returns the result of the publish attempt.
@@ -281,7 +281,7 @@ impl<T: TakTransport> PeatTakBridge<T> {
         results
     }
 
-    /// Encode a PEAT message to CoT with priority
+    /// Encode a Peat message to CoT with priority
     fn encode_message(&self, message: &PeatMessage) -> Result<(CotEvent, Priority), TakError> {
         let (event, priority) = match message {
             PeatMessage::Track(track) => {

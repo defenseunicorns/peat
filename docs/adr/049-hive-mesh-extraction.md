@@ -2,8 +2,8 @@
 
 **Status**: IMPLEMENTED (All 8 Phases Complete — PRs #622-#629)
 **Date**: 2025-01-31 (proposed) / 2026-02-12 (completed)
-**Authors**: Kit Plummer, Codex  
-**Organization**: (r)evolve - Revolve Team LLC (https://revolveteam.com)  
+**Authors**: Kit Plummer, Claude  
+**Organization**: Defense Unicorns (https://defenseunicorns.com)  
 **Priority**: URGENT - Blocking for Defense Unicorns transition  
 **Relates To**: ADR-011 (Automerge + Iroh), ADR-032 (Pluggable Transport), ADR-039 (peat-btle), ADR-041 (Multi-Transport Embedded)
 
@@ -11,16 +11,16 @@
 
 ## Executive Summary
 
-This ADR defines the extraction of **peat-mesh** - a standalone, open-source CRDT-based mesh synchronization library that serves as a direct alternative to Ditto. This crate provides the foundational sync infrastructure that PEAT Protocol consumes, but contains **zero PEAT-specific semantics**.
+This ADR defines the extraction of **peat-mesh** - a standalone, open-source CRDT-based mesh synchronization library that serves as a direct alternative to Ditto. This crate provides the foundational sync infrastructure that Peat Protocol consumes, but contains **zero Peat-specific semantics**.
 
-**peat-mesh** is to PEAT Protocol what SQLite is to an application - a general-purpose data layer that the application builds upon.
+**peat-mesh** is to Peat Protocol what SQLite is to an application - a general-purpose data layer that the application builds upon.
 
 ### Strategic Importance
 
-1. **IP Clarity**: Clean separation between sync infrastructure (open source) and PEAT Protocol (proprietary IP)
-2. **DU Transition**: Enables Defense Unicorns to receive PEAT Protocol IP without Ditto dependency
+1. **IP Clarity**: Clean separation between sync infrastructure (open source) and Peat Protocol (proprietary IP)
+2. **DU Transition**: Enables Defense Unicorns to receive Peat Protocol IP without Ditto dependency
 3. **Market Position**: Open source Ditto alternative creates competitive dynamics and community adoption
-4. **IETF Pathway**: Sync protocol can be standardized independently of PEAT semantics
+4. **IETF Pathway**: Sync protocol can be standardized independently of Peat semantics
 
 ---
 
@@ -28,7 +28,7 @@ This ADR defines the extraction of **peat-mesh** - a standalone, open-source CRD
 
 ### The Current State
 
-Today, PEAT Protocol's sync capabilities are intertwined with protocol semantics:
+Today, Peat Protocol's sync capabilities are intertwined with protocol semantics:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -51,7 +51,7 @@ Clean separation where peat-mesh is a standalone, reusable sync layer:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    PEAT Protocol (Your IP)                       │
+│                    Peat Protocol (Your IP)                       │
 │                                                                  │
 │  • Hierarchical Aggregation    • Capability Composition         │
 │  • Emergent Capability Synthesis                                │
@@ -77,7 +77,7 @@ Clean separation where peat-mesh is a standalone, reusable sync layer:
 │  │   Iroh (QUIC)  │  peat-btle (BLE)  │  Future: LoRa     │   │
 │  └─────────────────────────────────────────────────────────┘   │
 │                                                                  │
-│           NO PEAT SEMANTICS - sync arbitrary documents          │
+│           NO Peat SEMANTICS - sync arbitrary documents          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -85,9 +85,9 @@ Clean separation where peat-mesh is a standalone, reusable sync layer:
 
 | Stakeholder | Benefit |
 |-------------|---------|
-| **Defense Unicorns** | Receives PEAT Protocol IP without Ditto licensing complexity |
+| **Defense Unicorns** | Receives Peat Protocol IP without Ditto licensing complexity |
 | **Open Source Community** | Gets a Ditto alternative for their own mesh sync needs |
-| **PEAT Users** | Can choose sync backend (peat-mesh vs Ditto) based on requirements |
+| **Peat Users** | Can choose sync backend (peat-mesh vs Ditto) based on requirements |
 | **IETF Standardization** | Sync protocol can be specified independently |
 | **Competitive Position** | Open standard beats proprietary lock-in (Anduril Lattice, etc.) |
 
@@ -290,7 +290,7 @@ pub enum ConflictResolution {
 Current state assessment needed:
 - [ ] Audit `peat-protocol/src/sync/` - what's reusable?
 - [ ] Audit `peat-protocol/src/transport/` - what's reusable?
-- [ ] Identify PEAT-specific code that must NOT be extracted
+- [ ] Identify Peat-specific code that must NOT be extracted
 - [ ] Identify generic sync code that SHOULD be extracted
 
 #### Q3: Transport Layer Ownership
@@ -314,7 +314,7 @@ Options:
 2. **MeshProvider moves to peat-mesh** - The trait is part of peat-mesh's public API
 3. **MeshProvider is a wrapper** - peat-protocol defines MeshProvider, which wraps peat-mesh internally
 
-*Recommendation*: Option 1 - MeshProvider trait stays in peat-protocol (it's the PEAT-specific interface), peat-mesh implements it. This allows other implementations (Ditto, mock) to also implement MeshProvider.
+*Recommendation*: Option 1 - MeshProvider trait stays in peat-protocol (it's the Peat-specific interface), peat-mesh implements it. This allows other implementations (Ditto, mock) to also implement MeshProvider.
 
 ```rust
 // In peat-protocol
@@ -337,7 +337,7 @@ impl MeshProvider for DittoMesh { ... }
 | **Monorepo** | Easier development, atomic changes | IP boundary less clear, harder for community |
 | **Cargo workspace** | Best of both - separate crates, shared tooling | Still need clear ownership boundaries |
 
-*Recommendation*: Separate repo (`github.com/revolveteam/peat-mesh`) for clean IP separation and community adoption. PEAT Protocol depends on it as external crate.
+*Recommendation*: Separate repo (`github.com/defenseunicorns/peat-mesh`) for clean IP separation and community adoption. Peat Protocol depends on it as external crate.
 
 ### Tactical Questions
 
@@ -360,7 +360,7 @@ Deferred to post-MVP:
 
 #### Q7: Testing Strategy
 
-**How do we validate peat-mesh independently of PEAT Protocol?**
+**How do we validate peat-mesh independently of Peat Protocol?**
 
 - [ ] Unit tests for Collection/Document API
 - [ ] Integration tests with multiple mesh instances
@@ -459,7 +459,7 @@ full = ["iroh", "ble"]
 
 ### Phase 1: Core Extraction (THIS WEEK - DU Blocking)
 
-**Goal**: Minimal viable peat-mesh that PEAT Protocol can depend on
+**Goal**: Minimal viable peat-mesh that Peat Protocol can depend on
 
 - [ ] Create `peat-mesh` repository
 - [ ] Define public API (PeatMesh, Collection, Document)
@@ -472,14 +472,14 @@ full = ["iroh", "ble"]
 
 **Deliverable**: `peat-mesh` crate that compiles and syncs documents between two nodes
 
-### Phase 2: PEAT Protocol Integration (Week 2)
+### Phase 2: Peat Protocol Integration (Week 2)
 
 - [ ] Implement MeshProvider trait for PeatMesh
 - [ ] Refactor peat-protocol to use peat-mesh
-- [ ] Verify all existing PEAT tests pass
+- [ ] Verify all existing Peat tests pass
 - [ ] Document migration from embedded sync to peat-mesh
 
-**Deliverable**: PEAT Protocol uses peat-mesh, all tests green
+**Deliverable**: Peat Protocol uses peat-mesh, all tests green
 
 ### Phase 3: Production Hardening (Week 3-4)
 
@@ -521,8 +521,8 @@ full = ["iroh", "ble"]
 - [ ] Two nodes can sync documents via Iroh
 - [ ] Offline changes merge correctly on reconnection
 - [ ] CRDT conflicts resolve deterministically
-- [ ] PEAT Protocol works with peat-mesh backend
-- [ ] No PEAT-specific code in peat-mesh
+- [ ] Peat Protocol works with peat-mesh backend
+- [ ] No Peat-specific code in peat-mesh
 
 ### Performance
 
@@ -544,8 +544,8 @@ full = ["iroh", "ble"]
 
 ### Positive
 
-- **Clean IP separation** - PEAT Protocol is clearly differentiated from sync infrastructure
-- **Open source adoption** - Community can use peat-mesh without PEAT
+- **Clean IP separation** - Peat Protocol is clearly differentiated from sync infrastructure
+- **Open source adoption** - Community can use peat-mesh without Peat
 - **DU transition unblocked** - No Ditto dependency in delivered IP
 - **Competitive positioning** - Open standard beats proprietary
 - **Easier testing** - Can test sync layer independently
@@ -554,15 +554,15 @@ full = ["iroh", "ble"]
 
 - **Development effort** - Extraction takes time
 - **Two codebases** - Must maintain peat-mesh separately
-- **Version coordination** - PEAT Protocol must track peat-mesh versions
+- **Version coordination** - Peat Protocol must track peat-mesh versions
 - **Community support** - Open source means issue triage, PRs, etc.
 
 ### Risks
 
 - **Scope creep** - "Just one more feature" delays delivery
-- **API instability** - Changing peat-mesh API breaks PEAT Protocol
+- **API instability** - Changing peat-mesh API breaks Peat Protocol
 - **Performance regression** - Extraction might miss optimizations
-- **Incomplete extraction** - PEAT-specific code accidentally included
+- **Incomplete extraction** - Peat-specific code accidentally included
 
 ---
 
@@ -585,7 +585,7 @@ full = ["iroh", "ble"]
 |------|----------|-----------|
 | 2025-01-31 | Extract peat-mesh as standalone crate | IP clarity for DU transition, open source positioning |
 | 2025-01-31 | Automerge + Iroh as foundation | Already validated in ADR-011, production-ready |
-| 2025-01-31 | Zero PEAT semantics in peat-mesh | Clean separation, general-purpose utility |
+| 2025-01-31 | Zero Peat semantics in peat-mesh | Clean separation, general-purpose utility |
 | 2026-02-11 | Phase 0: Break reverse deps (PR #622) | Remove all peat-protocol/peat-schema imports from peat-mesh |
 | 2026-02-11 | Phase 1: Generic trait surface (PR #623) | DocumentStore, SyncEngine, DiscoveryStrategy traits |
 | 2026-02-11 | Phase 2: Transport layer (PR #624) | Multi-transport manager, bypass, health, reconnection |

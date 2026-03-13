@@ -1,6 +1,6 @@
 # peat-transport
 
-HTTP/REST API transport layer for PEAT Protocol external integration.
+HTTP/REST API transport layer for Peat Protocol external integration.
 
 ## Overview
 
@@ -256,4 +256,4 @@ MIT
 
 - [ADR-012: Schema Definition and Protocol Extensibility](../docs/adr/012-schema-definition-protocol-extensibility.md)
 - [peat-schema](../peat-schema/README.md) - Protocol Buffer message definitions
-- [peat-protocol](../peat-protocol/README.md) - Core PEAT Protocol implementation
+- [peat-protocol](../peat-protocol/README.md) - Core Peat Protocol implementation

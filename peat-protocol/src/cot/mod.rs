@@ -1,13 +1,13 @@
 //! # Cursor-on-Target (CoT) Translation Layer
 //!
-//! This module provides bidirectional translation between PEAT messages and
+//! This module provides bidirectional translation between Peat messages and
 //! CoT XML format for TAK (Team Awareness Kit) integration.
 //!
 //! ## Architecture (ADR-020, ADR-028)
 //!
 //! ```text
 //! ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-//! │  PEAT Messages  │ ──▶│   CoT Encoder   │ ──▶│    TAK/ATAK     │
+//! │  Peat Messages  │ ──▶│   CoT Encoder   │ ──▶│    TAK/ATAK     │
 //! │                 │    │                 │    │                 │
 //! │  TrackUpdate    │    │  XML Generation │    │  Situational    │
 //! │  Capability     │    │  _peat_ Ext     │    │  Awareness      │
@@ -17,11 +17,11 @@
 //!
 //! ## Components
 //!
-//! - [`types`]: PEAT message types for TAK integration (TrackUpdate, etc.)
+//! - [`types`]: Peat message types for TAK integration (TrackUpdate, etc.)
 //! - [`event`]: CoT Event structure and XML encoding
 //! - [`type_mapper`]: MIL-STD-2525 symbol type mappings
 //! - [`peat_extension`]: `<_peat_>` custom detail extension schema
-//! - [`encoder`]: PEAT → CoT message encoding
+//! - [`encoder`]: Peat → CoT message encoding
 
 pub mod encoder;
 pub mod event;

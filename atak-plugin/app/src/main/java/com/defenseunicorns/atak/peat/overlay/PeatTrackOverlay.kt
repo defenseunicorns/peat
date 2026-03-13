@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ * Copyright (c) 2026 Defense Unicorns.  All rights reserved.
  */
 
 package com.defenseunicorns.atak.peat.overlay
@@ -15,7 +15,7 @@ import com.atakmap.coremap.maps.coords.GeoPoint
 import com.defenseunicorns.atak.peat.model.PeatTrack
 
 /**
- * Manages PEAT track markers on the ATAK map.
+ * Manages Peat track markers on the ATAK map.
  *
  * Tracks are displayed as markers with:
  * - Icon based on classification (person, vehicle, etc.)
@@ -45,13 +45,13 @@ class PeatTrackOverlay(private val mapView: MapView) {
             return
         }
 
-        // Find or create PEAT Tracks group
+        // Find or create Peat Tracks group
         mapGroup = rootGroup.findMapGroup(GROUP_NAME)
         if (mapGroup == null) {
             mapGroup = rootGroup.addGroup(GROUP_NAME)
-            Log.i(TAG, "Created PEAT Tracks map group")
+            Log.i(TAG, "Created Peat Tracks map group")
         } else {
-            Log.d(TAG, "Found existing PEAT Tracks map group")
+            Log.d(TAG, "Found existing Peat Tracks map group")
         }
     }
 

@@ -458,7 +458,7 @@ cell_variants:
 
 ## Notes
 
-This is a foundational architectural decision that affects all subsequent work. Taking 2-3 days now to implement properly will save weeks of refactoring later and enable realistic demonstrations of the PEAT protocol in human-machine teaming scenarios.
+This is a foundational architectural decision that affects all subsequent work. Taking 2-3 days now to implement properly will save weeks of refactoring later and enable realistic demonstrations of the Peat protocol in human-machine teaming scenarios.
 
 The tunable configuration system is critical for research - allows experimentation with different authority policies to find optimal human-machine teaming strategies.
 

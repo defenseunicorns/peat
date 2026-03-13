@@ -1,6 +1,6 @@
-# PEAT Protocol Diagrams
+# Peat Protocol Diagrams
 
-This directory contains normative diagrams for the PEAT Protocol specification.
+This directory contains normative diagrams for the Peat Protocol specification.
 
 ## Purpose
 

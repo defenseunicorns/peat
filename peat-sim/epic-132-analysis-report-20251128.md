@@ -3,14 +3,14 @@
 
 ### Executive Summary
 
-All four labs completed successfully, validating the PEAT Protocol's distribution architecture across different topologies and bandwidth constraints.
+All four labs completed successfully, validating the Peat Protocol's distribution architecture across different topologies and bandwidth constraints.
 
 | Lab | Tests Run | Passed | Warnings | Failed | Status |
 |-----|-----------|--------|----------|--------|--------|
 | Lab 1: Producer-Only Baseline | 32 | 32 | 0 | 0 | **PASS** |
 | Lab 2: Client-Server Full Replication | 28 | 28 | 0 | 0 | **PASS** |
-| Lab 3b: PEAT Flat Mesh CRDT | 24 | 24 | 0 | 0 | **PASS** |
-| Lab 4: PEAT Hierarchical CRDT | 17 | 17 | 0 | 0 | **PASS** |
+| Lab 3b: Peat Flat Mesh CRDT | 24 | 24 | 0 | 0 | **PASS** |
+| Lab 4: Peat Hierarchical CRDT | 17 | 17 | 0 | 0 | **PASS** |
 
 **Lab 4 Notes (December 1 Update):**
 - 17 PASS: 24n, 48n, 96n, 384n (all bandwidths) + 1000n at 1gbps
@@ -78,7 +78,7 @@ All four labs completed successfully, validating the PEAT Protocol's distributio
 
 ---
 
-## Lab 3b: PEAT Flat Mesh CRDT (P2P Sync)
+## Lab 3b: Peat Flat Mesh CRDT (P2P Sync)
 
 **Purpose:** Test Ditto CRDT backend with flat mesh topology (all nodes as peers).
 
@@ -103,7 +103,7 @@ All four labs completed successfully, validating the PEAT Protocol's distributio
 
 ---
 
-## Lab 4: PEAT Hierarchical CRDT (Multi-Tier Aggregation)
+## Lab 4: Peat Hierarchical CRDT (Multi-Tier Aggregation)
 
 **Purpose:** Test hierarchical topology with CRDT (squad → platoon → company tiers).
 

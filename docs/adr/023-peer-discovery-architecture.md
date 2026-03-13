@@ -7,7 +7,7 @@
 
 ## Context
 
-PEAT requires peer discovery mechanisms to enable nodes to find and connect to each other in the P2P mesh network. Discovery needs vary by operational scale:
+Peat requires peer discovery mechanisms to enable nodes to find and connect to each other in the P2P mesh network. Discovery needs vary by operational scale:
 
 ### Tactical/Local Scale (meters to kilometers)
 - Squad members discovering squad leader
@@ -203,7 +203,7 @@ peat-mesh/src/discovery/
 - **Ethereum**: Kademlia DHT for global node discovery
 - **Polkadot**: libp2p-kad + mDNS
 
-PEAT follows similar pattern: **Local discovery (beacons) + optional global discovery (DHT)**.
+Peat follows similar pattern: **Local discovery (beacons) + optional global discovery (DHT)**.
 
 ## References
 

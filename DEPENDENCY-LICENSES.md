@@ -1,4 +1,4 @@
-# PEAT Project - Complete Dependency License Report
+# Peat Project - Complete Dependency License Report
 
 Generated: $(date +%Y-%m-%d)
 
@@ -1059,7 +1059,7 @@ Generated: $(date +%Y-%m-%d)
 | com.android.tools.build:gradle:8.13.0 | Apache-2.0 |
 | com.dittofederal:atak-compose:0.0.4 | Proprietary |
 | com.google.android.material:material:1.11.0 | Apache-2.0 |
-| com.revolveteam:peat:0.0.10 | Proprietary |
+| com.defenseunicorns:peat:0.0.10 | Proprietary |
 | junit:junit:4.13.2 | EPL-1.0 |
 | net.java.dev.jna:jna:5.14.0 | Apache-2.0/LGPL-2.1 |
 | org.jetbrains.kotlin:compose-compiler-gradle-plugin:2.1.10 | Apache-2.0 |

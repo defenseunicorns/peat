@@ -3,17 +3,17 @@ import java.io.File
 import java.util.UUID
 
 /**
- * PEAT Kotlin FFI Test Application
+ * Peat Kotlin FFI Test Application
  *
  * Tests the UniFFI bindings to the Rust peat-ffi crate.
  */
 fun main() {
-    println("=== PEAT Kotlin FFI Test ===\n")
+    println("=== Peat Kotlin FFI Test ===\n")
 
     // Test 1: Get library version
     println("1. Testing peatVersion()...")
     val version = peatVersion()
-    println("   PEAT library version: $version")
+    println("   Peat library version: $version")
     check(version.isNotEmpty()) { "Version should not be empty" }
     println("   ✓ Version check passed\n")
 

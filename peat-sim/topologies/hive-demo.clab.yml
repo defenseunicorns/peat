@@ -1,6 +1,6 @@
-# PEAT Demo Topology (Issue #293)
+# Peat Demo Topology (Issue #293)
 #
-# Three-network demo topology for PEAT protocol demonstration:
+# Three-network demo topology for Peat protocol demonstration:
 # - C2 Network: Command and control systems (TAK Server, WebTAK, MLOps)
 # - Network A (Alpha): Tactical team with operator, UGV, Jetson
 # - Network B (Bravo): Tactical team with operator, UAV, Jetson

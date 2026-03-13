@@ -1,4 +1,4 @@
-//! Data models for the PEAT protocol
+//! Data models for the Peat protocol
 
 pub mod capability;
 pub mod cell;

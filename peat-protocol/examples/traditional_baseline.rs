@@ -1,6 +1,6 @@
 //! Traditional IoT Baseline - Event-Driven Full State Messaging
 //!
-//! This is a NON-CRDT baseline implementation for comparing PEAT Protocol performance
+//! This is a NON-CRDT baseline implementation for comparing Peat Protocol performance
 //! against traditional IoT architectures.
 //!
 //! # Architecture

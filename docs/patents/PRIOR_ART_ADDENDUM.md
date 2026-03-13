@@ -24,13 +24,13 @@ The inventors acknowledge prior work in distributed autonomous systems coordinat
 **Concepts Derived from COD**:
 - **Prioritization**: Concept of priority-based data synchronization in bandwidth-constrained environments
   - COD demonstrated prioritizing critical mission data over routine telemetry
-  - PEAT Protocol may incorporate similar prioritization concepts (not currently claimed in this application)
+  - Peat Protocol may incorporate similar prioritization concepts (not currently claimed in this application)
 
 **Note**: Prioritization concepts are **NOT claimed** in the present patent applications. If future patent applications include prioritization, they will explicitly cite COD as prior art and claim only novel improvements.
 
-### Differentiation: PEAT Protocol Innovations
+### Differentiation: Peat Protocol Innovations
 
-The present invention (PEAT Protocol) was developed independently at (r)evolve LLC (2024-2025) and differs substantially from COD in the following critical ways:
+The present invention (Peat Protocol) was developed independently at Defense Unicorns LLC (2024-2025) and differs substantially from COD in the following critical ways:
 
 #### Innovation 1: Hierarchical Capability Composition (Not in COD)
 
@@ -87,9 +87,9 @@ The present invention (PEAT Protocol) was developed independently at (r)evolve L
 
 **Key Distinction**: While COD uses CRDTs for mesh networking, CAP extends CRDTs with hierarchical composition and authority control semantics not present in COD.
 
-### Independent Development at (r)evolve LLC
+### Independent Development at Defense Unicorns LLC
 
-PEAT Protocol was developed independently at (r)evolve LLC using:
+Peat Protocol was developed independently at Defense Unicorns LLC using:
 
 1. **Public Knowledge**:
    - Published CRDT literature (Shapiro et al., Automerge project)
@@ -103,14 +103,14 @@ PEAT Protocol was developed independently at (r)evolve LLC using:
    - CRDT-based composition engine (implemented 2024-2025)
 
 3. **Clean-Room Implementation**:
-   - PEAT Protocol codebase written from scratch at (r)evolve
+   - Peat Protocol codebase written from scratch at Defense Unicorns
    - No COD source code incorporated
    - No Ditto proprietary algorithms used beyond publicly documented CRDT patterns
 
 ### Coordination with DIU
 
 The inventors have proactively coordinated with the Defense Innovation Unit program manager for COD to:
-- Ensure transparency about PEAT Protocol development
+- Ensure transparency about Peat Protocol development
 - Confirm that CAP innovations extend beyond COD scope
 - Maintain good faith with government sponsors
 
@@ -123,10 +123,10 @@ The inventors have proactively coordinated with the Defense Innovation Unit prog
 - Government can use, modify, and share COD with contractors for government purposes
 - Ditto Technologies retains commercial rights to COD
 
-**PEAT Protocol Government Rights**:
-- No government funding for PEAT Protocol development to date
+**Peat Protocol Government Rights**:
+- No government funding for Peat Protocol development to date
 - If future SBIR/STTR funding received, government rights will be disclosed per FAR 52.227-11
-- (r)evolve LLC retains full commercial rights to CAP innovations
+- Defense Unicorns LLC retains full commercial rights to CAP innovations
 
 ### Summary of Novelty
 
@@ -149,7 +149,7 @@ The present patent applications claim:
 
 ### Conclusion
 
-While the inventors gained valuable domain expertise through COD participation, **the core PEAT Protocol innovations (hierarchical composition and graduated authority control) are independent and novel contributions** developed at (r)evolve LLC. This disclosure ensures transparency with USPTO and acknowledges prior art while clearly delineating CAP's novel contributions.
+While the inventors gained valuable domain expertise through COD participation, **the core Peat Protocol innovations (hierarchical composition and graduated authority control) are independent and novel contributions** developed at Defense Unicorns LLC. This disclosure ensures transparency with USPTO and acknowledges prior art while clearly delineating CAP's novel contributions.
 
 ---
 
@@ -178,7 +178,7 @@ While the inventors gained valuable domain expertise through COD participation, 
 
 1. **Good Faith with USPTO**: Shows awareness of prior art, strengthens patent
 2. **Reduces Ditto Challenge Risk**: Acknowledges COD, focuses on differentiation
-3. **Clear Inventorship**: Documents independent development at (r)evolve
+3. **Clear Inventorship**: Documents independent development at Defense Unicorns
 4. **Government Transparency**: Discloses prior DIU work, maintains trust
 5. **Patent Enforceability**: If challenged, can point to explicit prior art disclosure
 

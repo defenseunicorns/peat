@@ -1,10 +1,10 @@
 //! Orchestration Service - Issue #177 Phase 3 / ADR-026
 //!
 //! The `OrchestrationService` coordinates software deployment lifecycle:
-//! - Fetches blobs via PEAT BlobStore
+//! - Fetches blobs via Peat BlobStore
 //! - Selects appropriate RuntimeAdapter for each artifact type
 //! - Manages instance lifecycle (deploy, health, undeploy)
-//! - Routes products/anomalies through PEAT events
+//! - Routes products/anomalies through Peat events
 //! - Publishes capability advertisements
 //!
 //! ## Usage
@@ -114,8 +114,8 @@ pub struct DeploymentResult {
 
 /// Trait for blob storage backend
 ///
-/// Abstracts the PEAT BlobStore for dependency injection.
-/// In production, use the actual PEAT BlobStore implementation.
+/// Abstracts the Peat BlobStore for dependency injection.
+/// In production, use the actual Peat BlobStore implementation.
 #[async_trait::async_trait]
 pub trait BlobStorage: Send + Sync {
     /// Fetch a blob by hash and return its local path
@@ -127,7 +127,7 @@ pub trait BlobStorage: Send + Sync {
 
 /// Trait for event publishing
 ///
-/// Abstracts PEAT event publishing for dependency injection.
+/// Abstracts Peat event publishing for dependency injection.
 #[async_trait::async_trait]
 pub trait EventPublisher: Send + Sync {
     /// Publish a product event
@@ -307,7 +307,7 @@ impl CapabilityPublisher for SimulatedCapabilityPublisher {
 /// - Manages runtime adapters for different artifact types
 /// - Fetches blobs and activates instances
 /// - Monitors health and publishes events
-/// - Advertises capabilities to the PEAT network
+/// - Advertises capabilities to the Peat network
 pub struct OrchestrationService {
     /// Blob storage backend
     blob_storage: Arc<dyn BlobStorage>,

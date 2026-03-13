@@ -1,6 +1,6 @@
 //! Schema validation utilities
 //!
-//! This module provides validation functions for PEAT Protocol messages to ensure:
+//! This module provides validation functions for Peat Protocol messages to ensure:
 //! - Confidence scores are within valid range (0.0 - 1.0)
 //! - Required fields are present
 //! - Semantic constraints are satisfied

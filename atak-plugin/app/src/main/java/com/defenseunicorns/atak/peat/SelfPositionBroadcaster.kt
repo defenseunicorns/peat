@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ * Copyright (c) 2026 Defense Unicorns.  All rights reserved.
  */
 
 package com.defenseunicorns.atak.peat
@@ -13,11 +13,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Broadcasts ATAK self-position (PLI) to the PEAT network.
+ * Broadcasts ATAK self-position (PLI) to the Peat network.
  *
  * This class monitors the device's self-marker in ATAK and periodically
- * publishes the position as a platform to the PEAT mesh network. This allows
- * other PEAT nodes (including the test client) to see the ATAK user's position.
+ * publishes the position as a platform to the Peat mesh network. This allows
+ * other Peat nodes (including the test client) to see the ATAK user's position.
  *
  * @param mapView The ATAK MapView to get self-marker from
  */
@@ -37,7 +37,7 @@ class SelfPositionBroadcaster(private val mapView: MapView) {
     var onBroadcastCallback: ((success: Boolean, message: String) -> Unit)? = null
 
     /**
-     * Start broadcasting self-position to PEAT network.
+     * Start broadcasting self-position to Peat network.
      * Does nothing if already running.
      */
     fun start() {
@@ -98,7 +98,7 @@ class SelfPositionBroadcaster(private val mapView: MapView) {
     }
 
     /**
-     * Broadcast current self-position to PEAT network.
+     * Broadcast current self-position to Peat network.
      */
     private fun broadcastSelfPosition() {
         // Get the self-marker from ATAK
@@ -148,11 +148,11 @@ class SelfPositionBroadcaster(private val mapView: MapView) {
             if (cellId != null) put("cell_id", cellId)
         }
 
-        // Get PEAT node and publish
+        // Get Peat node and publish
         val node = PeatPluginLifecycle.getInstance()?.getPeatNodeJni()
         if (node == null) {
-            Log.w(TAG, "PEAT node not available")
-            onBroadcastCallback?.invoke(false, "PEAT not connected")
+            Log.w(TAG, "Peat node not available")
+            onBroadcastCallback?.invoke(false, "Peat not connected")
             return
         }
 

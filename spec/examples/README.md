@@ -1,6 +1,6 @@
-# PEAT Protocol Examples
+# Peat Protocol Examples
 
-This directory contains normative message examples for the PEAT Protocol.
+This directory contains normative message examples for the Peat Protocol.
 
 ## Purpose
 

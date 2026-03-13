@@ -1,6 +1,6 @@
 # Traditional IoT Baseline - Design Document
 
-**Purpose:** Non-CRDT baseline implementation for PEAT Protocol architectural comparison
+**Purpose:** Non-CRDT baseline implementation for Peat Protocol architectural comparison
 **Date:** 2025-11-07
 **Status:** Design phase
 
@@ -46,7 +46,7 @@ Every node sends ENTIRE state every period.
 Server receives, aggregates, redistributes.
 ```
 
-**PEAT Protocol (for comparison):**
+**Peat Protocol (for comparison):**
 ```
 ┌─────────┐                        ┌─────────┐
 │ Node 2  │←──── Delta Sync ───────│ Node 1  │
@@ -306,7 +306,7 @@ traditional_baseline \
 - Low frequency (10s) → Better bandwidth, worse latency
 - High frequency (1s) → Better latency, worse bandwidth
 
-**PEAT Protocol:**
+**Peat Protocol:**
 - Event-driven updates → Best of both worlds
 - Low latency (<100ms) AND low bandwidth (deltas only)
 
@@ -336,7 +336,7 @@ CAP Differential:  <100ms   (event-driven + filtered)
 3. Bandwidth usage matches calculation: `nodes × msg_size / period`
 4. Full state transmitted every period (no delta compression)
 
-✅ **PEAT Protocol demonstrates value if:**
+✅ **Peat Protocol demonstrates value if:**
 1. CRDT reduces bandwidth by 60-95% vs Traditional (delta sync benefit)
 2. CRDT reduces latency by 50-90% vs Traditional (event-driven benefit)
 3. CAP filtering reduces bandwidth by additional 30-50% (capability benefit)

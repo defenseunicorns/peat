@@ -109,9 +109,9 @@ impl TakServerTransport {
             .identity
             .as_ref()
             .map(|i| i.callsign.as_str())
-            .unwrap_or("PEAT-BRIDGE");
+            .unwrap_or("Peat-BRIDGE");
 
-        let uid = format!("PEAT-{}", uuid::Uuid::new_v4());
+        let uid = format!("Peat-{}", uuid::Uuid::new_v4());
         // Default position at 0,0 for presence announcement
         // Real position would come from configuration or GPS
         let presence = CotEventBuilder::new()

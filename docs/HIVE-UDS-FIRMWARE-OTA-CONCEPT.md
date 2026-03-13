@@ -1,4 +1,4 @@
-# PEAT + UDS: Firmware, Models, and Software Delivery Beyond the Enterprise Edge
+# Peat + UDS: Firmware, Models, and Software Delivery Beyond the Enterprise Edge
 
 **Concept Document — Defense Unicorns Integration Discussion**
 **Date**: 2026-02-22
@@ -8,9 +8,9 @@
 
 UDS delivers software to Kubernetes clusters. But customers operating at the tactical edge need to deliver **firmware to drones**, **AI models to GPU nodes**, **configs to radios**, and **software to vehicles** — none of which run Kubernetes.
 
-**PEAT extends UDS to every target type**, using a unified mesh protocol for coordination, distribution, and convergence tracking across the full spectrum of platforms — from cloud data centers to embedded microcontrollers.
+**Peat extends UDS to every target type**, using a unified mesh protocol for coordination, distribution, and convergence tracking across the full spectrum of platforms — from cloud data centers to embedded microcontrollers.
 
-This document outlines how PEAT's protocol and mesh networking capabilities address the firmware/OTA delivery use case and broader software supply chain needs beyond the enterprise edge.
+This document outlines how Peat's protocol and mesh networking capabilities address the firmware/OTA delivery use case and broader software supply chain needs beyond the enterprise edge.
 
 ## The Customer Problem
 
@@ -60,11 +60,11 @@ Defense and intelligence customers have a consistent set of needs that no single
 
 **No tool provides unified delivery across firmware + models + containers + config in disconnected environments.**
 
-## PEAT's Value Proposition
+## Peat's Value Proposition
 
-### What PEAT Brings to the Table
+### What Peat Brings to the Table
 
-PEAT is a mesh networking protocol built on CRDTs (Conflict-free Replicated Data Types) that provides:
+Peat is a mesh networking protocol built on CRDTs (Conflict-free Replicated Data Types) that provides:
 
 | Capability | How It Helps |
 |------------|-------------|
@@ -82,24 +82,24 @@ PEAT is a mesh networking protocol built on CRDTs (Conflict-free Replicated Data
 ┌──────────────────────────────────────────────────────────────────┐
 │                        Cloud / Enterprise                         │
 │                                                                   │
-│   CI/CD Pipeline ──▶ Artifact Registry ──▶ PEAT Gateway Node     │
+│   CI/CD Pipeline ──▶ Artifact Registry ──▶ Peat Gateway Node     │
 │   (builds firmware,    (OCI, firmware     (publishes manifests,  │
 │    models, Zarf pkgs)   images, ONNX)      distributes metadata) │
 │                                                                   │
 └─────────────────────────────────┬─────────────────────────────────┘
-                                  │ PEAT Sync (metadata + blobs)
+                                  │ Peat Sync (metadata + blobs)
                                   │
 ┌─────────────────────────────────┼─────────────────────────────────┐
 │                     FOB / Base  ▼                                  │
 │                                                                    │
 │   ┌────────────┐  ┌────────────┐  ┌────────────┐                  │
-│   │ Zarf Mirror│  │ PEAT Node  │  │ Blob Cache │                  │
+│   │ Zarf Mirror│  │ Peat Node  │  │ Blob Cache │                  │
 │   │ (K8s pkgs) │  │ (metadata) │  │ (firmware, │                  │
 │   │            │  │            │  │  models)   │                  │
 │   └────────────┘  └─────┬──────┘  └────────────┘                  │
 │                          │                                         │
 └──────────────────────────┼─────────────────────────────────────────┘
-                           │ PEAT Sync (hierarchical cascade)
+                           │ Peat Sync (hierarchical cascade)
               ┌────────────┼──────────────┐
               │            │              │
               ▼            ▼              ▼
@@ -117,7 +117,7 @@ PEAT is a mesh networking protocol built on CRDTs (Conflict-free Replicated Data
      UDS Core         Camera FW       Nav config
 ```
 
-**PEAT is the coordination layer that ties all of this together.** Zarf remains the K8s delivery mechanism. Firmware OTA agents handle embedded targets. ONNX Runtime handles AI models. PEAT provides the mesh, the metadata sync, the convergence tracking, and the fleet visibility across all of them.
+**Peat is the coordination layer that ties all of this together.** Zarf remains the K8s delivery mechanism. Firmware OTA agents handle embedded targets. ONNX Runtime handles AI models. Peat provides the mesh, the metadata sync, the convergence tracking, and the fleet visibility across all of them.
 
 ## The Firmware OTA Use Case in Detail
 
@@ -133,7 +133,7 @@ PEAT is a mesh networking protocol built on CRDTs (Conflict-free Replicated Data
 | Runtime dependency | Container runtime, K8s | **None — just a bootloader and bare metal** |
 | Size | 100MB-1GB (layered) | **500KB-100MB (monolithic binary)** |
 
-### What PEAT Provides for Firmware OTA
+### What Peat Provides for Firmware OTA
 
 **1. Firmware Manifest — "What firmware goes on what hardware"**
 
@@ -153,7 +153,7 @@ Cloud ──QUIC──▶ FOB ──QUIC──▶ Vehicle Gateway ──BLE─�
                  └──QUIC──▶ Other Vehicle ──Serial──▶ ECU
 ```
 
-PEAT's multi-transport mesh means firmware can flow over whatever link is available:
+Peat's multi-transport mesh means firmware can flow over whatever link is available:
 - QUIC for high-bandwidth backbone links
 - BLE for close-range maintenance updates
 - UDP for WiFi-connected embedded devices
@@ -184,7 +184,7 @@ Over a 9.6Kbps tactical link:
 
 **5. Convergence Tracking — "Are all my drones updated?"**
 
-PEAT's CRDT-based status aggregation gives fleet-wide visibility:
+Peat's CRDT-based status aggregation gives fleet-wide visibility:
 - Each device reports its firmware version and OTA state
 - Status aggregates through the hierarchy (squad → platoon → company → battalion)
 - Operators see convergence percentage, blockers, and stragglers at each echelon
@@ -201,10 +201,10 @@ The OTA agent enforces safety constraints before firmware activation:
 
 Automatic rollback if the new firmware fails boot verification.
 
-### The OTA Lifecycle Through PEAT
+### The OTA Lifecycle Through Peat
 
 ```
-1. PUBLISH    — CI/CD builds firmware, publishes manifest to PEAT
+1. PUBLISH    — CI/CD builds firmware, publishes manifest to Peat
 2. PROPAGATE  — Manifest syncs through hierarchy via CRDT
 3. COMMAND    — Operator issues deployment directive targeting a formation
 4. DISTRIBUTE — Firmware blob cascades through hierarchy (cached at each tier)
@@ -229,7 +229,7 @@ Drone Platform
 └── Mission config / ROE        ← Config sync (CRDT)
 ```
 
-PEAT handles AI model delivery with the same primitives:
+Peat handles AI model delivery with the same primitives:
 - **ONNX as standard format** — vendor-neutral, auditable, portable across hardware
 - **Variant selection** — INT8 for CPU nodes, FP16 for GPU nodes, auto-selected per device
 - **Differential propagation** — only changed model weights transfer (29x bandwidth savings)
@@ -244,7 +244,7 @@ The key insight: **firmware + models + config should be coordinated as a single 
 
 An operator's core question is not "what version is installed?" but **"can this formation execute its mission?"**
 
-PEAT's capability-focused model answers this by aggregating:
+Peat's capability-focused model answers this by aggregating:
 - Firmware versions and health status across all platforms
 - AI model versions and inference performance metrics
 - Configuration state (ROE, mission parameters)
@@ -268,7 +268,7 @@ Formation Alpha — Mission Readiness: 94%
 
 ### Metadata as a CRDT — No Central Server Required
 
-All fleet management metadata lives in PEAT's CRDT data store:
+All fleet management metadata lives in Peat's CRDT data store:
 - Firmware manifests replicate to all nodes that need them
 - Device capability advertisements are eventually consistent
 - Deployment status aggregates through the hierarchy
@@ -284,29 +284,29 @@ This is fundamentally different from centralized fleet management (Mender, hawkB
 Zarf → K8s cluster (containers, Helm charts, UDS Core)
 ```
 
-### Tomorrow: UDS + PEAT Delivers to Everything
+### Tomorrow: UDS + Peat Delivers to Everything
 
 ```
                     ┌── Zarf ────────── K8s clusters (containers)
                     │
-UDS + PEAT ────────┼── Firmware OTA ── Drones, vehicles, radios (firmware)
+UDS + Peat ────────┼── Firmware OTA ── Drones, vehicles, radios (firmware)
                     │
                     ├── Model Delivery ─ GPU/NPU nodes (ONNX models)
                     │
                     ├── Config Sync ──── All platforms (CRDT-based config)
                     │
-                    └── PEAT-Lite ────── Sensors, MCUs (lightweight gossip)
+                    └── Peat-Lite ────── Sensors, MCUs (lightweight gossip)
 ```
 
-PEAT becomes the **universal coordination layer**:
+Peat becomes the **universal coordination layer**:
 - Zarf handles the K8s "last mile"
 - Firmware OTA agents handle the embedded "last mile"
 - ONNX Runtime handles the AI inference "last mile"
-- PEAT provides the mesh, metadata, convergence, and fleet visibility for all of them
+- Peat provides the mesh, metadata, convergence, and fleet visibility for all of them
 
 ### The Defense Unicorns Value Story
 
-| Without PEAT | With PEAT |
+| Without Peat | With Peat |
 |-------------|-----------|
 | UDS delivers to K8s only | UDS delivers to every target type |
 | Firmware updates require separate tools per platform | One coordination layer for all firmware targets |
@@ -317,21 +317,21 @@ PEAT becomes the **universal coordination layer**:
 
 ## Technical Integration Points
 
-### Where PEAT Meets Zarf/UDS
+### Where Peat Meets Zarf/UDS
 
-PEAT doesn't replace Zarf — it complements it:
+Peat doesn't replace Zarf — it complements it:
 
 | Layer | Tool | Role |
 |-------|------|------|
 | Package building | Zarf | Build air-gap packages for K8s workloads |
-| Firmware building | CI/CD + PEAT manifests | Build firmware images, publish to PEAT |
-| Model training | MLOps pipeline | Train models, export as ONNX, publish to PEAT |
-| Metadata coordination | PEAT | Sync manifests, directives, status across mesh |
+| Firmware building | CI/CD + Peat manifests | Build firmware images, publish to Peat |
+| Model training | MLOps pipeline | Train models, export as ONNX, publish to Peat |
+| Metadata coordination | Peat | Sync manifests, directives, status across mesh |
 | K8s deployment | Zarf | Deploy containers to K8s clusters |
-| Firmware deployment | PEAT OTA Agent | Flash firmware to embedded targets |
-| Model deployment | PEAT + ONNX Runtime | Distribute and activate models on GPU nodes |
-| Fleet visibility | PEAT | Aggregate status through hierarchy |
-| Security/provenance | PEAT + Zarf (shared) | Signatures, SBOM, audit trail |
+| Firmware deployment | Peat OTA Agent | Flash firmware to embedded targets |
+| Model deployment | Peat + ONNX Runtime | Distribute and activate models on GPU nodes |
+| Fleet visibility | Peat | Aggregate status through hierarchy |
+| Security/provenance | Peat + Zarf (shared) | Signatures, SBOM, audit trail |
 
 ### Integration Architecture
 
@@ -352,7 +352,7 @@ PEAT doesn't replace Zarf — it complements it:
                                  │
                                  ▼
 ┌────────────────────────────────────────────────────────────────────┐
-│                    PEAT Mesh Protocol Layer                          │
+│                    Peat Mesh Protocol Layer                          │
 │                                                                      │
 │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐    │
 │  │ Manifests  │  │ Deployment │  │ Device     │  │ Convergence│    │
@@ -366,9 +366,9 @@ PEAT doesn't replace Zarf — it complements it:
 
 ## Competitive Differentiation
 
-### Why PEAT Is Different From Existing OTA Solutions
+### Why Peat Is Different From Existing OTA Solutions
 
-| Feature | Mender/RAUC/SWUpdate | PEAT Firmware OTA |
+| Feature | Mender/RAUC/SWUpdate | Peat Firmware OTA |
 |---------|---------------------|------------------|
 | Architecture | Client-server | Peer-to-peer mesh |
 | Connectivity | Requires server | Works disconnected (DIL) |
@@ -391,20 +391,20 @@ You could — but you'd have:
 - No hierarchical caching for bandwidth-constrained tactical links
 - Three separate security and audit systems
 
-PEAT provides the **connective tissue** that makes firmware, models, containers, and config work as a single coherent delivery system.
+Peat provides the **connective tissue** that makes firmware, models, containers, and config work as a single coherent delivery system.
 
 ## Use Cases and Scenarios
 
 ### Scenario 1: Drone Fleet Firmware Update (100 drones, FOB environment)
 
-**Without PEAT:**
+**Without Peat:**
 - Bring each drone to maintenance tent
 - Connect via USB, flash firmware manually
 - Track completion on a spreadsheet
 - Time: 2 days for 100 drones
 
-**With PEAT:**
-- Operator issues deployment directive from FOB PEAT node
+**With Peat:**
+- Operator issues deployment directive from FOB Peat node
 - Firmware cascades through mesh: FOB → vehicle gateways → drones
 - Drones stage firmware, activate during next landing/idle period
 - Convergence tracked automatically through hierarchy
@@ -414,16 +414,16 @@ PEAT provides the **connective tissue** that makes firmware, models, containers,
 
 **Situation:** New no-strike zone identified. Must update ROE config AND perception model that enforces it across all platforms.
 
-**Without PEAT:**
+**Without Peat:**
 - Push ROE config via one system (maybe Ansible if connected)
 - Push model update via another system (manual/ad-hoc)
 - No coordination — some platforms have new ROE but old model
 - No visibility into which platforms are updated
 
-**With PEAT:**
+**With Peat:**
 - Bundle ROE config + model as `PlatformUpdateBundle`
 - Issue with `Critical` priority — takes precedence over all other traffic
-- PEAT distributes both artifacts, applies in correct order
+- Peat distributes both artifacts, applies in correct order
 - Convergence tracking shows real-time progress
 - Platforms verify both artifacts before marking mission-ready
 
@@ -431,24 +431,24 @@ PEAT provides the **connective tissue** that makes firmware, models, containers,
 
 **Situation:** Remote outpost with 10 sensor nodes and 5 vehicles. Intermittent satellite link (9.6Kbps, 15 min/day window).
 
-**Without PEAT:**
+**Without Peat:**
 - Can't push updates over 9.6Kbps in 15 minutes
 - Physical media delivery (USB drives) — days/weeks delay
 - No visibility into what's running at the outpost
 
-**With PEAT:**
+**With Peat:**
 - Delta firmware patch (180KB) fits in a single satellite window
-- PEAT mesh at outpost distributes to all devices locally via WiFi/BLE
+- Peat mesh at outpost distributes to all devices locally via WiFi/BLE
 - Status aggregation flows back up via next satellite window
 - Full firmware image (if needed) trickles over multiple windows with resumable transfer
 
 ## Summary
 
-PEAT enables Defense Unicorns to extend UDS from "enterprise K8s delivery" to **"deliver anything to any platform, anywhere, over any link."**
+Peat enables Defense Unicorns to extend UDS from "enterprise K8s delivery" to **"deliver anything to any platform, anywhere, over any link."**
 
 The firmware OTA use case is the tip of the spear — it addresses the most immediate customer demand (delivering to non-K8s platforms). But the broader story is about **unified software supply chain management** across the full spectrum of defense platforms, from cloud data centers to embedded microcontrollers.
 
-**What PEAT adds to UDS:**
+**What Peat adds to UDS:**
 - Mesh networking that works in disconnected/intermittent/limited (DIL) environments
 - Hierarchical distribution with caching at every tier
 - CRDT-based fleet management without a central server
@@ -456,11 +456,11 @@ The firmware OTA use case is the tip of the spear — it addresses the most imme
 - Convergence tracking and capability-focused fleet visibility
 - Multi-transport delivery (QUIC, BLE, UDP, satellite)
 
-**What UDS adds to PEAT:**
+**What UDS adds to Peat:**
 - Proven K8s packaging and deployment (Zarf)
 - Secure runtime platform (UDS Core)
 - Policy enforcement (Pepr)
 - Air-gap tooling and SBOM generation
 - Enterprise adoption and customer trust
 
-Together, PEAT + UDS = complete tactical software delivery from cloud to edge to embedded.
+Together, Peat + UDS = complete tactical software delivery from cloud to edge to embedded.

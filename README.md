@@ -1,10 +1,10 @@
-# PEAT — Protocol for Emergent Autonomous Teaming
+# Peat
 
 > A hierarchical capability composition protocol using CRDTs for autonomous systems that scales to 1,000+ nodes with O(n log n) message complexity.
 
 ## Overview
 
-PEAT enables scalable coordination of autonomous nodes through:
+Peat enables scalable coordination of autonomous nodes through:
 
 - **Three-phase protocol**: Discovery → Cell Formation → Hierarchical Operations
 - **CRDT-based state**: Eventual consistency via Automerge/Ditto — operates through network partitions
@@ -106,7 +106,7 @@ Cells organize into zones for multi-level coordination. Differential state updat
 |----------|---------|
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Development setup and workflow |
 | [Architecture](docs/ARCHITECTURE.md) | Five-layer architecture overview |
-| [Developer Guide](docs/guides/developer/DEVELOPER_GUIDE.md) | API reference, extending PEAT |
+| [Developer Guide](docs/guides/developer/DEVELOPER_GUIDE.md) | API reference, extending Peat |
 | [Operator Guide](docs/guides/operator/OPERATOR_GUIDE.md) | Deployment, configuration, monitoring |
 | [ADRs](docs/adr/) | Architecture Decision Records |
 | [Whitepaper](docs/whitepaper/) | Technical whitepaper |
