@@ -240,7 +240,7 @@ traditional-96node-1gbps: 19,898 messages
 **Hypothesis 4: Correct Behavior**
 - P2P mesh with CRDTs may actually send very few messages
 - Efficient delta synchronization may require minimal traffic
-- This could be a PEAT protocol advantage, not a bug
+- This could be a Peat protocol advantage, not a bug
 
 ### Investigation Steps
 
@@ -287,7 +287,7 @@ traditional-96node-1gbps: 19,898 messages
 - Add message type breakdown to summary
 
 **If Hypothesis 4 (Correct Behavior):**
-- Document as expected PEAT protocol efficiency
+- Document as expected Peat protocol efficiency
 - Add analysis comparing message overhead vs Traditional IoT
 - Highlight low-bandwidth advantage in report
 

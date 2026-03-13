@@ -46,7 +46,7 @@ android {
 }
 
 dependencies {
-    // PEAT BLE library
+    // Peat BLE library
     implementation(project(":peat-btle"))
 
     // AndroidX

@@ -1,9 +1,9 @@
-//! Simulated UGV Client for PEAT Demo
+//! Simulated UGV Client for Peat Demo
 //!
 //! Provides a simulated Unmanned Ground Vehicle that:
 //! - Publishes position updates as TrackUpdate documents
 //! - Responds to MissionTask commands (TRACK_TARGET, SEARCH_AREA, etc.)
-//! - Advertises capabilities to the PEAT network
+//! - Advertises capabilities to the Peat network
 //! - Simulates movement patterns (waypoint patrol, pursuit, random walk)
 //!
 //! ## Usage

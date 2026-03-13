@@ -7,7 +7,7 @@
 
 ## Context and Problem Statement
 
-We have implemented the PEAT protocol's core synchronization mechanisms using Ditto (E1-E6) and a differential updates framework (E7). Before optimizing the integration between our protocol-level delta operations and Ditto's document model, we need to:
+We have implemented the Peat protocol's core synchronization mechanisms using Ditto (E1-E6) and a differential updates framework (E7). Before optimizing the integration between our protocol-level delta operations and Ditto's document model, we need to:
 
 1. **Establish baseline metrics** for current Ditto performance under realistic network conditions
 2. **Validate protocol behavior** across varying network quality (9.6Kbps - 1Mbps, 100ms - 5s latency)
@@ -259,11 +259,11 @@ impl SimulationHarness {
 ```
 
 #### 2. SimulatedNode
-**Purpose:** Represents a single PEAT protocol node with Ditto sync
+**Purpose:** Represents a single Peat protocol node with Ditto sync
 
 **Responsibilities:**
 - Wraps real Ditto store instance
-- Implements PEAT protocol logic (discovery, cell formation)
+- Implements Peat protocol logic (discovery, cell formation)
 - Tracks node-local metrics (bandwidth, message count)
 - Respects network constraints from NetworkSimulator
 
@@ -438,7 +438,7 @@ impl MetricsCollector {
 
 **Tasks:**
 - Implement Shadow YAML generator for scenarios
-- Build `peat-sim-node` binary (PEAT protocol + Ditto)
+- Build `peat-sim-node` binary (Peat protocol + Ditto)
 - Create simple scenario: Squad formation (12 nodes)
 - Run under Shadow, collect metrics
 
@@ -820,7 +820,7 @@ impl NetworkProfile {
 
 ## References
 
-- ADR-001: PEAT Protocol POC Architecture (network requirements)
+- ADR-001: Peat Protocol POC Architecture (network requirements)
 - ADR-002: Beacon Storage Architecture (Ditto integration patterns)
 - E7 Baseline Tests: `peat-protocol/tests/baseline_ditto_bandwidth_e2e.rs`
 - E2E Harness: `peat-protocol/src/testing/e2e_harness.rs`

@@ -84,7 +84,7 @@ impl CotFilter {
 
 /// TAK Transport Adapter
 ///
-/// Provides bidirectional CoT message transport between PEAT and TAK ecosystem.
+/// Provides bidirectional CoT message transport between Peat and TAK ecosystem.
 /// Supports TAK Server (TCP/SSL) and Mesh SA (UDP multicast) modes.
 #[async_trait]
 pub trait TakTransport: Send + Sync {
@@ -136,11 +136,11 @@ mod tests {
     fn test_cot_filter_builder() {
         let filter = CotFilter::all()
             .with_type_prefix("a-f-")
-            .with_uid_pattern("PEAT-")
+            .with_uid_pattern("Peat-")
             .with_max_age(300);
 
         assert_eq!(filter.type_prefix.as_deref(), Some("a-f-"));
-        assert_eq!(filter.uid_pattern.as_deref(), Some("PEAT-"));
+        assert_eq!(filter.uid_pattern.as_deref(), Some("Peat-"));
         assert_eq!(filter.max_age_secs, Some(300));
     }
 }

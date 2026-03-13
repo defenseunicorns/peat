@@ -2,7 +2,7 @@
 name = "peat-ffi"
 version = "0.1.0"
 edition = "2021"
-description = "FFI bindings for PEAT protocol (Kotlin/Swift via UniFFI)"
+description = "FFI bindings for Peat protocol (Kotlin/Swift via UniFFI)"
 license = "Apache-2.0"
 
 [lib]
@@ -42,7 +42,7 @@ uniffi = { version = "0.28", features = ["cli", "tokio"] }
 # JNI for direct Android native method binding (bypasses JNA symbol lookup issues)
 jni = "0.21"
 
-# PEAT crates - no ditto-backend for Android cross-compilation
+# Peat crates - no ditto-backend for Android cross-compilation
 peat-protocol = { path = "../peat-protocol", default-features = false }
 
 # Time handling

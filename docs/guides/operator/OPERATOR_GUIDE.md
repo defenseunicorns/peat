@@ -1,4 +1,4 @@
-# PEAT Operator Guide
+# Peat Operator Guide
 
 > **Version**: 1.0
 > **Last Updated**: 2025-12-08
@@ -25,9 +25,9 @@
 
 ## 1. Introduction
 
-### 1.1 What is PEAT?
+### 1.1 What is Peat?
 
-PEAT (Hierarchical Intelligence for Versatile Entities) is a protocol for scalable coordination of autonomous nodes (100+ nodes) using CRDTs with O(n log n) message complexity. It enables autonomous systems to coordinate without centralized control through:
+Peat (Hierarchical Intelligence for Versatile Entities) is a protocol for scalable coordination of autonomous nodes (100+ nodes) using CRDTs with O(n log n) message complexity. It enables autonomous systems to coordinate without centralized control through:
 
 - **Three-phase protocol**: Discovery → Cell Formation → Hierarchical Operations
 - **CRDT-based state**: Eventual consistency via distributed data structures
@@ -38,7 +38,7 @@ PEAT (Hierarchical Intelligence for Versatile Entities) is a protocol for scalab
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         PEAT Network                            │
+│                         Peat Network                            │
 │                                                                 │
 │  ┌──────────┐    ┌──────────┐    ┌──────────┐                  │
 │  │  Zone 1  │    │  Zone 2  │    │  Zone 3  │   Hierarchical   │
@@ -83,7 +83,7 @@ PEAT (Hierarchical Intelligence for Versatile Entities) is a protocol for scalab
 
 ## 2. Quick Start
 
-Get PEAT running in 10 minutes.
+Get Peat running in 10 minutes.
 
 ### 2.1 Prerequisites
 
@@ -112,7 +112,7 @@ cargo run --release --bin peat-sim
 
 Expected output:
 ```
-[INFO] PEAT Simulator starting...
+[INFO] Peat Simulator starting...
 [INFO] Creating 10 nodes with random capabilities
 [INFO] Phase 1: Discovery starting...
 [INFO] Node UAV-001 discovered 9 peers
@@ -301,7 +301,7 @@ sudo apt install mold
 Create `peat.toml` for file-based configuration:
 
 ```toml
-# peat.toml - PEAT Configuration
+# peat.toml - Peat Configuration
 
 [node]
 id = "node-001"                    # Optional: auto-generated if not set
@@ -658,7 +658,7 @@ sudo firewall-cmd --reload
 
 ### 6.3 NAT Traversal
 
-PEAT uses Iroh for NAT traversal when using the Automerge backend:
+Peat uses Iroh for NAT traversal when using the Automerge backend:
 
 ```toml
 # peat.toml
@@ -674,7 +674,7 @@ stun_servers = [
 
 ### 6.4 Bandwidth Considerations
 
-PEAT is designed for constrained networks:
+Peat is designed for constrained networks:
 
 | Profile | Bandwidth | Use Case |
 |---------|-----------|----------|
@@ -693,7 +693,7 @@ qos_enabled = true
 
 ### 6.5 Network Partition Handling
 
-PEAT automatically handles network partitions:
+Peat automatically handles network partitions:
 
 1. **Detection**: Heartbeat timeout (configurable, default 30s)
 2. **Recovery**: Exponential backoff reconnection (2s, 4s, 8s, 16s...)
@@ -744,7 +744,7 @@ Generate certificates:
 ```bash
 # Generate CA
 openssl genrsa -out ca.key 4096
-openssl req -new -x509 -days 365 -key ca.key -out ca.crt -subj "/CN=PEAT CA"
+openssl req -new -x509 -days 365 -key ca.key -out ca.crt -subj "/CN=Peat CA"
 
 # Generate node certificate
 openssl genrsa -out node.key 2048
@@ -754,7 +754,7 @@ openssl x509 -req -days 365 -in node.csr -CA ca.crt -CAkey ca.key -CAcreateseria
 
 ### 7.3 Encryption
 
-PEAT uses ChaCha20-Poly1305 for symmetric encryption:
+Peat uses ChaCha20-Poly1305 for symmetric encryption:
 
 ```toml
 [security]
@@ -787,7 +787,7 @@ password_hash_algorithm = "argon2"
 3. **Rotate credentials** regularly
 4. **Use PKI** for device authentication in secure environments
 5. **Audit logs** for security events
-6. **Network segmentation** for PEAT traffic
+6. **Network segmentation** for Peat traffic
 
 ---
 
@@ -808,7 +808,7 @@ curl http://localhost:8080/ready
 
 ### 8.2 Metrics
 
-PEAT exposes Prometheus-compatible metrics:
+Peat exposes Prometheus-compatible metrics:
 
 ```bash
 curl http://localhost:8080/metrics
@@ -870,23 +870,23 @@ service_name = "peat-node"
 
 ### 9.1 Overview
 
-PEAT integrates with Team Awareness Kit (TAK) via Cursor-on-Target (CoT) protocol translation:
+Peat integrates with Team Awareness Kit (TAK) via Cursor-on-Target (CoT) protocol translation:
 
 ```
 ┌─────────┐      ┌───────────────┐      ┌──────────┐
-│  PEAT   │ ←──→ │ CoT Translator│ ←──→ │  ATAK    │
+│  Peat   │ ←──→ │ CoT Translator│ ←──→ │  ATAK    │
 │ Network │      │   (peat-cot)  │      │  Devices │
 └─────────┘      └───────────────┘      └──────────┘
 ```
 
 ### 9.2 ATAK Plugin Installation
 
-1. Download the PEAT ATAK plugin APK
+1. Download the Peat ATAK plugin APK
 2. Install on Android device with ATAK
 3. Configure connection settings
 
 ```
-Settings → Tool Preferences → PEAT
+Settings → Tool Preferences → Peat
 - Server: 192.168.1.100
 - Port: 8087
 - Formation Key: [your-key]
@@ -902,7 +902,7 @@ bind_port = 8087
 protocol = "tcp"  # tcp, udp, or multicast
 
 [cot.translation]
-# Map PEAT capabilities to CoT types
+# Map Peat capabilities to CoT types
 platform_uav = "a-f-A-M-F-Q"      # UAV
 platform_ugv = "a-f-G-U-C"        # UGV
 platform_usv = "a-f-S-X-L"        # USV
@@ -911,11 +911,11 @@ sensor_eo_ir = "b-m-p-s-m"        # Sensor point
 
 ### 9.4 CoT Message Examples
 
-PEAT automatically translates to CoT XML:
+Peat automatically translates to CoT XML:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<event version="2.0" uid="PEAT-UAV-001" type="a-f-A-M-F-Q"
+<event version="2.0" uid="Peat-UAV-001" type="a-f-A-M-F-Q"
        time="2025-12-08T10:30:00Z" start="2025-12-08T10:30:00Z"
        stale="2025-12-08T10:35:00Z" how="m-g">
   <point lat="38.8977" lon="-77.0365" hae="100" ce="10" le="10"/>
@@ -929,7 +929,7 @@ PEAT automatically translates to CoT XML:
 
 ### 9.5 Bidirectional Integration
 
-PEAT receives commands from TAK/ATAK:
+Peat receives commands from TAK/ATAK:
 - Position updates from ATAK users
 - Mission waypoints
 - Target designations
@@ -950,7 +950,7 @@ command_authority = "C2_ONLY"  # or "ANY_TAK_USER"
 
 ### 10.1 State Persistence
 
-PEAT persists state to disk for recovery:
+Peat persists state to disk for recovery:
 
 ```toml
 [storage]
@@ -1167,7 +1167,7 @@ If issues persist:
    ```
 
 2. Include:
-   - PEAT version (`cargo --version`, git commit)
+   - Peat version (`cargo --version`, git commit)
    - Configuration (sanitized, no keys)
    - Logs from issue timeframe
    - Network topology diagram
@@ -1275,4 +1275,4 @@ export PEAT_FORMATION_KEY="your-formation-key"
 
 **Document Version**: 1.0
 **Last Updated**: 2025-12-08
-**Maintainer**: PEAT Operations Team
+**Maintainer**: Peat Operations Team

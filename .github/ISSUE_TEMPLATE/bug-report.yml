@@ -83,7 +83,7 @@ body:
       description: "Where does this occur?"
       value: |
         - OS: 
-        - PEAT Version: 
+        - Peat Version: 
         - Hardware (if relevant): 
         - Network config:
     validations:

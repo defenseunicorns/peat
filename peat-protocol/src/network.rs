@@ -1,4 +1,4 @@
-//! Network layer for PEAT Protocol
+//! Network layer for Peat Protocol
 //!
 //! This module provides both:
 //! - Network simulation (bandwidth, latency, loss constraints)

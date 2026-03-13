@@ -2,7 +2,7 @@
 # Method and System for Hierarchical Human-Machine Team Coordination in Distributed Autonomous Systems with Authority-Weighted Leadership
 
 **Inventors**: Kit Plummer, et al.
-**Company**: (r)evolve LLC
+**Company**: Defense Unicorns LLC
 **Filing Date**: [To be filled by USPTO]
 **Application Number**: [To be assigned by USPTO]
 
@@ -105,9 +105,9 @@ The inventors acknowledge prior work in distributed autonomous systems coordinat
 - COD work focused on resilient peer-to-peer networking and mesh coordination
 - General autonomous systems expertise and domain knowledge gained through COD participation
 
-### Differentiation: PEAT Protocol Innovations Beyond COD
+### Differentiation: Peat Protocol Innovations Beyond COD
 
-The present invention (PEAT Protocol) was developed independently at (r)evolve LLC (2024-2025) and differs substantially from COD:
+The present invention (Peat Protocol) was developed independently at Defense Unicorns LLC (2024-2025) and differs substantially from COD:
 
 **COD Approach** (Prior Art):
 - Autonomous platforms coordinate without explicit human leadership model
@@ -127,7 +127,7 @@ The present invention (PEAT Protocol) was developed independently at (r)evolve L
 
 ### Independent Development
 
-PEAT Protocol was developed independently at (r)evolve LLC using:
+Peat Protocol was developed independently at Defense Unicorns LLC using:
 - DoD research on human-robot teaming
 - Published literature on cognitive load in multi-tasking scenarios
 - Military command structure (rank hierarchy)

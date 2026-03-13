@@ -87,7 +87,7 @@ impl HardwareRequirements {
 
 /// Model manifest containing all metadata for distribution
 ///
-/// This is the primary type for announcing and distributing models across PEAT.
+/// This is the primary type for announcing and distributing models across Peat.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ModelManifest {
     /// Unique model identifier (e.g., "ministral-3b-q4km")

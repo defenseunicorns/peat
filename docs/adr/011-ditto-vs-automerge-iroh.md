@@ -4,7 +4,7 @@
 **Date**: 2025-11-06  
 **Authors**: Codex, Kit Plummer  
 **Supersedes**: ADR-007 (Automerge-Based Sync Engine)  
-**Relates To**: ADR-001 (PEAT Protocol POC), ADR-005 (Data Sync Abstraction), ADR-006 (Security), ADR-010 (Transport Layer)
+**Relates To**: ADR-001 (Peat Protocol POC), ADR-005 (Data Sync Abstraction), ADR-006 (Security), ADR-010 (Transport Layer)
 
 ## Context
 
@@ -37,7 +37,7 @@ Initial analysis (ADR-007) assumed simplified Ethernet-only networking. **Real t
 
 ### Backend Architecture Design
 
-**Important Conceptual Clarification**: A "backend" in PEAT Protocol is a **complete, integrated solution** for storage, synchronization, and persistence - not individual components.
+**Important Conceptual Clarification**: A "backend" in Peat Protocol is a **complete, integrated solution** for storage, synchronization, and persistence - not individual components.
 
 #### What is a Backend?
 
@@ -87,7 +87,7 @@ A backend is the complete stack that provides:
 
 #### Capability-Based Architecture
 
-Rather than forcing all backends into one interface, PEAT Protocol uses **optional capability traits**:
+Rather than forcing all backends into one interface, Peat Protocol uses **optional capability traits**:
 
 ```rust
 // Required for all backends
@@ -262,7 +262,7 @@ Use Loro instead of Automerge as CRDT foundation, Iroh for networking.
 
 **Adopt Option 3: Automerge + Iroh**
 
-Build PEAT Protocol's sync and networking layers using:
+Build Peat Protocol's sync and networking layers using:
 - **Automerge** for CRDT foundation and delta sync
 - **Iroh** for multi-path QUIC networking and peer connectivity
 - **Custom glue code** for Repository/Collection API, discovery, storage, queries
@@ -346,7 +346,7 @@ impl CapMdnsDiscovery {
             &self.service_type,
             &format!("cap-{}", node_id),
             &format!("0.0.0.0:{}", port),
-            "PEAT Protocol Node",
+            "Peat Protocol Node",
         )?;
         self.daemon.register(service)?;
         Ok(())
@@ -1540,7 +1540,7 @@ impl MdnsDiscovery {
             &self.service_type,
             &format!("cap-{}", endpoint_id),
             &format!("0.0.0.0:{}", port),
-            "PEAT Protocol Node",
+            "Peat Protocol Node",
         )?;
         
         // Add EndpointId as TXT record
@@ -2491,7 +2491,7 @@ Result: 64x smaller updates for single-field changes
 
 ### Feature Parity (Week 18)
 
-- [x] All PEAT Protocol use cases supported
+- [x] All Peat Protocol use cases supported
 - [x] Performance within 20% of Ditto on key metrics
 - [x] Security layer integrated (PKI, encryption, authorization)
 - [x] Geohash-based proximity queries
@@ -2542,7 +2542,7 @@ The identified gaps are **manageable** with well-known libraries and straightfor
 6. [QUIC Multipath Extension](https://datatracker.ietf.org/doc/draft-ietf-quic-multipath/)
 7. [Loro CRDT](https://loro.dev/)
 8. [RocksDB](https://rocksdb.org/)
-9. ADR-001: PEAT Protocol POC Architecture
+9. ADR-001: Peat Protocol POC Architecture
 10. ADR-005: Data Synchronization Abstraction Layer
 11. ADR-006: Security, Authentication, and Authorization
 12. ADR-007: Automerge-Based Sync Engine

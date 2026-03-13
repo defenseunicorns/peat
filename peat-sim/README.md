@@ -1,6 +1,6 @@
-# PEAT Protocol Network Simulation with ContainerLab
+# Peat Protocol Network Simulation with ContainerLab
 
-This directory contains ContainerLab-based network simulation infrastructure for testing PEAT Protocol under realistic network conditions.
+This directory contains ContainerLab-based network simulation infrastructure for testing Peat Protocol under realistic network conditions.
 
 ## Overview
 
@@ -41,7 +41,7 @@ docker build -f peat-sim/Dockerfile -t peat-sim-node:latest .
 This creates a Docker image with:
 - Rust 1.86 environment
 - Ditto SDK (v4.11.5)
-- PEAT Protocol simulation node binary
+- Peat Protocol simulation node binary
 - Network debugging tools (ping, tcpdump, etc.)
 
 ### 2. Set Up Environment Variables

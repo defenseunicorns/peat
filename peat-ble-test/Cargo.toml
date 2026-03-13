@@ -11,7 +11,7 @@ name = "peat-ble-test"
 path = "src/main.rs"
 
 [dependencies]
-# PEAT dependencies
+# Peat dependencies
 peat-protocol = { path = "../peat-protocol", default-features = false, features = ["bluetooth", "automerge-backend"] }
 
 # Async runtime

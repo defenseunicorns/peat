@@ -348,5 +348,5 @@ MIT
 ## References
 
 - ADR-012: Schema Definition and Protocol Extensibility
-- PEAT Protocol Documentation: `/docs`
+- Peat Protocol Documentation: `/docs`
 - Protobuf Style Guide: https://protobuf.dev/programming-guides/style/

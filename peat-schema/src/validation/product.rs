@@ -1,6 +1,6 @@
 //! Product validators (AI/ML Products)
 //!
-//! Validates Product messages and their content types for PEAT Protocol.
+//! Validates Product messages and their content types for Peat Protocol.
 
 use super::{ValidationError, ValidationResult};
 use crate::product::v1::{

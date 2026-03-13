@@ -4391,7 +4391,7 @@ mod issue_271_clone_tests {
 
     #[test]
     fn test_custom_query_real_world_patterns() {
-        // Test actual patterns from the PEAT codebase
+        // Test actual patterns from the Peat codebase
 
         // Pattern 1: collection_name == 'squad_summaries' (from peat-sim)
         let doc_summaries = create_test_doc(vec![(

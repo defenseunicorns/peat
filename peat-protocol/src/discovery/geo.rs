@@ -1,4 +1,4 @@
-//! Geographic primitives for PEAT protocol
+//! Geographic primitives for Peat protocol
 //!
 //! Provides fundamental geographic types and operations for defining
 //! operational areas and spatial relationships between platforms.

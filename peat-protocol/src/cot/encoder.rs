@@ -1,6 +1,6 @@
-//! PEAT → CoT message encoder
+//! Peat → CoT message encoder
 //!
-//! Converts PEAT messages to CoT XML format for TAK integration.
+//! Converts Peat messages to CoT XML format for TAK integration.
 
 use chrono::Duration;
 
@@ -22,9 +22,9 @@ pub struct CotEncoderConfig {
     pub capability_stale_secs: i64,
     /// Default stale duration for handoff messages
     pub handoff_stale_secs: i64,
-    /// Default affiliation for PEAT entities
+    /// Default affiliation for Peat entities
     pub default_affiliation: Affiliation,
-    /// Include PEAT extension in output
+    /// Include Peat extension in output
     pub include_peat_extension: bool,
 }
 
@@ -40,7 +40,7 @@ impl Default for CotEncoderConfig {
     }
 }
 
-/// Encoder for converting PEAT messages to CoT XML
+/// Encoder for converting Peat messages to CoT XML
 #[derive(Debug, Clone)]
 pub struct CotEncoder {
     /// Configuration
@@ -102,7 +102,7 @@ impl CotEncoder {
             builder = builder.track(vel.bearing, vel.speed_mps);
         }
 
-        // Add PEAT extension
+        // Add Peat extension
         if self.config.include_peat_extension {
             let mut ext = PeatExtension::new()
                 .with_source(PeatSource::new(
@@ -180,7 +180,7 @@ impl CotEncoder {
             builder = builder.group(cell_id, "Team Member");
         }
 
-        // Add PEAT extension
+        // Add Peat extension
         if self.config.include_peat_extension {
             let mut ext =
                 PeatExtension::new().with_status(PeatStatus::new(cap.status, cap.readiness));
@@ -259,7 +259,7 @@ impl CotEncoder {
         };
         builder = builder.flow_priority(flow_priority);
 
-        // Add PEAT extension
+        // Add Peat extension
         if self.config.include_peat_extension {
             let ext = PeatExtension::new().with_handoff(PeatHandoff::new(
                 &handoff.source_cell,
@@ -322,7 +322,7 @@ impl CotEncoder {
                 summary.readiness * 100.0
             ));
 
-        // Add PEAT extension with aggregated capabilities
+        // Add Peat extension with aggregated capabilities
         if self.config.include_peat_extension {
             let mut ext = PeatExtension::new()
                 .with_status(PeatStatus::new(

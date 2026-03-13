@@ -1,6 +1,6 @@
 //! Sensor validators
 //!
-//! Validates SensorSpec and SensorStateUpdate messages for PEAT Protocol.
+//! Validates SensorSpec and SensorStateUpdate messages for Peat Protocol.
 
 use super::{ValidationError, ValidationResult};
 use crate::sensor::v1::{

@@ -1,8 +1,8 @@
-# PEAT Protocol - Development Guide
+# Peat Protocol - Development Guide
 
 ## Overview
 
-This repository contains the Hierarchical Intelligence for Versatile Entities (PEAT) proof-of-concept implementation in Rust. The PEAT protocol enables scalable coordination of autonomous nodes through hierarchical capability composition using CRDTs.
+This repository contains the Peat proof-of-concept implementation in Rust. The Peat protocol enables scalable coordination of autonomous nodes through hierarchical capability composition using CRDTs.
 
 ## Repository Structure
 

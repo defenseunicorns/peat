@@ -1,4 +1,4 @@
-// PEAT ATAK Plugin - Root Build Configuration
+// Peat ATAK Plugin - Root Build Configuration
 // Based on ATAK-CIV SDK 5.6.0 plugintemplate-compose
 
 buildscript {

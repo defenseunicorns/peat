@@ -1,6 +1,6 @@
-//! PEAT FFI - Foreign Function Interface for Kotlin/Swift
+//! Peat FFI - Foreign Function Interface for Kotlin/Swift
 //!
-//! This crate provides UniFFI bindings to expose PEAT functionality
+//! This crate provides UniFFI bindings to expose Peat functionality
 //! to Kotlin (Android/ATAK) and Swift (iOS) applications.
 //!
 //! ## Features
@@ -86,7 +86,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 // Setup UniFFI scaffolding
 uniffi::setup_scaffolding!();
 
-/// Get the PEAT library version
+/// Get the Peat library version
 #[uniffi::export]
 pub fn peat_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
@@ -362,7 +362,7 @@ impl Drop for SubscriptionHandle {
     }
 }
 
-/// A PEAT network node with P2P sync capabilities
+/// A Peat network node with P2P sync capabilities
 ///
 /// Wraps AutomergeIrohBackend for authenticated document sync.
 /// Requires matching app_id and shared_key for peer connections.
@@ -771,7 +771,7 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<PeatNode>, PeatError> {
     #[cfg(target_os = "android")]
     android_log(&format!("[TIMING] Runtime creation: {}ms", runtime_ms));
     #[cfg(not(target_os = "android"))]
-    eprintln!("[PEAT TIMING] Runtime creation: {}ms", runtime_ms);
+    eprintln!("[Peat TIMING] Runtime creation: {}ms", runtime_ms);
 
     // Parse bind address
     let bind_addr: SocketAddr = config
@@ -859,13 +859,13 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<PeatNode>, PeatError> {
     }
     #[cfg(not(target_os = "android"))]
     {
-        eprintln!("[PEAT TIMING] Store open: {}ms", store_ms);
+        eprintln!("[Peat TIMING] Store open: {}ms", store_ms);
         eprintln!(
-            "[PEAT TIMING] Transport create (with mDNS): {}ms",
+            "[Peat TIMING] Transport create (with mDNS): {}ms",
             transport_ms
         );
         eprintln!(
-            "[PEAT TIMING] Parallel total (max of above): {}ms",
+            "[Peat TIMING] Parallel total (max of above): {}ms",
             parallel_total_ms
         );
     }
@@ -916,7 +916,7 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<PeatNode>, PeatError> {
         android_log("=== sync_backend.initialize() completed successfully ===");
     }
     #[cfg(not(target_os = "android"))]
-    eprintln!("[PEAT TIMING] Sync backend init: {}ms", sync_init_ms);
+    eprintln!("[Peat TIMING] Sync backend init: {}ms", sync_init_ms);
 
     // Start background task to listen for peer events and forward to Java (Issue #275)
     let cleanup_running = Arc::new(AtomicBool::new(true));
@@ -1001,7 +1001,7 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<PeatNode>, PeatError> {
                     tm_config.collection_routes = table;
                 }
                 Err(e) => {
-                    eprintln!("[PEAT] Failed to parse collection_routes_json: {}", e);
+                    eprintln!("[Peat] Failed to parse collection_routes_json: {}", e);
                 }
             }
         }
@@ -1151,18 +1151,18 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<PeatNode>, PeatError> {
                             .with_description("Primary BLE transport");
                             transport_manager.register_instance(ble_instance, ble_as_transport);
                             eprintln!(
-                                "[PEAT] BLE transport registered as PACE instance 'ble-primary'"
+                                "[Peat] BLE transport registered as PACE instance 'ble-primary'"
                             );
                         }
                         Err(e) => {
-                            eprintln!("[PEAT] Failed to initialize BLE adapter: {} (continuing without BLE)", e);
+                            eprintln!("[Peat] Failed to initialize BLE adapter: {} (continuing without BLE)", e);
                         }
                     }
                 }
 
                 #[cfg(not(target_os = "linux"))]
                 eprintln!(
-                    "[PEAT] BLE transport requested but not yet implemented for this platform"
+                    "[Peat] BLE transport requested but not yet implemented for this platform"
                 );
             }
         }
@@ -1176,7 +1176,7 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<PeatNode>, PeatError> {
         total_ms
     ));
     #[cfg(not(target_os = "android"))]
-    eprintln!("[PEAT TIMING] === TOTAL create_node: {}ms ===", total_ms);
+    eprintln!("[Peat TIMING] === TOTAL create_node: {}ms ===", total_ms);
 
     Ok(Arc::new(PeatNode {
         sync_backend,
@@ -1199,15 +1199,15 @@ impl From<anyhow::Error> for PeatError {
 }
 
 // =============================================================================
-// PEAT Data Types for TAK Plugin Integration
+// Peat Data Types for TAK Plugin Integration
 // =============================================================================
 //
-// These types represent PEAT entities that can be synced and displayed in the
+// These types represent Peat entities that can be synced and displayed in the
 // ATAK plugin. They use well-known collection names for document storage.
 
-/// Well-known collection names for PEAT data
+/// Well-known collection names for Peat data
 pub mod collections {
-    /// Collection for PEAT cells (teams/squads)
+    /// Collection for Peat cells (teams/squads)
     pub const CELLS: &str = "cells";
     /// Collection for detected tracks (entities being tracked)
     pub const TRACKS: &str = "tracks";
@@ -1253,7 +1253,7 @@ impl CellStatus {
     }
 }
 
-/// PEAT Cell information for display
+/// Peat Cell information for display
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct CellInfo {
     /// Unique cell identifier
@@ -1956,7 +1956,7 @@ mod tests {
 // }
 // ```
 
-/// JNI: Get PEAT library version
+/// JNI: Get Peat library version
 ///
 /// Kotlin signature: external fun peatVersion(): String
 #[no_mangle]
@@ -1978,7 +1978,7 @@ pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_testJni(
     mut env: JNIEnv,
     _class: JClass,
 ) -> jstring {
-    let msg = "JNI bindings working! PEAT FFI loaded successfully.";
+    let msg = "JNI bindings working! Peat FFI loaded successfully.";
     env.new_string(msg)
         .expect("Failed to create Java string")
         .into_raw()
@@ -2690,7 +2690,7 @@ pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_getPlatformsJn
         .into_raw()
 }
 
-/// JNI: Publish a platform (self-position/PLI) to the PEAT network
+/// JNI: Publish a platform (self-position/PLI) to the Peat network
 ///
 /// Kotlin signature: external fun publishPlatformJni(handle: Long, platformJson: String): Boolean
 /// Stores the platform in the "platforms" collection for sync to peers.

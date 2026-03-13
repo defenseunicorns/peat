@@ -506,7 +506,7 @@ This creates **perfect symmetry** between upward and downward flows:
 
 **Proposed State**: Policy-driven aggregation with the same flexibility as downward commands
 
-**Philosophy**: **"PEAT Protocol provides mechanism, integrators provide policy"** - this principle should apply **both ways** (upward AND downward)
+**Philosophy**: **"Peat Protocol provides mechanism, integrators provide policy"** - this principle should apply **both ways** (upward AND downward)
 
 ---
 

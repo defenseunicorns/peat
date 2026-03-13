@@ -19,7 +19,7 @@ use uuid::Uuid;
 // Core Traits
 // ============================================================================
 
-/// Trait for platforms that can advertise capabilities to the PEAT network
+/// Trait for platforms that can advertise capabilities to the Peat network
 #[async_trait]
 pub trait CapabilityProvider: Send + Sync {
     /// Get the platform's unique identifier
@@ -40,7 +40,7 @@ pub trait CapabilityProvider: Send + Sync {
     /// Get capabilities as peat-protocol Capability objects
     fn get_capabilities(&self) -> Vec<Capability>;
 
-    /// Generate a capability advertisement message for the PEAT network
+    /// Generate a capability advertisement message for the Peat network
     fn advertise_capabilities(&self) -> CapabilityAdvertisement;
 
     /// Update the platform's state (called periodically)

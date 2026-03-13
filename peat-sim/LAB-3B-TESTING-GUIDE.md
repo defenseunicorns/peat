@@ -55,7 +55,7 @@ cd peat-sim
 
 ## What Gets Tested
 
-### Flat Mesh Coordinator (Core PEAT)
+### Flat Mesh Coordinator (Core Peat)
 
 ```
 peat-mesh::FlatMeshCoordinator
@@ -122,7 +122,7 @@ python3 analyze-lab3b-results.py \
 
 **Comparison metrics**:
 - Lab 3 (raw TCP): Direct peer-to-peer messaging
-- Lab 3b (PEAT CRDT): Same topology + CRDT sync
+- Lab 3b (Peat CRDT): Same topology + CRDT sync
 - **Overhead**: Difference in latency/bandwidth
 
 ---
@@ -244,7 +244,7 @@ docker exec clab-<name>-peer-1 /usr/local/bin/peat-sim --help
 
 ### Lab 3b: Flat Mesh with CRDT
 
-**Architecture**: Same O(n²) connections + PEAT CRDT sync
+**Architecture**: Same O(n²) connections + Peat CRDT sync
 **Complexity**: P2P + CRDT overhead
 **Expected**: Similar scaling, higher latency due to CRDT
 
@@ -272,14 +272,14 @@ This isolates the pure cost of CRDT synchronization from:
    - Add to Epic #132 report
 
 3. **Proceed to Lab 4**
-   - Hierarchical PEAT CRDT
+   - Hierarchical Peat CRDT
    - Compare Lab 3b (flat) vs Lab 4 (hierarchical)
    - Measure hierarchy benefit
 
 4. **Complete Epic #132**
    - All 5 labs complete
    - Comprehensive empirical validation
-   - Proof that PEAT scales where others fail
+   - Proof that Peat scales where others fail
 
 ---
 

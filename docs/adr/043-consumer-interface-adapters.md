@@ -2,23 +2,23 @@
 
 **Status**: Proposed  
 **Date**: 2026-01-06 (Updated: 2025-01-31)  
-**Authors**: Kit Plummer, Codex  
-**Organization**: (r)evolve - Revolve Team LLC (https://revolveteam.com)  
+**Authors**: Kit Plummer, Claude  
+**Organization**: Defense Unicorns (https://defenseunicorns.com)  
 **Related ADRs**:
 - [ADR-029](029-tak-transport-adapter.md) (TAK Transport Adapter)
 - [ADR-032](032-pluggable-transport-abstraction.md) (Pluggable Transport Abstraction)
 - [ADR-042](042-direct-udp-bypass-pathway.md) (Direct UDP Bypass Pathway)
 - [ADR-005](005-datasync-abstraction-layer.md) (Data Sync Abstraction Layer)
 - [ADR-049](049-schema-extraction-and-codegen.md) (Schema Extraction)
-- [ADR-050](050-sdk-integration.md) (PEAT SDK - Optimal Integration Path)
+- [ADR-050](050-sdk-integration.md) (Peat SDK - Optimal Integration Path)
 
 ---
 
 ## Executive Summary
 
-This ADR defines **Consumer Interface Adapters** - network-based interfaces (WebSocket, TCP, HTTP/REST) that enable external systems to interact with PEAT nodes.
+This ADR defines **Consumer Interface Adapters** - network-based interfaces (WebSocket, TCP, HTTP/REST) that enable external systems to interact with Peat nodes.
 
-> **⚠️ IMPORTANT**: Consumer interface adapters are the **compatibility layer**, not the optimal integration path. Systems that can integrate the PEAT SDK directly (ADR-050) should do so for better performance, offline capability, and full CRDT benefits. These adapters exist for systems that **cannot** be modified to embed the SDK.
+> **⚠️ IMPORTANT**: Consumer interface adapters are the **compatibility layer**, not the optimal integration path. Systems that can integrate the Peat SDK directly (ADR-050) should do so for better performance, offline capability, and full CRDT benefits. These adapters exist for systems that **cannot** be modified to embed the SDK.
 
 ---
 
@@ -99,7 +99,7 @@ Platform A ──CRDT Sync──► Platform B
 ### Adapter Integration (Compatibility Path)
 
 ```
-Legacy System ──HTTP/WS──► Adapter ──Query──► PEAT ──Response──► Adapter ──HTTP/WS──► Legacy
+Legacy System ──HTTP/WS──► Adapter ──Query──► Peat ──Response──► Adapter ──HTTP/WS──► Legacy
               ~20ms        ~5ms      ~10ms     ~5ms      ~5ms       ~20ms
                                                                     
 Total: ~65ms minimum, typically 100-200ms
@@ -111,7 +111,7 @@ Total: ~65ms minimum, typically 100-200ms
 |-----------|---------|-------|
 | Network to Adapter | 10-50ms | Depends on network topology |
 | Protocol parsing | 1-5ms | JSON/Protobuf decode |
-| PEAT query | 5-20ms | Local CRDT read |
+| Peat query | 5-20ms | Local CRDT read |
 | Response serialization | 1-5ms | JSON/Protobuf encode |
 | Network from Adapter | 10-50ms | Return path |
 | **Total** | **50-200ms** | Per request |
@@ -129,7 +129,7 @@ Total: ~65ms minimum, typically 100-200ms
 
 ### Problem Statement
 
-PEAT Protocol's primary interface is via **direct Rust API integration** using the `peat-protocol` and `peat-ffi` crates, or the **PEAT SDK** (ADR-050) for multi-language support. However, many potential consumers cannot integrate at this level:
+Peat Protocol's primary interface is via **direct Rust API integration** using the `peat-protocol` and `peat-ffi` crates, or the **Peat SDK** (ADR-050) for multi-language support. However, many potential consumers cannot integrate at this level:
 
 1. **Legacy C2 Systems**: Existing command and control systems built on older stacks
 2. **Web Dashboards**: Browser-based monitoring and control interfaces
@@ -162,7 +162,7 @@ pub trait TakTransport: Send + Sync {
 }
 ```
 
-This pattern works for **outbound integration** (PEAT → TAK). We need the inverse for **consumer interfaces** (External Systems → PEAT).
+This pattern works for **outbound integration** (Peat → TAK). We need the inverse for **consumer interfaces** (External Systems → Peat).
 
 ### Existing Infrastructure
 
@@ -186,11 +186,11 @@ This needs extension for:
 
 ### Consumer Interface Adapter Architecture
 
-We will implement **Consumer Interface Adapters** as a facade layer over the PEAT Protocol API, supporting multiple transport protocols with unified semantics.
+We will implement **Consumer Interface Adapters** as a facade layer over the Peat Protocol API, supporting multiple transport protocols with unified semantics.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         PEAT Node                                        │
+│                         Peat Node                                        │
 │                                                                          │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │               Consumer Interface Layer (This ADR)                │   │
@@ -1018,7 +1018,7 @@ pub struct CoordinatorMetrics {
 
 1. [ADR-029](029-tak-transport-adapter.md) - TAK Transport pattern
 2. [ADR-032](032-pluggable-transport-abstraction.md) - Transport abstraction
-3. [ADR-050](050-sdk-integration.md) - PEAT SDK (Optimal Integration Path)
+3. [ADR-050](050-sdk-integration.md) - Peat SDK (Optimal Integration Path)
 4. [ADR-049](049-schema-extraction-and-codegen.md) - Schema Extraction
 5. [WebSocket RFC 6455](https://tools.ietf.org/html/rfc6455)
 6. [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events)

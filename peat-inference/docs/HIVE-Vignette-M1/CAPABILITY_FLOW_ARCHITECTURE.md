@@ -1,4 +1,4 @@
-# PEAT Protocol - System Architecture & Capability Flow
+# Peat Protocol - System Architecture & Capability Flow
 
 ## 1. Physical Network Topology
 
@@ -19,9 +19,9 @@
 │                              COORDINATOR NODE (Bridge)                                   │
 │                                                                                          │
 │   ┌─────────────────────────────────────────────────────────────────────────────────┐   │
-│   │                            PEAT-TAK Bridge                                       │   │
+│   │                            Peat-TAK Bridge                                       │   │
 │   │  • Aggregates capabilities from both teams                                       │   │
-│   │  • Translates PEAT ↔ CoT                                                        │   │
+│   │  • Translates Peat ↔ CoT                                                        │   │
 │   │  • Routes model updates downward                                                 │   │
 │   └─────────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                          │
@@ -30,7 +30,7 @@
 │            └────────┬─────────┘              └────────┬─────────┘                        │
 └─────────────────────┼────────────────────────────────┼──────────────────────────────────┘
                       │                                │
-                      │ PEAT Protocol                  │ PEAT Protocol
+                      │ Peat Protocol                  │ Peat Protocol
                       ▼                                ▼
 ┌────────────────────────────────────┐  ┌────────────────────────────────────┐
 │         TEAM ALPHA (Net A)         │  │         TEAM BRAVO (Net B)         │
@@ -91,7 +91,7 @@ This diagram shows how capabilities bubble up through the hierarchy, aggregating
 │                                                                                          │
 │                                          ▲                                               │
 │                                          │ Aggregated capabilities                       │
-│                                          │ via PEAT-TAK Bridge                          │
+│                                          │ via Peat-TAK Bridge                          │
 └──────────────────────────────────────────┼──────────────────────────────────────────────┘
                                            │
 ┌──────────────────────────────────────────┼──────────────────────────────────────────────┐
@@ -165,7 +165,7 @@ This diagram shows how capabilities bubble up through the hierarchy, aggregating
 │ └───────┘   └─────────┘  └─────────┘    │ │   └───────┘   └─────────┘  └─────────┘   │
 │                                          │ │                                          │
 │  Each platform advertises its own        │ │  Each platform advertises its own        │
-│  capabilities via PEAT Protocol          │ │  capabilities via PEAT Protocol          │
+│  capabilities via Peat Protocol          │ │  capabilities via Peat Protocol          │
 │                                          │ │                                          │
 └──────────────────────────────────────────┘ └──────────────────────────────────────────┘
 ```
@@ -230,7 +230,7 @@ This shows how C2's view of aggregated capabilities **directly informs** the dec
 │                                                                                          │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
                                            │
-                                           │ Tasking sent via CoT → PEAT
+                                           │ Tasking sent via CoT → Peat
                                            ▼
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
 │                                                                                          │
@@ -247,16 +247,16 @@ This shows how C2's view of aggregated capabilities **directly informs** the dec
 │                              │   TAK Server    │                                        │
 │                              └────────┬────────┘                                        │
 │                                       │                                                 │
-│                                       │ CoT → PEAT translation                          │
+│                                       │ CoT → Peat translation                          │
 │                                       ▼                                                 │
 │                              ┌─────────────────┐                                        │
 │                              │  Coordinator    │                                        │
-│                              │  PEAT-TAK Bridge│                                        │
+│                              │  Peat-TAK Bridge│                                        │
 │                              └────────┬────────┘                                        │
 │                                       │                                                 │
 │                    ┌──────────────────┴──────────────────┐                              │
 │                    │                                     │                              │
-│                    │ PEAT: TRACK_TARGET                  │ PEAT: TRACK_TARGET           │
+│                    │ Peat: TRACK_TARGET                  │ Peat: TRACK_TARGET           │
 │                    ▼                                     ▼                              │
 │           ┌─────────────────┐                   ┌─────────────────┐                     │
 │           │   Team Alpha    │                   │   Team Bravo    │                     │
@@ -346,7 +346,7 @@ This shows how C2's view of aggregated capabilities **directly informs** the dec
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
 │                                                                                          │
-│   TRADITIONAL APPROACH                      PEAT APPROACH                               │
+│   TRADITIONAL APPROACH                      Peat APPROACH                               │
 │   ────────────────────                      ─────────────                               │
 │                                                                                          │
 │   C2: "Team Alpha, do you have             C2 already knows:                            │
@@ -423,4 +423,4 @@ Alpha-1 advertises:                                               │     level:
 
 ---
 
-*This is the PEAT value proposition: C2 knows what capabilities exist before deciding to task, eliminating the query overhead and enabling truly capability-driven operations.*
+*This is the Peat value proposition: C2 knows what capabilities exist before deciding to task, eliminating the query overhead and enabling truly capability-driven operations.*

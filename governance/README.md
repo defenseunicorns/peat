@@ -1,6 +1,6 @@
-# PEAT Protocol Governance
+# Peat Protocol Governance
 
-This directory contains the governance documents for the PEAT Protocol project.
+This directory contains the governance documents for the Peat Protocol project.
 
 ## Documents
 
@@ -33,4 +33,4 @@ This directory contains the governance documents for the PEAT Protocol project.
 ## Contact
 
 - GitHub Issues: [github.com/defenseunicorns/peat/issues](https://github.com/defenseunicorns/peat/issues)
-- Email: kit@revolveteam.com
+- Email: kitplummer@defenseunicorns.com

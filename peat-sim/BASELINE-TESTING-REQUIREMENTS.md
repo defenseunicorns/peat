@@ -1,4 +1,4 @@
-# Baseline Testing Requirements for PEAT Protocol Evaluation
+# Baseline Testing Requirements for Peat Protocol Evaluation
 
 **Date:** 2025-11-07
 **Purpose:** Define baseline testing framework to appropriately compare CAP's architectural differences
@@ -6,17 +6,17 @@
 
 ## Executive Summary
 
-To properly evaluate PEAT Protocol's architectural benefits, we need structured baseline comparisons across three dimensions:
+To properly evaluate Peat Protocol's architectural benefits, we need structured baseline comparisons across three dimensions:
 
 1. **CAP Full Replication** vs **CAP Differential Filtering** (capability-based optimization)
-2. **PEAT Protocol** vs **Ditto Baseline** (CRDT without capability model)
+2. **Peat Protocol** vs **Ditto Baseline** (CRDT without capability model)
 3. **Topology Modes** (client-server vs hub-spoke vs dynamic mesh)
 
 This document defines the testing framework required to demonstrate CAP's value proposition.
 
 ## Background
 
-### PEAT Protocol Architecture
+### Peat Protocol Architecture
 
 CAP (Capability-Aware Protocol) provides:
 - **Capability-based authorization:** Role-based access control at data model level
@@ -316,7 +316,7 @@ Ditto Baseline:
 2. Document size variation tested (1KB to 1MB payloads)
 3. Dynamic updates tested (continuous state changes)
 4. All topology modes compared (client-server, hub-spoke)
-5. Clear ROI demonstration for PEAT Protocol vs Traditional IoT
+5. Clear ROI demonstration for Peat Protocol vs Traditional IoT
 
 ## Traditional IoT Baseline Implementation
 
@@ -367,7 +367,7 @@ In mesh topology, every node sends to every other node:
 
 ## Expected Outcomes
 
-### Hypothesis: PEAT Protocol Value Proposition
+### Hypothesis: Peat Protocol Value Proposition
 
 **Scenario:** 12-node squad, 10 documents (varied authorization), 10Mbps bandwidth, 5-second update frequency
 
@@ -443,11 +443,11 @@ The protobuf migration (Phase 5) has validated that the simulation infrastructur
 
 ### Key Insight
 
-To properly evaluate PEAT Protocol's value proposition, we need to compare against **traditional IoT event-driven architectures**, not just CRDT variants. The three-way comparison will demonstrate:
+To properly evaluate Peat Protocol's value proposition, we need to compare against **traditional IoT event-driven architectures**, not just CRDT variants. The three-way comparison will demonstrate:
 
 1. **CRDT Advantage:** Delta-state sync vs periodic full messages
 2. **CAP Filtering Advantage:** Capability-based filtering vs full replication
-3. **Combined Advantage:** PEAT Protocol vs Traditional IoT baseline
+3. **Combined Advantage:** Peat Protocol vs Traditional IoT baseline
 
 ### Immediate Next Steps
 

@@ -45,7 +45,7 @@ Traditional baseline with UPDATE_FREQUENCY=0.5s (500ms broadcast interval):
 - Server → Client: ~1ms (measured)
 - **Total P50: ~252ms** (250× higher than measured!)
 
-### Why This Matters for PEAT Comparison
+### Why This Matters for Peat Comparison
 
 We're building hierarchical CRDT to improve on traditional client-server. But our comparison is unfair:
 
@@ -247,7 +247,7 @@ Could add additional metrics:
 - **ServerQueuingDelay**: Time between receive and broadcast
 - **MultiHopPropagation**: Track propagation through multiple tiers
 
-This creates a comprehensive latency measurement framework for all PEAT architectures.
+This creates a comprehensive latency measurement framework for all Peat architectures.
 
 ## References
 

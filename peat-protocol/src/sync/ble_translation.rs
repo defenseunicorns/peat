@@ -271,7 +271,7 @@ impl BleTranslator {
     /// Convert BLE position to track document JSON with cell membership
     ///
     /// The `mesh_id` parameter (from BLE mesh configuration) is used as the cell_id,
-    /// allowing BLE-originated tracks to be associated with PEAT cells.
+    /// allowing BLE-originated tracks to be associated with Peat cells.
     ///
     /// # Arguments
     /// * `position` - The BLE position data
@@ -347,7 +347,7 @@ impl BleTranslator {
     /// Convert BLE peripheral to platform document JSON with cell membership
     ///
     /// The `mesh_id` parameter (from BLE mesh configuration) is used as the cell_id,
-    /// allowing BLE peripherals to be associated with PEAT cells.
+    /// allowing BLE peripherals to be associated with Peat cells.
     ///
     /// # Arguments
     /// * `peripheral` - The BLE peripheral data
@@ -596,7 +596,7 @@ impl BleTranslator {
     /// Convert BLE canned message to Automerge document JSON with cell membership
     ///
     /// The `mesh_id` parameter (from BLE mesh configuration) is used as the cell_id,
-    /// allowing BLE-originated canned messages to be associated with PEAT cells.
+    /// allowing BLE-originated canned messages to be associated with Peat cells.
     ///
     /// # Arguments
     /// * `message` - The BLE canned message data

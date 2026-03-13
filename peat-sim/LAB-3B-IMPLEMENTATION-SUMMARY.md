@@ -2,17 +2,17 @@
 
 **Date**: 2025-11-23
 **Epic**: #132 Comprehensive Empirical Validation
-**Goal**: P2P Flat Mesh with PEAT CRDT (measure pure CRDT overhead)
+**Goal**: P2P Flat Mesh with Peat CRDT (measure pure CRDT overhead)
 
 ---
 
 ## Implementation Complete ✅
 
-Lab 3b has been implemented using the core PEAT library architecture, following the principle that **peat-sim should use the core PEAT library, not reimplement functionality**.
+Lab 3b has been implemented using the core Peat library architecture, following the principle that **peat-sim should use the core Peat library, not reimplement functionality**.
 
 ### What Was Implemented
 
-#### 1. Core PEAT: FlatMeshCoordinator (`peat-mesh/src/flat_mesh.rs`)
+#### 1. Core Peat: FlatMeshCoordinator (`peat-mesh/src/flat_mesh.rs`)
 
 New module in the core `peat-mesh` crate that provides flat mesh coordination:
 
@@ -66,7 +66,7 @@ Updated `generate-flat-mesh-peat-topology.py`:
 
 ### Follows Core Principles
 
-1. **peat-sim uses core PEAT library**
+1. **peat-sim uses core Peat library**
    - `FlatMeshCoordinator` is in `peat-mesh` (reusable)
    - peat-sim is a thin wrapper that instantiates core components
 
@@ -102,7 +102,7 @@ This will run Lab 3b tests across:
 - State convergence across flat mesh
 
 **Comparison Points**:
-- Lab 3 (raw TCP) vs Lab 3b (PEAT CRDT) → **CRDT overhead**
+- Lab 3 (raw TCP) vs Lab 3b (Peat CRDT) → **CRDT overhead**
 - Lab 3b (flat mesh) vs Lab 4 (hierarchical) → **Hierarchy benefit**
 
 ---
@@ -158,7 +158,7 @@ python3 analyze-lab3b-vs-lab3.py <lab3b-results-dir> <lab3-results-dir>
 
 ## Files Changed
 
-### Core PEAT (`peat-mesh` crate)
+### Core Peat (`peat-mesh` crate)
 - ✅ `peat-mesh/src/flat_mesh.rs` - New FlatMeshCoordinator
 - ✅ `peat-mesh/src/lib.rs` - Export FlatMeshCoordinator
 - ✅ Tests passing (3/3)
@@ -212,6 +212,6 @@ Can now answer:
 1. Validate the implementation works end-to-end
 2. Gather empirical data on CRDT overhead
 3. Complete Epic #132 with comprehensive validation
-4. Then move to Lab 4 (hierarchical PEAT CRDT)
+4. Then move to Lab 4 (hierarchical Peat CRDT)
 
 The implementation is architecturally sound and ready for empirical validation.

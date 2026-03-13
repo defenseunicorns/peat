@@ -1,14 +1,14 @@
-# PEAT Protocol Specification: Data Schema Definitions
+# Peat Protocol Specification: Data Schema Definitions
 
-**Spec ID**: PEAT-SPEC-003
+**Spec ID**: Peat-SPEC-003
 **Status**: Draft
 **Version**: 0.1.0
 **Date**: 2025-01-07
-**Authors**: (r)evolve - Revolve Team LLC
+**Authors**: Defense Unicorns
 
 ## Abstract
 
-This document specifies the data schemas for PEAT Protocol. It defines the Protocol Buffer message formats for tactical entities, their relationships, and mapping to external standards (CoT/TAK).
+This document specifies the data schemas for Peat Protocol. It defines the Protocol Buffer message formats for tactical entities, their relationships, and mapping to external standards (CoT/TAK).
 
 ## Table of Contents
 
@@ -30,7 +30,7 @@ This document specifies the data schemas for PEAT Protocol. It defines the Proto
 
 ### 1.1 Purpose
 
-PEAT schemas define the structure of all data exchanged between nodes. Using Protocol Buffers ensures:
+Peat schemas define the structure of all data exchanged between nodes. Using Protocol Buffers ensures:
 - Compact binary encoding
 - Forward/backward compatibility
 - Cross-language support
@@ -552,7 +552,7 @@ message CommunicationCapability {
 
 enum LinkType {
     LINK_TYPE_UNSPECIFIED = 0;
-    LINK_TYPE_MESH = 1;         // PEAT mesh
+    LINK_TYPE_MESH = 1;         // Peat mesh
     LINK_TYPE_SATCOM = 2;
     LINK_TYPE_HF = 3;
     LINK_TYPE_VHF = 4;
@@ -769,9 +769,9 @@ message Detection {
 
 ### 9.1 CoT Event Mapping
 
-PEAT beacons map to CoT events:
+Peat beacons map to CoT events:
 
-| PEAT Field | CoT Field | Notes |
+| Peat Field | CoT Field | Notes |
 |------------|-----------|-------|
 | `track_id` | `uid` | UUID format |
 | `position.latitude` | `point/@lat` | |
@@ -786,7 +786,7 @@ PEAT beacons map to CoT events:
 ### 9.2 CoT Type Mapping
 
 ```
-PEAT Affiliation + Dimension → CoT Type
+Peat Affiliation + Dimension → CoT Type
 
 MEMBER + GROUND     → a-f-G
 MEMBER + AIR        → a-f-A
@@ -797,7 +797,7 @@ UNKNOWN + AIR       → a-u-A
 
 ### 9.3 CoT Detail Extensions
 
-PEAT-specific data is carried in CoT `<detail>` elements:
+Peat-specific data is carried in CoT `<detail>` elements:
 
 ```xml
 <detail>

@@ -128,7 +128,7 @@ impl StorageBackend for DittoBackend {
 
     fn list_collections(&self) -> Vec<String> {
         // Ditto doesn't provide a direct way to list collections
-        // Return known collections based on PEAT Protocol schema
+        // Return known collections based on Peat Protocol schema
         vec![
             "cells".to_string(),
             "nodes".to_string(),

@@ -1,6 +1,6 @@
 //! CapabilityAdvertisement validators
 //!
-//! Validates capability advertisement messages for PEAT Protocol.
+//! Validates capability advertisement messages for Peat Protocol.
 
 use super::{ValidationError, ValidationResult};
 use crate::capability::v1::{CapabilityAdvertisement, OperationalStatus, ResourceStatus};

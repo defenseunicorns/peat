@@ -1,28 +1,28 @@
-# PEAT Protocol Patent Pledge
+# Peat Protocol Patent Pledge
 
 **Effective Date**: [To be filled upon patent filing]
 **Version**: 1.0
 **Last Updated**: 2025-11-04
-**Organization**: (r)evolve LLC
+**Organization**: Defense Unicorns LLC
 
 ---
 
 ## Our Commitment
 
-(r)evolve LLC ("Company") believes that innovation in autonomous systems and distributed coordination technology should advance the common good, particularly in support of national security, international cooperation, and scientific research.
+Defense Unicorns LLC ("Company") believes that innovation in autonomous systems and distributed coordination technology should advance the common good, particularly in support of national security, international cooperation, and scientific research.
 
-To that end, we commit to using our patents related to the **PEAT Protocol** (Capability-based Autonomous Protocol) **defensively** and pledge not to assert them against parties acting in good faith to advance open collaboration, defense, and research.
+To that end, we commit to using our patents related to the **Peat Protocol** (Capability-based Autonomous Protocol) **defensively** and pledge not to assert them against parties acting in good faith to advance open collaboration, defense, and research.
 
 ## Protected Parties
 
-We will **NOT** assert any PEAT Protocol patents against the following parties:
+We will **NOT** assert any Peat Protocol patents against the following parties:
 
 ### 1. Government and Defense
 
 **NATO Member Nations and Allies**:
-- Government agencies using PEAT Protocol for defense, security, or public safety applications
+- Government agencies using Peat Protocol for defense, security, or public safety applications
 - Military branches and defense organizations
-- Government contractors and subcontractors implementing PEAT Protocol for government programs
+- Government contractors and subcontractors implementing Peat Protocol for government programs
 - Coalition partners in joint operations
 
 **U.S. Government**:
@@ -55,7 +55,7 @@ We will **NOT** assert any PEAT Protocol patents against the following parties:
 ### 3. Open Source Community
 
 **Contributors**:
-- Contributors to PEAT Protocol repository (https://github.com/r-evolve/cap)
+- Contributors to Peat Protocol repository (https://github.com/r-evolve/cap)
 - Contributors to automerge-edge repository (when released)
 - Developers of compatible implementations following CAP specifications
 - Projects using Apache-2.0, MIT, or other OSI-approved licenses
@@ -92,22 +92,22 @@ We will **NOT** assert any PEAT Protocol patents against the following parties:
 This pledge does **NOT** extend to parties that:
 
 ### 1. Offensive Patent Assertion
-- Assert any patent offensively against (r)evolve LLC, our customers, partners, or the PEAT Protocol community
-- Initiate patent litigation against PEAT Protocol users or contributors
+- Assert any patent offensively against Defense Unicorns LLC, our customers, partners, or the Peat Protocol community
+- Initiate patent litigation against Peat Protocol users or contributors
 - Threaten patent enforcement to extract licensing fees from open-source projects
 
 ### 2. Proprietary Closed-Source Use
-- Use PEAT Protocol in proprietary products without contributing improvements back to the community
+- Use Peat Protocol in proprietary products without contributing improvements back to the community
 - Violate the terms of the Apache-2.0 license or other applicable open-source licenses
 - Attempt to create proprietary forks without open-sourcing modifications
 
 ### 3. Patent Troll Behavior
-- Acquire PEAT Protocol patents for the purpose of offensive assertion
+- Acquire Peat Protocol patents for the purpose of offensive assertion
 - Operate as non-practicing entities (NPEs) asserting patents for revenue
 - Engage in licensing schemes targeting small businesses or open-source projects
 
 ### 4. Malicious Use
-- Use PEAT Protocol for illegal activities
+- Use Peat Protocol for illegal activities
 - Use technology to harm civilians or violate international humanitarian law
 - Violate export control regulations (ITAR, EAR)
 
@@ -122,7 +122,7 @@ This pledge covers the following patent applications and any continuations, cont
 ### Future Patents
 This pledge automatically extends to:
 - Utility patent applications claiming priority to the above provisionals
-- Future patents related to PEAT Protocol core functionality
+- Future patents related to Peat Protocol core functionality
 - Any patents explicitly listed on our website: https://[company-website]/patents
 
 We will update this document when new patent applications are filed.
@@ -142,7 +142,7 @@ This pledge covers patents specifically related to:
    - Hierarchical authority constraint propagation
    - Cryptographic audit trails
 
-3. **PEAT Protocol Core**:
+3. **Peat Protocol Core**:
    - Cell formation and hierarchy management
    - Distributed leader election
    - CRDT-based state synchronization
@@ -154,7 +154,7 @@ This pledge covers patents specifically related to:
 - Discovery mechanisms (mDNS, Bluetooth)
 - Transport protocols (TCP, QUIC, WebSocket)
 
-These infrastructure components are implemented using existing open-source libraries and are not subject to PEAT Protocol patents.
+These infrastructure components are implemented using existing open-source libraries and are not subject to Peat Protocol patents.
 
 ## How to Qualify for Protection
 
@@ -173,10 +173,10 @@ To benefit from this pledge:
 This pledge constitutes a legally binding, worldwide, royalty-free, non-exclusive, irrevocable (for qualifying parties) license under our patents for the protected use cases described above.
 
 ### Defensive Termination
-If a party covered by this pledge asserts patents offensively against (r)evolve LLC or the PEAT Protocol community, their protection under this pledge terminates immediately. We reserve the right to assert our patents defensively against such parties.
+If a party covered by this pledge asserts patents offensively against Defense Unicorns LLC or the Peat Protocol community, their protection under this pledge terminates immediately. We reserve the right to assert our patents defensively against such parties.
 
 ### No Warranty
-This pledge grants patent rights only. PEAT Protocol software is provided "AS IS" under the Apache-2.0 license, without warranties of any kind.
+This pledge grants patent rights only. Peat Protocol software is provided "AS IS" under the Apache-2.0 license, without warranties of any kind.
 
 ### Governing Law
 This pledge is governed by the laws of [State], United States, without regard to conflict of law principles.
@@ -187,7 +187,7 @@ This pledge is governed by the laws of [State], United States, without regard to
 We may expand the scope of protected parties or use cases at any time by publishing an updated version of this document.
 
 ### Limitation of Protections
-We will **NOT reduce** the scope of protections without **12 months advance notice** published on our website and in the PEAT Protocol repository.
+We will **NOT reduce** the scope of protections without **12 months advance notice** published on our website and in the Peat Protocol repository.
 
 ### Notification
 Subscribe to updates:
@@ -197,15 +197,15 @@ Subscribe to updates:
 
 ## Frequently Asked Questions
 
-### Q: Can I use PEAT Protocol in a commercial product?
+### Q: Can I use Peat Protocol in a commercial product?
 **A**: Yes, if:
 - Your product is open-source (OSI-approved license), OR
 - You're a government contractor implementing for defense programs, OR
-- You contribute improvements back to the PEAT Protocol community
+- You contribute improvements back to the Peat Protocol community
 
 If you're building a proprietary closed-source product, please contact us to discuss commercial licensing.
 
-### Q: Can I fork PEAT Protocol and create my own version?
+### Q: Can I fork Peat Protocol and create my own version?
 **A**: Yes, under the Apache-2.0 license terms. You must:
 - Keep the same open-source license (Apache-2.0 or compatible)
 - Attribute original authors
@@ -216,16 +216,16 @@ Proprietary forks are not covered by this pledge.
 ### Q: What if I'm a defense contractor working for a non-NATO ally?
 **A**: Contact us at patents@[company-domain]. We're open to extending protections on a case-by-case basis for legitimate defense applications.
 
-### Q: Can I patent my own improvements to PEAT Protocol?
+### Q: Can I patent my own improvements to Peat Protocol?
 **A**: Yes! This pledge does not restrict your ability to patent your own innovations. We encourage open collaboration while respecting intellectual property rights.
 
 ### Q: What if I'm sued by a patent troll - can you help?
-**A**: If you're a qualifying party under this pledge and a troll asserts patents against your PEAT Protocol use, contact us. We may be able to provide defensive support.
+**A**: If you're a qualifying party under this pledge and a troll asserts patents against your Peat Protocol use, contact us. We may be able to provide defensive support.
 
 ### Q: How is this different from the Apache-2.0 license?
-**A**: The Apache-2.0 license includes a patent grant from contributors. This pledge extends patent protection from **(r)evolve LLC** specifically, covering our provisional and utility patents. Both work together to protect users.
+**A**: The Apache-2.0 license includes a patent grant from contributors. This pledge extends patent protection from **Defense Unicorns LLC** specifically, covering our provisional and utility patents. Both work together to protect users.
 
-### Q: What happens if (r)evolve is acquired?
+### Q: What happens if Defense Unicorns is acquired?
 **A**: This pledge is binding on any successor organization. Acquirers must honor these commitments.
 
 ### Q: Can I get this pledge in writing for my legal team?
@@ -260,7 +260,7 @@ We thank these organizations for pioneering defensive patent strategies.
 
 ## Summary
 
-**(r)evolve LLC pledges not to assert PEAT Protocol patents against NATO allies, academic institutions, open-source contributors, or non-commercial researchers. We commit to using our patents defensively to protect the community while reserving rights against offensive patent assertion and proprietary closed-source use.**
+**Defense Unicorns LLC pledges not to assert Peat Protocol patents against NATO allies, academic institutions, open-source contributors, or non-commercial researchers. We commit to using our patents defensively to protect the community while reserving rights against offensive patent assertion and proprietary closed-source use.**
 
 **This is our commitment to advancing autonomous systems technology for the common good.**
 
@@ -268,7 +268,7 @@ We thank these organizations for pioneering defensive patent strategies.
 
 **Signed**:
 [Name], [Title]
-(r)evolve LLC
+Defense Unicorns LLC
 [Date]
 
 ---

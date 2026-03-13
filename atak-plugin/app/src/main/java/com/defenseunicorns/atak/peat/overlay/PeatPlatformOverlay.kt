@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ * Copyright (c) 2026 Defense Unicorns.  All rights reserved.
  */
 
 package com.defenseunicorns.atak.peat.overlay
@@ -14,7 +14,7 @@ import com.defenseunicorns.atak.peat.model.PeatCell
 import com.defenseunicorns.atak.peat.model.PeatPlatform
 
 /**
- * Manages PEAT platform markers on the ATAK map.
+ * Manages Peat platform markers on the ATAK map.
  *
  * Platforms are displayed as markers with:
  * - Callsign label including cell membership (e.g., "HAWK-1 [Atlanta]")
@@ -63,13 +63,13 @@ class PeatPlatformOverlay(private val mapView: MapView) {
             return
         }
 
-        // Find or create PEAT Platforms group
+        // Find or create Peat Platforms group
         mapGroup = rootGroup.findMapGroup(GROUP_NAME)
         if (mapGroup == null) {
             mapGroup = rootGroup.addGroup(GROUP_NAME)
-            Log.i(TAG, "Created PEAT Platforms map group")
+            Log.i(TAG, "Created Peat Platforms map group")
         } else {
-            Log.d(TAG, "Found existing PEAT Platforms map group")
+            Log.d(TAG, "Found existing Peat Platforms map group")
         }
     }
 

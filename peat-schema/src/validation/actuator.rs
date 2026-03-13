@@ -1,6 +1,6 @@
 //! Actuator validators
 //!
-//! Validates ActuatorSpec, ActuatorStateUpdate, and ActuatorCommand messages for PEAT Protocol.
+//! Validates ActuatorSpec, ActuatorStateUpdate, and ActuatorCommand messages for Peat Protocol.
 
 use super::{ValidationError, ValidationResult};
 use crate::actuator::v1::{

@@ -1,6 +1,6 @@
-//! PEAT-Lite Aggregator Example
+//! Peat-Lite Aggregator Example
 //!
-//! A Full Peat node that communicates with PEAT-Lite embedded devices.
+//! A Full Peat node that communicates with Peat-Lite embedded devices.
 //!
 //! This example demonstrates:
 //! - Enabling the lite-transport feature alongside the main backend
@@ -18,7 +18,7 @@
 //!
 //! ```text
 //! ┌──────────────────────────────────────────────────────────────┐
-//! │                    Full PEAT Node                            │
+//! │                    Full Peat Node                            │
 //! │  ┌─────────────────┐    ┌─────────────────────────────────┐ │
 //! │  │ AutomergeBackend│    │      LiteMeshTransport          │ │
 //! │  │   (or Ditto)    │    │  - UDP port 5555                │ │
@@ -51,7 +51,7 @@ mod example {
     use std::time::Duration;
 
     pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
-        println!("=== PEAT-Lite Aggregator ===");
+        println!("=== Peat-Lite Aggregator ===");
         println!("Listening for Lite nodes on UDP port 5555...\n");
 
         // Configure the Lite transport

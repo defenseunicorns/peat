@@ -1,16 +1,16 @@
-# ADR-051: PEAT-SBD Satellite Transport Crate
+# ADR-051: Peat-SBD Satellite Transport Crate
 
 **Status**: Proposed
 **Date**: 2025-02-10
-**Authors**: Kit Plummer, Codex
-**Organization**: (r)evolve - Revolve Team LLC (https://revolveteam.com)
-**Relates To**: ADR-032 (Pluggable Transport Abstraction), ADR-035 (PEAT-Lite Embedded Nodes), ADR-037 (Resource-Constrained Device Optimization), ADR-039 (PEAT-BTLE Mesh Transport), ADR-041 (Multi-Transport Embedded Integration)
+**Authors**: Kit Plummer, Claude
+**Organization**: Defense Unicorns (https://defenseunicorns.com)
+**Relates To**: ADR-032 (Pluggable Transport Abstraction), ADR-035 (Peat-Lite Embedded Nodes), ADR-037 (Resource-Constrained Device Optimization), ADR-039 (Peat-BTLE Mesh Transport), ADR-041 (Multi-Transport Embedded Integration)
 
 ---
 
 ## Executive Summary
 
-This ADR defines the architecture for `peat-sbd`, a Rust crate providing Iridium Short Burst Data (SBD) satellite transport for PEAT Protocol. The crate enables global, infrastructure-independent message exchange via the Iridium satellite constellation, targeting beyond-line-of-sight (BLOS) scenarios where no terrestrial network exists. It implements the ADR-032 `Transport` trait as an external transport extension, following the same pattern established by `peat-btle`.
+This ADR defines the architecture for `peat-sbd`, a Rust crate providing Iridium Short Burst Data (SBD) satellite transport for Peat Protocol. The crate enables global, infrastructure-independent message exchange via the Iridium satellite constellation, targeting beyond-line-of-sight (BLOS) scenarios where no terrestrial network exists. It implements the ADR-032 `Transport` trait as an external transport extension, following the same pattern established by `peat-btle`.
 
 ---
 
@@ -18,9 +18,9 @@ This ADR defines the architecture for `peat-sbd`, a Rust crate providing Iridium
 
 ### The Satellite Communication Gap
 
-PEAT's current transport options—QUIC/Iroh (IP networks) and peat-btle (BLE mesh)—share a common limitation: they require terrestrial infrastructure or proximity between peers. Tactical edge operations frequently occur in environments where neither is available:
+Peat's current transport options—QUIC/Iroh (IP networks) and peat-btle (BLE mesh)—share a common limitation: they require terrestrial infrastructure or proximity between peers. Tactical edge operations frequently occur in environments where neither is available:
 
-| Scenario | Gap | PEAT Use Case |
+| Scenario | Gap | Peat Use Case |
 |----------|-----|---------------|
 | Maritime patrol | No cellular, no WiFi | Ship-to-shore PLI and status |
 | Remote overwatch | Beyond radio range of C2 | Forward observer position reports |
@@ -30,7 +30,7 @@ PEAT's current transport options—QUIC/Iroh (IP networks) and peat-btle (BLE me
 
 ### Why Iridium SBD?
 
-Iridium SBD is uniquely suited as a PEAT transport for several reasons:
+Iridium SBD is uniquely suited as a Peat transport for several reasons:
 
 | Property | Iridium SBD | Starlink | Inmarsat BGAN |
 |----------|-------------|----------|---------------|
@@ -83,11 +83,11 @@ peat-sbd (external)  ← SBD satellite transport [NEW]
 1. **Global Coverage**: Operate anywhere on Earth with sky visibility
 2. **Low Power**: Suitable for battery-powered field devices (< 2W transmit)
 3. **Small Form Factor**: Integrate with man-portable and UAS platforms
-4. **PEAT Transport Trait**: Implement ADR-032 `Transport` trait for TransportManager integration
-5. **Message Efficiency**: Maximize PEAT data per SBD message given 1,960-byte limit
+4. **Peat Transport Trait**: Implement ADR-032 `Transport` trait for TransportManager integration
+5. **Message Efficiency**: Maximize Peat data per SBD message given 1,960-byte limit
 6. **Reliability**: Handle message queuing, retry, and confirmation
 7. **Security**: Application-layer encryption over SBD (per ADR-006)
-8. **Dual-Mode Operation**: Standalone (embedded gateway) or transport plugin (full PEAT node)
+8. **Dual-Mode Operation**: Standalone (embedded gateway) or transport plugin (full Peat node)
 
 ### Constraints
 
@@ -123,14 +123,14 @@ peat-sbd/
 │   │   └── mock.rs          # Mock modem for testing
 │   ├── message/
 │   │   ├── mod.rs           # Message framing and types
-│   │   ├── encoding.rs      # Compact binary encoding (PEAT → SBD payload)
+│   │   ├── encoding.rs      # Compact binary encoding (Peat → SBD payload)
 │   │   ├── fragmentation.rs # Multi-message fragmentation for >1960 byte payloads
 │   │   └── compression.rs   # Optional payload compression (LZ4/zstd)
 │   ├── gateway/
 │   │   ├── mod.rs           # Gateway relay abstraction
 │   │   ├── directip.rs      # DirectIP socket gateway client
 │   │   ├── email.rs         # Email-based gateway (SMTP/IMAP)
-│   │   └── relay.rs         # PEAT relay server (SBD ↔ PEAT mesh bridge)
+│   │   └── relay.rs         # Peat relay server (SBD ↔ Peat mesh bridge)
 │   ├── routing/
 │   │   ├── mod.rs           # Peer-to-IMEI routing
 │   │   └── imei_map.rs      # NodeId ↔ IMEI mapping table
@@ -206,7 +206,7 @@ pub enum GatewayConfig {
         imap_server: String,
         credentials: String, // Reference to credential store, not inline
     },
-    /// PEAT relay server (bridges SBD ↔ PEAT mesh)
+    /// Peat relay server (bridges SBD ↔ Peat mesh)
     PeatRelay {
         relay_url: String,
     },
@@ -406,10 +406,10 @@ impl PeatSbdTransport {
 
 ### Compact Message Encoding
 
-Given the 1,960-byte constraint, efficient encoding is critical. PEAT messages must be packed tightly:
+Given the 1,960-byte constraint, efficient encoding is critical. Peat messages must be packed tightly:
 
 ```rust
-/// Compact PEAT-over-SBD message format
+/// Compact Peat-over-SBD message format
 ///
 /// Header (8 bytes):
 ///   [0]     Version + flags (1 byte)
@@ -419,7 +419,7 @@ Given the 1,960-byte constraint, efficient encoding is critical. PEAT messages m
 ///   [6-7]   CRC-16 of payload (2 bytes)
 ///
 /// Payload (up to 1,952 bytes):
-///   Encoded PEAT data (protobuf, CBOR, or raw)
+///   Encoded Peat data (protobuf, CBOR, or raw)
 ///
 /// Total: max 1,960 bytes
 ///
@@ -541,7 +541,7 @@ pub fn fragment_message(data: &[u8], max_fragment_payload: usize) -> Result<Vec<
 
 ### Gateway Relay Architecture
 
-The key architectural decision is how SBD messages flow between isolated SBD-equipped nodes and the broader PEAT mesh:
+The key architectural decision is how SBD messages flow between isolated SBD-equipped nodes and the broader Peat mesh:
 
 ```
                         Iridium Constellation
@@ -551,18 +551,18 @@ The key architectural decision is how SBD messages flow between isolated SBD-equ
 ┌──────────────────┐      /          \      ┌──────────────────┐
 │  Field Device A  │     /            \     │  Field Device B  │
 │  ┌─────────────┐ │    /              \    │ ┌─────────────┐  │
-│  │ PEAT Node   │ │   ▼                ▼   │ │ PEAT Node   │  │
+│  │ Peat Node   │ │   ▼                ▼   │ │ Peat Node   │  │
 │  │ peat-sbd    │◄──► Iridium    Iridium ◄──►│ peat-sbd    │  │
 │  │ (MO/MT)     │ │   Gateway    Gateway   │ │ (MO/MT)     │  │
 │  └─────────────┘ │      │            │    │ └─────────────┘  │
 └──────────────────┘      │            │    └──────────────────┘
                           ▼            ▼
                     ┌────────────────────────┐
-                    │   PEAT SBD Relay       │
+                    │   Peat SBD Relay       │
                     │   (DirectIP server)    │
                     │                        │
-                    │   MO → PEAT mesh pub   │
-                    │   PEAT mesh sub → MT   │
+                    │   MO → Peat mesh pub   │
+                    │   Peat mesh sub → MT   │
                     │                        │
                     │   Peer IMEI registry   │
                     │   Message routing      │
@@ -570,18 +570,18 @@ The key architectural decision is how SBD messages flow between isolated SBD-equ
                     └───────────┬────────────┘
                                 │
                     ┌───────────▼────────────┐
-                    │   PEAT Mesh            │
+                    │   Peat Mesh            │
                     │   (QUIC/Iroh)          │
                     │   Full CRDT sync       │
                     └────────────────────────┘
 ```
 
-**PEAT SBD Relay** is a server-side component that:
+**Peat SBD Relay** is a server-side component that:
 1. Receives MO messages from the Iridium gateway via DirectIP
-2. Decodes PEAT-over-SBD frames
-3. Publishes decoded data into the PEAT mesh (as a full PEAT node)
-4. Subscribes to PEAT mesh data destined for SBD-connected peers
-5. Encodes PEAT data into SBD frames
+2. Decodes Peat-over-SBD frames
+3. Publishes decoded data into the Peat mesh (as a full Peat node)
+4. Subscribes to Peat mesh data destined for SBD-connected peers
+5. Encodes Peat data into SBD frames
 6. Sends MT messages to field devices via the Iridium gateway
 
 ### Dual-Mode Operation
@@ -590,7 +590,7 @@ Following `peat-btle`'s pattern:
 
 ```
 ┌─────────────────────────────────┐
-│   Full PEAT (ATAK, CLI, etc.)   │
+│   Full Peat (ATAK, CLI, etc.)   │
 │   TransportManager (PACE policy)│ ← peat-sbd is one transport option
 └──────────┬──────────────────────┘
            │
@@ -602,13 +602,13 @@ Following `peat-btle`'s pattern:
 ┌──────────▼──────────────────────┐
 │  Embedded tracker               │
 │  (ESP32 + Iridium 9603)         │ ← Standalone peat-sbd
-│  Can't run full PEAT            │
+│  Can't run full Peat            │
 └─────────────────────────────────┘
 ```
 
 **Mode 1 - Standalone**: Embedded devices (ESP32 + Iridium 9603, asset trackers) use peat-sbd directly to send compact PLI/status reports via satellite.
 
-**Mode 2 - Transport Plugin**: Full PEAT nodes wrap peat-sbd via `PeatSbdTransport` in `TransportManager`, using it as a contingency/emergency PACE transport.
+**Mode 2 - Transport Plugin**: Full Peat nodes wrap peat-sbd via `PeatSbdTransport` in `TransportManager`, using it as a contingency/emergency PACE transport.
 
 ### PACE Integration
 
@@ -776,7 +776,7 @@ pub struct SbdSessionResult {
 
 - [ ] DirectIP server for MO message reception
 - [ ] DirectIP client for MT message sending
-- [ ] PEAT mesh bridge (full PEAT node that relays SBD ↔ mesh)
+- [ ] Peat mesh bridge (full Peat node that relays SBD ↔ mesh)
 - [ ] Peer IMEI registry and routing table
 - [ ] Fragment reassembly at gateway
 - [ ] End-to-end integration tests
@@ -796,7 +796,7 @@ pub struct SbdSessionResult {
 
 - [ ] Send MO SBD message via Iridium 9603 modem
 - [ ] Receive MT SBD message from gateway
-- [ ] Round-trip message through gateway relay into PEAT mesh
+- [ ] Round-trip message through gateway relay into Peat mesh
 - [ ] Fragment and reassemble messages exceeding 1,960 bytes
 - [ ] Compress payloads to maximize data per message
 - [ ] Implement ADR-032 `Transport` trait for TransportManager
@@ -814,7 +814,7 @@ pub struct SbdSessionResult {
 - [ ] Unit tests with mock modem (no hardware required)
 - [ ] Integration tests with mock gateway (DirectIP server)
 - [ ] Hardware-in-the-loop tests with Iridium 9603 + RockBLOCK developer kit
-- [ ] End-to-end test: field device → SBD → gateway → PEAT mesh → response → SBD → field device
+- [ ] End-to-end test: field device → SBD → gateway → Peat mesh → response → SBD → field device
 
 ---
 
@@ -822,12 +822,12 @@ pub struct SbdSessionResult {
 
 ### Positive
 
-- **True global reach**: PEAT nodes can communicate from anywhere with sky visibility
+- **True global reach**: Peat nodes can communicate from anywhere with sky visibility
 - **PACE completeness**: Provides a genuine emergency transport when all terrestrial options fail
 - **Low power**: Iridium 9603 draws ~1.5W transmit, suitable for battery-powered platforms
 - **Small form factor**: 9603 module is 32×30×12mm, embeddable in almost anything
 - **Proven infrastructure**: Iridium constellation has been operational since 1998 with 99.9% uptime
-- **Dual-mode flexibility**: Same crate works standalone on embedded or as transport plugin on full PEAT
+- **Dual-mode flexibility**: Same crate works standalone on embedded or as transport plugin on full Peat
 
 ### Negative
 
@@ -881,7 +881,7 @@ pub struct SbdSessionResult {
 3. [Iridium 9603 Transceiver](https://www.iridium.com/products/iridium-9603/) - Primary target hardware
 4. [RockBLOCK Developer Kit](https://www.groundcontrol.com/products/iridium/rockblock/) - Development hardware
 5. ADR-032: Pluggable Transport Abstraction
-6. ADR-039: PEAT-BTLE Mesh Transport Crate
+6. ADR-039: Peat-BTLE Mesh Transport Crate
 7. ADR-041: Multi-Transport Embedded Integration
 8. [peat-btle on Radicle](https://app.radicle.xyz/nodes/rosa.radicle.xyz/rad%3Az458mp9Um3AYNQQFMdHaNEUtmiohq) - External transport crate pattern
 
@@ -902,7 +902,7 @@ pub struct SbdSessionResult {
 2. Create `peat-sbd` Radicle repository
 3. Phase 1: Modem driver with mock testing
 4. Acquire RockBLOCK developer kit for hardware-in-the-loop testing
-5. Phase 4: Gateway relay for bidirectional SBD ↔ PEAT mesh bridging
+5. Phase 4: Gateway relay for bidirectional SBD ↔ Peat mesh bridging
 
 **Radicle:**
 - Create `rad:z...` for peat-sbd (pending approval)

@@ -1,7 +1,7 @@
 //! Connected Detection Pipeline - Full End-to-End Example
 //!
-//! Demonstrates the complete inference pipeline with PEAT sync:
-//!   Video → Detection → Tracking → TrackUpdates → PEAT Sync
+//! Demonstrates the complete inference pipeline with Peat sync:
+//!   Video → Detection → Tracking → TrackUpdates → Peat Sync
 //!
 //! Usage:
 //!   cargo run --example connected_detection --features onnx-inference --release -- <video_file>
@@ -10,7 +10,7 @@
 //!   --gpu        Use CUDA execution provider
 //!   --tensorrt   Use TensorRT execution provider (best on Jetson)
 //!   --frames N   Process N frames (default: 100)
-//!   --sync       Enable PEAT sync (requires network setup)
+//!   --sync       Enable Peat sync (requires network setup)
 //!
 //! Example:
 //!   cargo run --example connected_detection --features onnx-inference --release -- \
@@ -94,7 +94,7 @@ async fn main() -> anyhow::Result<()> {
     println!("Execution: {:?}", execution_provider);
     println!("Max frames: {}", max_frames);
     println!(
-        "PEAT sync: {}",
+        "Peat sync: {}",
         if enable_sync {
             "enabled"
         } else {
@@ -160,11 +160,11 @@ async fn main() -> anyhow::Result<()> {
     let mut video = VideoSource::new(video_config)?;
     video.start().await?;
 
-    // Optional: Initialize PEAT sync
+    // Optional: Initialize Peat sync
     // In production, this would connect to the Peat mesh network
     let sync_client: Option<SyncTracker> = if enable_sync {
-        println!("Initializing PEAT sync client...");
-        // Note: Full PEAT sync requires AutomergeIrohBackend setup
+        println!("Initializing Peat sync client...");
+        // Note: Full Peat sync requires AutomergeIrohBackend setup
         // For now, we use a tracking-only client that logs what would be synced
         Some(SyncTracker::new("Jetson-Platform-1", "alpha-formation"))
     } else {
@@ -198,7 +198,7 @@ async fn main() -> anyhow::Result<()> {
         total_detections += output.detections.len();
         total_updates += output.track_updates.len();
 
-        // Publish track updates to PEAT (if enabled)
+        // Publish track updates to Peat (if enabled)
         if let Some(ref mut sync) = sync_client.as_ref() {
             for update in &output.track_updates {
                 sync.track_update(update);
@@ -297,13 +297,13 @@ async fn main() -> anyhow::Result<()> {
     // Print sync stats if enabled
     if let Some(sync) = sync_client {
         println!();
-        println!("PEAT Sync Stats:");
+        println!("Peat Sync Stats:");
         println!("  Track updates queued: {}", sync.updates_count());
         println!("  Unique tracks: {}", sync.unique_tracks());
     }
 
     println!();
-    println!("Pipeline ready for PEAT integration!");
+    println!("Pipeline ready for Peat integration!");
     println!("Next: Connect PeatSyncClient with AutomergeIrohBackend");
 
     Ok(())
@@ -377,7 +377,7 @@ impl SyncTracker {
 
     fn track_update(&self, update: &TrackUpdate) {
         tracing::debug!(
-            "PEAT: Would publish track {} to formation {}",
+            "Peat: Would publish track {} to formation {}",
             update.track_id,
             self.formation_id
         );

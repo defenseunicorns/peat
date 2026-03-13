@@ -1,4 +1,4 @@
-//! Testing utilities and infrastructure for PEAT Protocol
+//! Testing utilities and infrastructure for Peat Protocol
 //!
 //! This module provides test harnesses and utilities for E2E and integration testing.
 

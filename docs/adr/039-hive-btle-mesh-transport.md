@@ -1,16 +1,16 @@
-# ADR-039: PEAT-BTLE Mesh Transport Crate
+# ADR-039: Peat-BTLE Mesh Transport Crate
 
 **Status**: Proposed  
 **Date**: 2025-12-13  
-**Authors**: Kit Plummer, Codex  
-**Organization**: (r)evolve - Revolve Team LLC (https://revolveteam.com)  
-**Relates To**: ADR-032 (Pluggable Transport Abstraction), ADR-035 (PEAT-Lite Embedded Nodes), ADR-037 (Resource-Constrained Device Optimization), ADR-017 (P2P Mesh Management), ADR-006 (Security)
+**Authors**: Kit Plummer, Claude  
+**Organization**: Defense Unicorns (https://defenseunicorns.com)  
+**Relates To**: ADR-032 (Pluggable Transport Abstraction), ADR-035 (Peat-Lite Embedded Nodes), ADR-037 (Resource-Constrained Device Optimization), ADR-017 (P2P Mesh Management), ADR-006 (Security)
 
 ---
 
 ## Executive Summary
 
-This ADR defines the architecture for `peat-btle`, a Rust crate providing Bluetooth Low Energy mesh networking for PEAT Protocol. The crate enables peer-to-peer discovery, advertisement, and connectivity across resource-constrained devices while supporting PEAT-Lite synchronization. It implements configurable Coded PHYs for throughput/range tradeoffs and targets cross-platform deployment on Linux, Android, macOS, iOS, and Windows across x86 and ARM architectures.
+This ADR defines the architecture for `peat-btle`, a Rust crate providing Bluetooth Low Energy mesh networking for Peat Protocol. The crate enables peer-to-peer discovery, advertisement, and connectivity across resource-constrained devices while supporting Peat-Lite synchronization. It implements configurable Coded PHYs for throughput/range tradeoffs and targets cross-platform deployment on Linux, Android, macOS, iOS, and Windows across x86 and ARM architectures.
 
 ---
 
@@ -18,9 +18,9 @@ This ADR defines the architecture for `peat-btle`, a Rust crate providing Blueto
 
 ### The BLE Mesh Opportunity
 
-Bluetooth Low Energy represents a critical transport for PEAT's tactical edge scenarios:
+Bluetooth Low Energy represents a critical transport for Peat's tactical edge scenarios:
 
-| Scenario | BLE Advantage | PEAT Use Case |
+| Scenario | BLE Advantage | Peat Use Case |
 |----------|---------------|---------------|
 | Wearable sync | Ultra-low power (10mW) | WearTAK on Samsung watches |
 | Sensor mesh | No infrastructure required | Environmental sensors, asset trackers |
@@ -39,10 +39,10 @@ Ditto BLE Behavior:
 ├─ Full mesh participation: All devices relay everything
 └─ Result: 3-4 hour battery life (mission failure)
 
-PEAT-BTLE Target:
+Peat-BTLE Target:
 ├─ Batched sync windows: Radio active <5% of time
 ├─ Hierarchical discovery: Leaf nodes don't scan
-├─ PEAT Lite profile: Minimal state, single parent
+├─ Peat Lite profile: Minimal state, single parent
 └─ Result: 18-24 hour battery life (mission capable)
 ```
 
@@ -65,7 +65,7 @@ Per ADR-032 (Pluggable Transport Abstraction), each transport type requires fund
 
 1. **Cross-Platform**: Single codebase targeting Linux, Android, macOS, iOS, Windows
 2. **Cross-Architecture**: x86_64 and ARM (aarch64, armv7, armv7-a)
-3. **PEAT-Lite Support**: Synchronize minimal CRDT state per ADR-035/037
+3. **Peat-Lite Support**: Synchronize minimal CRDT state per ADR-035/037
 4. **Coded PHY Support**: Configure LE Coded (S=2, S=8) for range/throughput tradeoffs
 5. **Mesh Topology**: P2P discovery, advertisement, and multi-peer connectivity
 6. **Power Efficiency**: >50% battery improvement over Ditto baseline
@@ -103,7 +103,7 @@ peat-btle/
 │   │   ├── mod.rs
 │   │   ├── advertiser.rs   # Advertisement broadcasting
 │   │   ├── scanner.rs      # Passive/active scanning
-│   │   └── beacon.rs       # PEAT beacon encoding/decoding
+│   │   └── beacon.rs       # Peat beacon encoding/decoding
 │   │
 │   ├── mesh/               # Mesh topology management
 │   │   ├── mod.rs
@@ -113,11 +113,11 @@ peat-btle/
 │   │
 │   ├── gatt/               # GATT service definition
 │   │   ├── mod.rs
-│   │   ├── service.rs      # PEAT BLE service
+│   │   ├── service.rs      # Peat BLE service
 │   │   ├── characteristics.rs
 │   │   └── protocol.rs     # Characteristic read/write protocol
 │   │
-│   ├── sync/               # PEAT-Lite synchronization
+│   ├── sync/               # Peat-Lite synchronization
 │   │   ├── mod.rs
 │   │   ├── batch.rs        # Batched sync accumulator
 │   │   ├── delta.rs        # Differential sync encoding
@@ -172,7 +172,7 @@ use peat_protocol::transport::{
     MessageRequirements, MeshConnection
 };
 
-/// Bluetooth LE transport implementing PEAT Transport trait
+/// Bluetooth LE transport implementing Peat Transport trait
 pub struct BluetoothLETransport {
     config: BleConfig,
     adapter: BleAdapter,
@@ -333,10 +333,10 @@ pub enum PhyStrategy {
 
 use crate::phy::BlePhy;
 
-/// PEAT BLE beacon format (fits in BLE advertisement payload)
+/// Peat BLE beacon format (fits in BLE advertisement payload)
 #[derive(Debug, Clone)]
 pub struct PeatBeacon {
-    /// PEAT protocol version (4 bits)
+    /// Peat protocol version (4 bits)
     pub version: u8,
     /// Node capabilities flags (12 bits)
     pub capabilities: NodeCapabilities,
@@ -356,7 +356,7 @@ impl PeatBeacon {
     /// Encode to BLE advertisement data (max 31 bytes legacy, 254 bytes extended)
     pub fn encode(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(16);
-        // PEAT service UUID (16 bits)
+        // Peat service UUID (16 bits)
         buf.extend_from_slice(&PEAT_SERVICE_UUID_SHORT);
         // Packed beacon data (13 bytes)
         buf.push((self.version << 4) | ((self.capabilities.bits() >> 8) as u8 & 0x0F));
@@ -428,9 +428,9 @@ impl DiscoveryManager {
 ```rust
 // File: src/gatt/service.rs
 
-/// PEAT BLE GATT Service definition
+/// Peat BLE GATT Service definition
 /// 
-/// Service UUID: 0xPEAT (custom 128-bit UUID)
+/// Service UUID: 0xPeat (custom 128-bit UUID)
 /// 
 /// Characteristics:
 /// - Node Info (read): Node identity and capabilities
@@ -483,7 +483,7 @@ impl PeatGattService {
     }
 }
 
-/// PEAT Sync Protocol over GATT
+/// Peat Sync Protocol over GATT
 /// 
 /// Uses chunked transfer for payloads > MTU
 pub struct GattSyncProtocol {
@@ -542,7 +542,7 @@ impl GattSyncProtocol {
 }
 ```
 
-#### 5. PEAT-Lite Sync Support
+#### 5. Peat-Lite Sync Support
 
 ```rust
 // File: src/sync/mod.rs
@@ -628,7 +628,7 @@ impl DeltaEncoder {
     }
 }
 
-/// PEAT-Lite sync state for BLE transport
+/// Peat-Lite sync state for BLE transport
 pub struct BlePeatLiteSync {
     node_id: NodeId,
     parent_id: Option<NodeId>,
@@ -696,7 +696,7 @@ pub enum PowerProfile {
         adv_interval_ms: u32,    // 500ms
         conn_interval_ms: u32,   // 30ms
     },
-    /// Maximum battery life (PEAT Lite default)
+    /// Maximum battery life (Peat Lite default)
     /// Radio active ~2% of time
     LowPower {
         scan_interval_ms: u32,   // 5000ms
@@ -842,7 +842,7 @@ impl BleSecurityManager {
             }
         }
         
-        // Step 3: PEAT-level authentication
+        // Step 3: Peat-level authentication
         let identity = self.peat_security.authenticate_peer(peer_id).await?;
         
         Ok(identity)
@@ -943,10 +943,10 @@ mod embedded {
 name = "peat-btle"
 version = "0.1.0"
 edition = "2021"
-authors = ["(r)evolve - Revolve Team LLC"]
+authors = ["Defense Unicorns"]
 license = "Apache-2.0"
-description = "Bluetooth Low Energy mesh transport for PEAT Protocol"
-repository = "https://github.com/revolveteam/peat-protocol"
+description = "Bluetooth Low Energy mesh transport for Peat Protocol"
+repository = "https://github.com/defenseunicorns/peat-protocol"
 keywords = ["ble", "bluetooth", "mesh", "sync", "crdt"]
 categories = ["network-programming", "embedded", "hardware-support"]
 
@@ -994,7 +994,7 @@ esp-idf-hal = { version = "0.43", optional = true }  # ESP32
 # Embedded
 embedded-hal = { version = "1.0", optional = true }
 
-# PEAT Protocol integration
+# Peat Protocol integration
 peat-protocol = { path = "../peat-protocol" }
 peat-lite = { path = "../peat-lite", optional = true }
 
@@ -1025,14 +1025,14 @@ harness = false
 | Level 3 | Yes | Yes | MITM-protected pairing |
 | Level 4 | Yes | Yes (FIPS) | LE Secure Connections |
 
-**Recommendation**: PEAT-BTLE should require Level 3+ for sync operations.
+**Recommendation**: Peat-BTLE should require Level 3+ for sync operations.
 
 ### Application-Layer Security
 
 Per ADR-006, BLE transport security is layered:
 
 1. **BLE Pairing**: Establishes link encryption (AES-CCM)
-2. **PEAT PKI**: Verifies device identity via certificates
+2. **Peat PKI**: Verifies device identity via certificates
 3. **Application Encryption**: ChaCha20-Poly1305 for sync payloads (optional)
 
 ### Threat Model
@@ -1041,7 +1041,7 @@ Per ADR-006, BLE transport security is layered:
 |--------|------------|
 | Eavesdropping | BLE link encryption + optional app-layer encryption |
 | MITM | Numeric comparison or passkey pairing |
-| Replay | Sequence numbers in PEAT beacon/sync messages |
+| Replay | Sequence numbers in Peat beacon/sync messages |
 | Rogue device | PKI-based device authentication |
 | Battery drain attack | Rate limiting, connection limits |
 
@@ -1100,7 +1100,7 @@ Per ADR-006, BLE transport security is layered:
 - [ ] Parent failover works
 - [ ] Connection limits enforced
 
-### Phase 3: PEAT-Lite Sync (Weeks 6-7)
+### Phase 3: Peat-Lite Sync (Weeks 6-7)
 
 **Deliverables:**
 1. Batch accumulator
@@ -1164,7 +1164,7 @@ peat-btle is designed to operate in two modes:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│              Full PEAT (ATAK, CLI, etc.)                │
+│              Full Peat (ATAK, CLI, etc.)                │
 │                                                         │
 │  TransportManager (PACE policy)                         │
 │  ├── IrohTransport (QUIC/WiFi) - Primary                │
@@ -1182,15 +1182,15 @@ peat-btle is designed to operate in two modes:
                                 │ uses directly
 ┌───────────────────────────────┴─────────────────────────┐
 │              WearTAK (Samsung Watch)                    │
-│         Can't run full PEAT - standalone peat-btle      │
+│         Can't run full Peat - standalone peat-btle      │
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Mode 1: Standalone** - For resource-constrained devices (WearTAK on Samsung watches, ESP32 sensors) that cannot run full PEAT. The device uses peat-btle directly with its lightweight CRDT sync.
+**Mode 1: Standalone** - For resource-constrained devices (WearTAK on Samsung watches, ESP32 sensors) that cannot run full Peat. The device uses peat-btle directly with its lightweight CRDT sync.
 
-**Mode 2: Transport Plugin** - For full PEAT nodes (ATAK, CLI, servers), peat-btle is wrapped by `PeatBleTransport` and registered with `TransportManager` alongside other transports (Iroh/QUIC, future LoRa, etc.).
+**Mode 2: Transport Plugin** - For full Peat nodes (ATAK, CLI, servers), peat-btle is wrapped by `PeatBleTransport` and registered with `TransportManager` alongside other transports (Iroh/QUIC, future LoRa, etc.).
 
-**Interoperability**: Both modes use the same BLE protocol (GATT service, beacon format, sync protocol), so a Samsung Watch running standalone peat-btle can sync with ATAK running full PEAT with BLE as a transport.
+**Interoperability**: Both modes use the same BLE protocol (GATT service, beacon format, sync protocol), so a Samsung Watch running standalone peat-btle can sync with ATAK running full Peat with BLE as a transport.
 
 ### peat-ffi Transport Abstraction
 
@@ -1302,7 +1302,7 @@ external fun getBleStatus(nodeHandle: Long): BleStatus
 
 ### Translation Layer (ADR-041 Integration)
 
-Full PEAT nodes act as gateways between Automerge documents and peat-btle's lightweight CRDTs:
+Full Peat nodes act as gateways between Automerge documents and peat-btle's lightweight CRDTs:
 
 ```rust
 // peat-protocol/src/sync/ble_translation.rs
@@ -1411,7 +1411,7 @@ Bluetooth SIG defines a mesh networking standard.
 **Pros**: Standardized, multi-vendor support
 **Cons**: Complex provisioning, no CRDT support, designed for lighting/IoT not tactical
 
-**Decision**: Implement PEAT-native mesh over GATT, not SIG Mesh.
+**Decision**: Implement Peat-native mesh over GATT, not SIG Mesh.
 
 ### 3. ESP-NOW on ESP32
 
@@ -1431,7 +1431,7 @@ ESP-NOW is Espressif's proprietary peer-to-peer protocol.
 3. [bluer crate](https://docs.rs/bluer/) - Linux BlueZ bindings
 4. [btleplug crate](https://docs.rs/btleplug/) - Cross-platform BLE
 5. ADR-032: Pluggable Transport Abstraction
-6. ADR-035: PEAT-Lite Embedded Nodes
+6. ADR-035: Peat-Lite Embedded Nodes
 7. ADR-037: Resource-Constrained Device Optimization
 8. ADR-006: Security, Authentication, and Authorization
 
@@ -1442,12 +1442,12 @@ ESP-NOW is Espressif's proprietary peer-to-peer protocol.
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2025-12-13 | Create dedicated peat-btle crate | BLE requires fundamentally different abstractions than IP-based transports |
-| 2025-12-13 | GATT-based sync over SIG Mesh | PEAT needs CRDT sync semantics, not broadcast mesh |
+| 2025-12-13 | GATT-based sync over SIG Mesh | Peat needs CRDT sync semantics, not broadcast mesh |
 | 2025-12-13 | Platform abstraction with native implementations | Each platform has different BLE APIs and capabilities |
 | 2025-12-13 | Coded PHY support as feature | Enables range/throughput tradeoffs, requires BLE 5.0 |
-| 2025-01-12 | Dual-mode operation (standalone + transport plugin) | peat-btle must work standalone for constrained devices (WearTAK) AND as transport within full PEAT |
+| 2025-01-12 | Dual-mode operation (standalone + transport plugin) | peat-btle must work standalone for constrained devices (WearTAK) AND as transport within full Peat |
 | 2025-01-12 | Integrate via TransportManager in peat-ffi | Unifies transport selection with PACE policy; avoids dual-system architecture in ATAK plugin |
-| 2025-01-12 | Translation layer for Automerge ↔ peat-btle | Per ADR-041, full PEAT nodes act as gateways translating between document formats |
+| 2025-01-12 | Translation layer for Automerge ↔ peat-btle | Per ADR-041, full Peat nodes act as gateways translating between document formats |
 
 ---
 

@@ -11,7 +11,7 @@
 //! ## Error Codes
 //!
 //! - `PEAT_OK` (0): Operation succeeded
-//! - `PEAT_ERR_NOT_INITIALIZED` (-1): PEAT not initialized
+//! - `PEAT_ERR_NOT_INITIALIZED` (-1): Peat not initialized
 //! - `PEAT_ERR_INVALID_PEER` (-2): Invalid peer ID
 //! - `PEAT_ERR_CONNECTION_FAILED` (-3): Connection failed
 //! - `PEAT_ERR_ALREADY_CONNECTED` (-4): Already connected to peer
@@ -32,7 +32,7 @@ use std::sync::{Arc, OnceLock, RwLock};
 
 /// Operation succeeded
 pub const PEAT_OK: c_int = 0;
-/// PEAT not initialized
+/// Peat not initialized
 pub const PEAT_ERR_NOT_INITIALIZED: c_int = -1;
 /// Invalid peer ID
 pub const PEAT_ERR_INVALID_PEER: c_int = -2;
@@ -182,11 +182,11 @@ pub extern "C" fn peat_get_last_error() -> *mut c_char {
     }
 }
 
-/// Free a string returned by PEAT FFI functions.
+/// Free a string returned by Peat FFI functions.
 ///
 /// # Safety
 ///
-/// The pointer must have been returned by a PEAT FFI function.
+/// The pointer must have been returned by a Peat FFI function.
 /// Do not call this on the same pointer twice.
 #[no_mangle]
 pub unsafe extern "C" fn peat_free_string(s: *mut c_char) {
@@ -218,7 +218,7 @@ pub extern "C" fn peat_get_connected_peers() -> *mut c_char {
     let transport = match get_transport() {
         Some(t) => t,
         None => {
-            set_last_error("PEAT not initialized".to_string());
+            set_last_error("Peat not initialized".to_string());
             return std::ptr::null_mut();
         }
     };
@@ -292,7 +292,7 @@ pub unsafe extern "C" fn peat_get_peer_status(peer_id: *const c_char) -> *mut c_
     let transport = match get_transport() {
         Some(t) => t,
         None => {
-            set_last_error("PEAT not initialized".to_string());
+            set_last_error("Peat not initialized".to_string());
             return std::ptr::null_mut();
         }
     };
@@ -349,7 +349,7 @@ pub unsafe extern "C" fn peat_get_peer_health(peer_id: *const c_char) -> *mut c_
     let transport = match get_transport() {
         Some(t) => t,
         None => {
-            set_last_error("PEAT not initialized".to_string());
+            set_last_error("Peat not initialized".to_string());
             return std::ptr::null_mut();
         }
     };
@@ -404,7 +404,7 @@ pub unsafe extern "C" fn peat_get_peer_health(peer_id: *const c_char) -> *mut c_
 /// # Returns
 ///
 /// - `PEAT_OK` on success
-/// - `PEAT_ERR_NOT_INITIALIZED` if PEAT not initialized
+/// - `PEAT_ERR_NOT_INITIALIZED` if Peat not initialized
 ///
 /// # Callback Signature
 ///
@@ -425,7 +425,7 @@ pub extern "C" fn peat_register_peer_callback(callback: Option<PeerEventCallback
     let transport = match get_transport() {
         Some(t) => t,
         None => {
-            set_last_error("PEAT not initialized".to_string());
+            set_last_error("Peat not initialized".to_string());
             return PEAT_ERR_NOT_INITIALIZED;
         }
     };
@@ -603,7 +603,7 @@ impl PeatAsyncContext {
         let transport = match get_transport() {
             Some(t) => t.clone(),
             None => {
-                set_last_error("PEAT not initialized".to_string());
+                set_last_error("Peat not initialized".to_string());
                 return PEAT_ERR_NOT_INITIALIZED;
             }
         };
@@ -624,7 +624,7 @@ impl PeatAsyncContext {
         let transport = match get_transport() {
             Some(t) => t.clone(),
             None => {
-                set_last_error("PEAT not initialized".to_string());
+                set_last_error("Peat not initialized".to_string());
                 return PEAT_ERR_NOT_INITIALIZED;
             }
         };
@@ -682,7 +682,7 @@ pub extern "C" fn peat_init_async() -> c_int {
 /// # Returns
 ///
 /// - `PEAT_OK` on success
-/// - `PEAT_ERR_NOT_INITIALIZED` if PEAT not initialized
+/// - `PEAT_ERR_NOT_INITIALIZED` if Peat not initialized
 /// - `PEAT_ERR_INVALID_ARGUMENT` if peer_id is null
 /// - `PEAT_ERR_CONNECTION_FAILED` if connection failed
 ///
@@ -724,7 +724,7 @@ pub unsafe extern "C" fn peat_connect_peer(peer_id: *const c_char) -> c_int {
 /// # Returns
 ///
 /// - `PEAT_OK` on success
-/// - `PEAT_ERR_NOT_INITIALIZED` if PEAT not initialized
+/// - `PEAT_ERR_NOT_INITIALIZED` if Peat not initialized
 /// - `PEAT_ERR_INVALID_ARGUMENT` if peer_id is null
 ///
 /// # Safety

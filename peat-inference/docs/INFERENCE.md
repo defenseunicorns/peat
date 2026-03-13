@@ -4,7 +4,7 @@ This document describes how to run YOLOv8 object detection using ONNX Runtime wi
 
 ## Overview
 
-The PEAT M1 POC includes an ONNX-based inference pipeline for object detection. It supports multiple execution providers:
+The Peat M1 POC includes an ONNX-based inference pipeline for object detection. It supports multiple execution providers:
 
 - **CPU**: Works everywhere, no special setup required
 - **CUDA**: GPU acceleration via CUDA

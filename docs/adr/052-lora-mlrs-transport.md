@@ -1,16 +1,16 @@
-# ADR-052: PEAT-LoRa Long-Range Radio Transport
+# ADR-052: Peat-LoRa Long-Range Radio Transport
 
 **Status**: Proposed
 **Date**: 2026-02-25
-**Authors**: Kit Plummer, Codex
-**Organization**: (r)evolve - Revolve Team LLC (https://revolveteam.com)
-**Relates To**: ADR-032 (Pluggable Transport Abstraction), ADR-035 (PEAT-Lite Embedded Nodes), ADR-039 (PEAT-BTLE Mesh Transport), ADR-041 (Multi-Transport Embedded Integration), ADR-051 (PEAT-SBD Satellite Transport)
+**Authors**: Kit Plummer, Claude
+**Organization**: Defense Unicorns (https://defenseunicorns.com)
+**Relates To**: ADR-032 (Pluggable Transport Abstraction), ADR-035 (Peat-Lite Embedded Nodes), ADR-039 (Peat-BTLE Mesh Transport), ADR-041 (Multi-Transport Embedded Integration), ADR-051 (Peat-SBD Satellite Transport)
 
 ---
 
 ## Executive Summary
 
-This ADR defines the architecture for `peat-lora`, a Rust crate providing long-range LoRa radio transport for PEAT Protocol. The crate fills the 7-87 km range gap between BLE mesh (100-400m) and SBD satellite (global), targeting remote sensor relay, forward observer links, and cross-ridge communication where IP infrastructure is unavailable. A single crate provides two feature-gated link backends: `mlrs-serial` for Linux/desktop nodes communicating via mLRS hardware over UART/USB, and `lora-phy` for embedded nodes (ESP32 + SX1262) driving LoRa chipsets directly. Both backends share the same over-the-air frame format and implement the ADR-032 `Transport` trait as an external transport extension, following the pattern established by `peat-btle` and `peat-sbd`.
+This ADR defines the architecture for `peat-lora`, a Rust crate providing long-range LoRa radio transport for Peat Protocol. The crate fills the 7-87 km range gap between BLE mesh (100-400m) and SBD satellite (global), targeting remote sensor relay, forward observer links, and cross-ridge communication where IP infrastructure is unavailable. A single crate provides two feature-gated link backends: `mlrs-serial` for Linux/desktop nodes communicating via mLRS hardware over UART/USB, and `lora-phy` for embedded nodes (ESP32 + SX1262) driving LoRa chipsets directly. Both backends share the same over-the-air frame format and implement the ADR-032 `Transport` trait as an external transport extension, following the pattern established by `peat-btle` and `peat-sbd`.
 
 ---
 
@@ -18,7 +18,7 @@ This ADR defines the architecture for `peat-lora`, a Rust crate providing long-r
 
 ### The Long-Range Gap
 
-PEAT's current transport options cover short-range and global communication, but leave a critical gap in between:
+Peat's current transport options cover short-range and global communication, but leave a critical gap in between:
 
 | Transport | Range | Bandwidth | Latency | Power | Use Case |
 |-----------|-------|-----------|---------|-------|----------|
@@ -29,7 +29,7 @@ PEAT's current transport options cover short-range and global communication, but
 
 Tactical edge operations regularly need communication across distances that BLE cannot reach but where satellite is overkill or too slow:
 
-| Scenario | Gap | PEAT Use Case |
+| Scenario | Gap | Peat Use Case |
 |----------|-----|---------------|
 | Cross-ridge relay | 5-15 km, no line-of-sight to IP | Forward observer ↔ command post PLI |
 | Remote sensor network | 10-50 km, no infrastructure | Environmental / seismic sensor data relay |
@@ -51,7 +51,7 @@ mLRS (Mavlink LoRa System) is an open-source LoRa firmware that provides transpa
 | **Infrastructure** | None (peer-to-peer) | None (peer-to-peer) | Requires gateway + network server |
 | **Range** | 7-87 km (mLRS optimized) | 5-50 km (depends on params) | 2-15 km typical |
 
-mLRS is the fastest path to long-range capability—connect mLRS modules to UART/USB, push PEAT frames through the serial link. Direct LoRa via `lora-phy` enables embedded nodes (ESP32 + SX1262) to participate without separate mLRS hardware.
+mLRS is the fastest path to long-range capability—connect mLRS modules to UART/USB, push Peat frames through the serial link. Direct LoRa via `lora-phy` enables embedded nodes (ESP32 + SX1262) to participate without separate mLRS hardware.
 
 ### Why a Single Crate with Feature Flags?
 
@@ -99,7 +99,7 @@ peat-lora (external) ← LoRa long-range transport [NEW]
 1. **Long-Range**: 7-87 km depending on frequency band and terrain
 2. **Low Power**: Suitable for battery-powered field devices (< 1W transmit)
 3. **No Infrastructure**: Peer-to-peer links, no gateways or network servers required
-4. **PEAT Transport Trait**: Implement ADR-032 `Transport` trait for TransportManager integration
+4. **Peat Transport Trait**: Implement ADR-032 `Transport` trait for TransportManager integration
 5. **Dual Link Backends**: mLRS serial bridge (Linux) and direct LoRa radio (embedded)
 6. **Shared Frame Format**: Identical over-the-air encoding regardless of link backend
 7. **Gateway Bridge**: Linux nodes bridge LoRa ↔ IP mesh per ADR-041
@@ -289,7 +289,7 @@ pub const FRAGMENT_HEADER_SIZE: usize = 3;
 pub const FRAGMENT_MAX_PAYLOAD: usize = LORA_MAX_PAYLOAD_SIZE - FRAGMENT_HEADER_SIZE; // 246
 ```
 
-At LoRa data rates (1.5-9.1 kB/s), fragmentation should be kept to a minimum. Most PEAT messages (PLI, status, CRDT deltas) fit in a single frame. Fragmentation is available for larger payloads but not the common case.
+At LoRa data rates (1.5-9.1 kB/s), fragmentation should be kept to a minimum. Most Peat messages (PLI, status, CRDT deltas) fit in a single frame. Fragmentation is available for larger payloads but not the common case.
 
 ### Core Types
 
@@ -377,7 +377,7 @@ pub enum Region {
 /// Pre-configured peer entry
 #[derive(Debug, Clone)]
 pub struct PeerEntry {
-    /// PEAT node ID (hex string)
+    /// Peat node ID (hex string)
     pub node_id: String,
     /// Human-readable label
     pub label: Option<String>,
@@ -474,7 +474,7 @@ impl PeatLoRaTransport {
         })
     }
 
-    /// Send a PEAT message over LoRa
+    /// Send a Peat message over LoRa
     pub async fn send_message(&self, payload: &[u8]) -> Result<(), LoRaError> {
         // Check duty cycle budget
         if let Some(ref tracker) = self.duty_cycle {
@@ -534,7 +534,7 @@ LoRa performance varies significantly by frequency band. These figures assume mL
 
 ### Topology: Point-to-Point with Gateway Bridge
 
-LoRa links in PEAT are point-to-point, not mesh. A Linux gateway node bridges LoRa traffic into the IP mesh, following the ADR-041 multi-transport gateway pattern:
+LoRa links in Peat are point-to-point, not mesh. A Linux gateway node bridges LoRa traffic into the IP mesh, following the ADR-041 multi-transport gateway pattern:
 
 ```
                 LoRa Radio Link (7-87 km)
@@ -549,13 +549,13 @@ LoRa links in PEAT are point-to-point, not mesh. A Linux gateway node bridges Lo
 │  │ (lora-phy)  │ │                    │ └──────┬───────┘  │
 │  └─────────────┘ │                    │        │          │
 └──────────────────┘                    │ ┌──────▼───────┐  │
-                                        │ │ PEAT Node    │  │
+                                        │ │ Peat Node    │  │
                                         │ │ (QUIC/Iroh)  │  │
                                         │ └──────┬───────┘  │
                                         └────────┼──────────┘
                                                  │
                                         ┌────────▼──────────┐
-                                        │   PEAT IP Mesh    │
+                                        │   Peat IP Mesh    │
                                         │   (Full CRDT sync)│
                                         └───────────────────┘
 ```
@@ -564,9 +564,9 @@ Multiple remote nodes can each have a dedicated LoRa link to the gateway (separa
 
 ### Discovery
 
-**mLRS serial mode**: Peers are pre-configured. The mLRS link is established at the radio firmware level (binding); PEAT sees a connected serial port. The `peers` list in `LoRaConfig` maps PEAT node IDs to known LoRa endpoints.
+**mLRS serial mode**: Peers are pre-configured. The mLRS link is established at the radio firmware level (binding); Peat sees a connected serial port. The `peers` list in `LoRaConfig` maps Peat node IDs to known LoRa endpoints.
 
-**Direct LoRa mode**: Optional beacon-based discovery. Nodes periodically transmit a beacon frame containing their PEAT node ID and capabilities. Receiving nodes add discovered peers to their local peer table.
+**Direct LoRa mode**: Optional beacon-based discovery. Nodes periodically transmit a beacon frame containing their Peat node ID and capabilities. Receiving nodes add discovered peers to their local peer table.
 
 ```rust
 /// Beacon frame payload (fits in a single LoRa frame)
@@ -592,7 +592,7 @@ Two layers of encryption protect LoRa traffic:
 
 1. **Link-layer (mLRS only)**: mLRS firmware provides AES encryption of the radio link. This protects against casual eavesdropping but uses a shared key configured in mLRS firmware.
 
-2. **Application-layer (both backends)**: PEAT app-layer ChaCha20-Poly1305 encryption using a pre-shared key (PSK). This protects the PEAT payload end-to-end, even if the link layer is compromised or absent (direct LoRa mode).
+2. **Application-layer (both backends)**: Peat app-layer ChaCha20-Poly1305 encryption using a pre-shared key (PSK). This protects the Peat payload end-to-end, even if the link layer is compromised or absent (direct LoRa mode).
 
 ```rust
 /// Encrypt payload with ChaCha20-Poly1305
@@ -648,9 +648,9 @@ impl DutyCycleTracker {
 
 ### MAVLink and UAS Integration
 
-mLRS — "MAVLink LoRa System" — was originally designed for MAVLink telemetry, the standard protocol for drone autopilot communication (ArduPilot, PX4). This heritage creates a natural synergy with PEAT's UAS integration architecture (see CAP Protocol Technology Deep Dive, ROS-CAP Bridge):
+mLRS — "MAVLink LoRa System" — was originally designed for MAVLink telemetry, the standard protocol for drone autopilot communication (ArduPilot, PX4). This heritage creates a natural synergy with Peat's UAS integration architecture (see CAP Protocol Technology Deep Dive, ROS-CAP Bridge):
 
-**Shared radio link**: mLRS supports multiple serial channels on a single LoRa link. A companion computer on a UAS can multiplex PEAT sync frames and MAVLink telemetry over the same mLRS radio, eliminating the need for separate data links:
+**Shared radio link**: mLRS supports multiple serial channels on a single LoRa link. A companion computer on a UAS can multiplex Peat sync frames and MAVLink telemetry over the same mLRS radio, eliminating the need for separate data links:
 
 ```
 ┌──────────────────────────────────┐
@@ -658,7 +658,7 @@ mLRS — "MAVLink LoRa System" — was originally designed for MAVLink telemetry
 │  ┌────────────┐ ┌──────────────┐ │
 │  │ Autopilot  │ │ Companion    │ │
 │  │ (PX4/Ardu) │ │ (Jetson/Pi)  │ │
-│  │ MAVLink    │ │ PEAT + ROS   │ │
+│  │ MAVLink    │ │ Peat + ROS   │ │
 │  └─────┬──────┘ └──────┬───────┘ │
 │        │  UART1         │  UART2  │
 │  ┌─────▼────────────────▼──────┐ │
@@ -674,7 +674,7 @@ mLRS — "MAVLink LoRa System" — was originally designed for MAVLink telemetry
 │  └─────┬────────────────┬──────┘ │
 │        │  UART1         │  UART2  │
 │  ┌─────▼──────┐ ┌──────▼───────┐ │
-│  │ GCS        │ │ PEAT Gateway │ │
+│  │ GCS        │ │ Peat Gateway │ │
 │  │ (QGroundC) │ │ (peat-lora)  │ │
 │  └────────────┘ └──────────────┘ │
 │  Ground Station                   │
@@ -683,8 +683,8 @@ mLRS — "MAVLink LoRa System" — was originally designed for MAVLink telemetry
 
 **Design implications**:
 - `peat-lora` treats the mLRS serial port as a transparent byte pipe — it is unaware of MAVLink traffic on other serial channels
-- Frame marker byte `0xEC` ensures PEAT frames are distinguishable from MAVLink frames (`0xFD` for MAVLink v2) if sharing a single serial channel
-- Future work: optional MAVLink passthrough mode where `peat-lora` can forward MAVLink position data into PEAT CRDTs, bridging UAS telemetry directly into the PEAT mesh without a separate ROS-CAP bridge
+- Frame marker byte `0xEC` ensures Peat frames are distinguishable from MAVLink frames (`0xFD` for MAVLink v2) if sharing a single serial channel
+- Future work: optional MAVLink passthrough mode where `peat-lora` can forward MAVLink position data into Peat CRDTs, bridging UAS telemetry directly into the Peat mesh without a separate ROS-CAP bridge
 
 ### PACE Integration
 
@@ -770,7 +770,7 @@ pub struct TransportConfigFFI {
 - [ ] Implement `PeatLoRaTransport` (ADR-032 `Transport` trait)
 - [ ] Pre-configured peer routing
 - [ ] Signal quality mapping (RSSI → 0-100)
-- [ ] Gateway bridge: LoRa frames ↔ PEAT mesh messages (ADR-041 pattern)
+- [ ] Gateway bridge: LoRa frames ↔ Peat mesh messages (ADR-041 pattern)
 - [ ] Integration tests with mock link
 
 ### Phase 4: Direct LoRa Radio (Embedded)
@@ -804,10 +804,10 @@ pub struct TransportConfigFFI {
 
 ### Functional Requirements
 
-- [ ] Send/receive PEAT messages via mLRS serial bridge (Linux)
-- [ ] Send/receive PEAT messages via direct SX1262 radio (ESP32)
+- [ ] Send/receive Peat messages via mLRS serial bridge (Linux)
+- [ ] Send/receive Peat messages via direct SX1262 radio (ESP32)
 - [ ] Fragment and reassemble messages exceeding 249 bytes
-- [ ] Gateway bridge relays LoRa traffic into PEAT IP mesh
+- [ ] Gateway bridge relays LoRa traffic into Peat IP mesh
 - [ ] Pre-configured peer discovery works for mLRS mode
 - [ ] Beacon-based discovery works for direct LoRa mode
 - [ ] App-layer encryption protects payload end-to-end
@@ -828,7 +828,7 @@ pub struct TransportConfigFFI {
 - [ ] Integration tests with mock serial port
 - [ ] Hardware-in-the-loop tests with mLRS modules (915 MHz)
 - [ ] Hardware-in-the-loop tests with ESP32 + SX1262
-- [ ] End-to-end test: remote sensor → LoRa → gateway → PEAT mesh → response → LoRa → sensor
+- [ ] End-to-end test: remote sensor → LoRa → gateway → Peat mesh → response → LoRa → sensor
 - [ ] Range test at 915 MHz: verify > 10 km line-of-sight
 
 ---
@@ -876,13 +876,13 @@ pub struct TransportConfigFFI {
 
 ### Option 2: LoRaWAN (The Things Network / Helium)
 **Pros**: Established ecosystem, public network coverage in urban areas
-**Cons**: Uplink-dominant design (poor for bidirectional PEAT sync), 51-byte payload limit (SF12), requires LoRaWAN gateways (infrastructure dependency), class A latency of 1-5 seconds, not suitable for peer-to-peer tactical use
-**Decision**: LoRaWAN's gateway-centric architecture and tiny payloads are fundamentally misaligned with PEAT's peer-to-peer model. Raw LoRa (via mLRS or direct) provides the full 252-byte frame and true peer-to-peer operation.
+**Cons**: Uplink-dominant design (poor for bidirectional Peat sync), 51-byte payload limit (SF12), requires LoRaWAN gateways (infrastructure dependency), class A latency of 1-5 seconds, not suitable for peer-to-peer tactical use
+**Decision**: LoRaWAN's gateway-centric architecture and tiny payloads are fundamentally misaligned with Peat's peer-to-peer model. Raw LoRa (via mLRS or direct) provides the full 252-byte frame and true peer-to-peer operation.
 
 ### Option 3: Meshtastic
 **Pros**: Popular open-source LoRa mesh, large community, built-in mesh routing
-**Cons**: Opinionated protocol (protobuf-based, own message types), not a transparent bridge, mesh routing adds latency and complexity, would require adapting PEAT protocol to Meshtastic's message format rather than using native peat-lite framing
-**Decision**: mLRS's transparent serial passthrough lets PEAT use its own frame format directly. Meshtastic's mesh layer would conflict with PEAT's own routing and sync logic.
+**Cons**: Opinionated protocol (protobuf-based, own message types), not a transparent bridge, mesh routing adds latency and complexity, would require adapting Peat protocol to Meshtastic's message format rather than using native peat-lite framing
+**Decision**: mLRS's transparent serial passthrough lets Peat use its own frame format directly. Meshtastic's mesh layer would conflict with Peat's own routing and sync logic.
 
 ### Option 4: Integrate into peat-btle
 **Pros**: Reuse existing external transport infrastructure
@@ -898,10 +898,10 @@ pub struct TransportConfigFFI {
 3. [Semtech SX1262 Datasheet](https://www.semtech.com/products/wireless-rf/lora-connect/sx1262) - Target LoRa transceiver
 4. [LoRa Alliance — LoRa Technology Overview](https://lora-alliance.org/about-lorawan/) - LoRa modulation background
 5. ADR-032: Pluggable Transport Abstraction
-6. ADR-035: PEAT-Lite Embedded Nodes (peat-lite protocol)
-7. ADR-039: PEAT-BTLE Mesh Transport Crate
+6. ADR-035: Peat-Lite Embedded Nodes (peat-lite protocol)
+7. ADR-039: Peat-BTLE Mesh Transport Crate
 8. ADR-041: Multi-Transport Embedded Integration
-9. ADR-051: PEAT-SBD Satellite Transport
+9. ADR-051: Peat-SBD Satellite Transport
 10. [MAVLink Protocol](https://mavlink.io/en/) - Standard UAS telemetry protocol (mLRS's native payload)
 11. [peat-btle on Radicle](https://app.radicle.xyz/nodes/rosa.radicle.xyz/rad%3Az458mp9Um3AYNQQFMdHaNEUtmiohq) - External transport crate pattern
 12. CAP Protocol Technology Deep Dive (ROS-CAP Bridge, MAVLink/mavros integration)
@@ -917,7 +917,7 @@ pub struct TransportConfigFFI {
 | 2026-02-25 | mLRS as primary serial bridge | Open-source, transparent serial passthrough, proven 87 km range, no protocol adaptation needed |
 | 2026-02-25 | Direct LoRa via lora-phy for embedded | Enables ESP32+SX1262 nodes without separate mLRS hardware |
 | 2026-02-25 | Point-to-point topology (not mesh) | LoRa is half-duplex; mesh adds latency and complexity; gateway bridge to IP mesh is cleaner (ADR-041) |
-| 2026-02-25 | ChaCha20-Poly1305 app-layer encryption | Consistent with PEAT security model; supplements mLRS link-layer AES |
+| 2026-02-25 | ChaCha20-Poly1305 app-layer encryption | Consistent with Peat security model; supplements mLRS link-layer AES |
 
 ---
 

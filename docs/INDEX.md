@@ -1,6 +1,6 @@
-# PEAT Protocol Documentation Index
+# Peat Protocol Documentation Index
 
-> **Navigation Guide**: All documentation for the PEAT Protocol project, organized by category and purpose.
+> **Navigation Guide**: All documentation for the Peat Protocol project, organized by category and purpose.
 
 ---
 
@@ -53,7 +53,7 @@ ADRs document significant architectural decisions and their rationale.
 
 | ADR | Title | Date | Status |
 |-----|-------|------|--------|
-| [001](adr/001-peat-protocol-poc.md) | PEAT Protocol POC | 2024-10-28 | Implemented |
+| [001](adr/001-peat-protocol-poc.md) | Peat Protocol POC | 2024-10-28 | Implemented |
 | [002](adr/002-beacon-storage-architecture.md) | Beacon Storage Architecture | 2024-10-29 | Implemented |
 | [004](adr/004-human-machine-cell-composition.md) | Human-Machine Cell Composition | 2024-10-30 | Implemented |
 | [011](adr/011-ditto-vs-automerge-iroh.md) | Ditto vs Automerge/Iroh Backend Abstraction | 2024-11-15 | Accepted |
@@ -71,7 +71,7 @@ IETF RFC-style specifications for protocol implementers. See [spec/README.md](sp
 
 | Spec | Topic |
 |------|-------|
-| [001-transport.md](spec/001-transport.md) | Wire formats, QUIC/Iroh, UDP bypass, PEAT-Lite |
+| [001-transport.md](spec/001-transport.md) | Wire formats, QUIC/Iroh, UDP bypass, Peat-Lite |
 | [002-sync.md](spec/002-sync.md) | CRDT semantics, Automerge, Negentropy |
 | [003-schema.md](spec/003-schema.md) | Protobuf definitions, CoT mapping |
 | [004-coordination.md](spec/004-coordination.md) | Cell formation, leader election, hierarchy |
@@ -109,7 +109,7 @@ Comprehensive testing strategy and implementation guides.
 
 ## Codebase Documentation
 
-### PEAT Protocol Core (`peat-protocol/`)
+### Peat Protocol Core (`peat-protocol/`)
 
 | Module | Documentation |
 |--------|---------------|
@@ -224,5 +224,5 @@ When making significant changes:
 ---
 
 **Last Updated**: 2025-01-08
-**Maintained By**: PEAT Protocol Team
+**Maintained By**: Peat Protocol Team
 **Questions?**: Check DEVELOPMENT.md for contribution guidelines

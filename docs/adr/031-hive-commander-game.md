@@ -1,4 +1,4 @@
-# ADR-031: PEAT Commander - Tactical Capability RPG
+# ADR-031: Peat Commander - Tactical Capability RPG
 
 ## Status
 **Superseded** — peat-commander has been removed from the workspace and will be redeveloped as an external repository. This ADR is retained for historical context.
@@ -7,17 +7,17 @@
 
 ## Context
 
-Industry feedback identified two critical gaps in PEAT's current demonstration capability:
+Industry feedback identified two critical gaps in Peat's current demonstration capability:
 
 1. **Visualization Gap**: "You need to be able to visualize the hierarchy in some simple C2 map, video game kind of way - showing individual capabilities being aggregated into emergent capabilities, and tasking being redistributed back out by the player"
 
 2. **Cross-Boundary Coordination Gap**: "Can you take one asset from one squad and another asset from a different squad and task them as a new group? This would be super valuable, especially if they are crossing ownership boundaries (operated by two different countries)"
 
-Additionally, the concept of **coagency performance** - measuring how well human-machine-AI teams perform together - was identified as a research differentiator that PEAT could demonstrate through interactive gameplay.
+Additionally, the concept of **coagency performance** - measuring how well human-machine-AI teams perform together - was identified as a research differentiator that Peat could demonstrate through interactive gameplay.
 
 ### Why Not RTS?
 
-Real-time strategy games are chaotic, hard to follow in demos, and don't naturally emphasize **composition** - the core value of PEAT. Players focus on micro-management and APM rather than thoughtful capability aggregation.
+Real-time strategy games are chaotic, hard to follow in demos, and don't naturally emphasize **composition** - the core value of Peat. Players focus on micro-management and APM rather than thoughtful capability aggregation.
 
 ### Why D&D-Style Tactical RPG?
 
@@ -26,18 +26,18 @@ Dungeons & Dragons is fundamentally about **party composition**:
 - "Who has the skill we need? Can we combine abilities?"
 - "The rogue can't pick the lock alone, but with the wizard's guidance spell..."
 
-This is *exactly* what PEAT does - matching task requirements to composed capabilities. The D&D framing makes this intuitive and memorable.
+This is *exactly* what Peat does - matching task requirements to composed capabilities. The D&D framing makes this intuitive and memorable.
 
 ## Decision
 
-Build **PEAT Commander**, a turn-based tactical RPG that uses the actual Rust PEAT reference implementation to coordinate heterogeneous assets on a 3D terrain map. The game emphasizes **capability composition** through D&D-style skill checks and party mechanics.
+Build **Peat Commander**, a turn-based tactical RPG that uses the actual Rust Peat reference implementation to coordinate heterogeneous assets on a 3D terrain map. The game emphasizes **capability composition** through D&D-style skill checks and party mechanics.
 
 ### Core Design Principles
 
 1. **Composition is the game** - Victory comes from clever capability combinations, not twitch reflexes
 2. **Turn-based for clarity** - Audience can follow the action in demos
 3. **DM = Presenter** - The presenter controls scenarios, introduces challenges
-4. **Skill checks = Capability matching** - D&D's core mechanic maps perfectly to PEAT
+4. **Skill checks = Capability matching** - D&D's core mechanic maps perfectly to Peat
 5. **3D terrain map** - Spatial context with elevation, cover, and line-of-sight
 6. **Hierarchy through zoom** - Zoomed out shows composed capabilities, drill down for details
 
@@ -45,9 +45,9 @@ Build **PEAT Commander**, a turn-based tactical RPG that uses the actual Rust PE
 
 ## Game Design
 
-### The PEAT Party System
+### The Peat Party System
 
-Instead of D&D's Fighter/Wizard/Rogue classes, PEAT Commander has **Capability Classes**:
+Instead of D&D's Fighter/Wizard/Rogue classes, Peat Commander has **Capability Classes**:
 
 | Class | Role | Base Capabilities | D&D Analog |
 |-------|------|-------------------|------------|
@@ -86,7 +86,7 @@ Every piece has a capability profile:
 
 ### The Skill Check System
 
-When a task requires capabilities, PEAT Commander uses D&D-style skill checks:
+When a task requires capabilities, Peat Commander uses D&D-style skill checks:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -121,7 +121,7 @@ When a task requires capabilities, PEAT Commander uses D&D-style skill checks:
 
 ### Turn Structure
 
-Each round has phases that mirror PEAT's coordination flow:
+Each round has phases that mirror Peat's coordination flow:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -135,7 +135,7 @@ Each round has phases that mirror PEAT's coordination flow:
 │                                                                 │
 │  PHASE 2: PLANNING (Commander)                                  │
 │  ├── View capability requirements for each objective           │
-│  ├── See PEAT's recommended compositions                       │
+│  ├── See Peat's recommended compositions                       │
 │  └── Decide which objectives to pursue                         │
 │                                                                 │
 │  PHASE 3: MOVEMENT (All Players)                                │
@@ -324,7 +324,7 @@ In demo mode, the presenter acts as Dungeon Master:
 │                                                                 │
 │  TEACHING MOMENTS                                               │
 │  ├── [Highlight Composition] - show why this combo worked      │
-│  ├── [Show PEAT Recommendation] - "PEAT suggests..."           │
+│  ├── [Show Peat Recommendation] - "Peat suggests..."           │
 │  └── [Pause for Q&A] - freeze game state                       │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
@@ -399,7 +399,7 @@ In demo mode, the presenter acts as Dungeon Master:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        PEAT Commander                           │
+│                        Peat Commander                           │
 ├─────────────────────────────────────────────────────────────────┤
 │  Frontend (TypeScript/React)                                    │
 │  ├── 3D Map Renderer (Three.js or React Three Fiber)           │
@@ -412,7 +412,7 @@ In demo mode, the presenter acts as Dungeon Master:
 │  WebSocket Connection                                           │
 ├─────────────────────────────────────────────────────────────────┤
 │  Backend (Rust/Axum)                                            │
-│  ├── PEAT Reference Implementation                              │
+│  ├── Peat Reference Implementation                              │
 │  │   ├── Capability Documents (Automerge CRDTs)                │
 │  │   ├── Composition Engine (calculate synergies)              │
 │  │   ├── Task-Capability Matching (DC calculation)             │
@@ -465,10 +465,10 @@ cap/
 
 ### 1. Capability Composition (Core Mechanic)
 
-The skill check system directly validates PEAT's composition engine:
+The skill check system directly validates Peat's composition engine:
 
 ```rust
-// Does PEAT's composition bonus calculation match player intuition?
+// Does Peat's composition bonus calculation match player intuition?
 fn calculate_party_modifier(party: &[Piece], check_type: Capability) -> i32 {
     let base = party.iter()
         .map(|p| p.get_modifier(check_type))
@@ -498,7 +498,7 @@ Encounters validate that DC calculation makes sense:
 
 - Are "impossible" encounters actually impossible without the right composition?
 - Do "easy" encounters feel appropriately simple?
-- Does PEAT's recommendation system suggest good parties?
+- Does Peat's recommendation system suggest good parties?
 
 ### 4. Cross-Boundary Coordination
 
@@ -599,7 +599,7 @@ The D&D-style mechanics support multiple themes:
 |-----------|---------|--------|
 | Time to "get it" | New user understands composition | < 2 minutes |
 | Engagement | "I was the drone" recall | > 90% |
-| Teaching value | Audience asks about PEAT | > 50% |
+| Teaching value | Audience asks about Peat | > 50% |
 
 ### Technical Validation
 
@@ -615,7 +615,7 @@ The D&D-style mechanics support multiple themes:
 |-----------|---------|--------|
 | Composition data | Which synergies players discover | Logged |
 | Strategy patterns | Winning compositions | Analyzed |
-| Human-AI teaming | PEAT recommendation acceptance | Tracked |
+| Human-AI teaming | Peat recommendation acceptance | Tracked |
 
 ---
 
@@ -624,7 +624,7 @@ The D&D-style mechanics support multiple themes:
 ### RTS (Real-Time Strategy) - Rejected
 - Pro: Exciting, immediate
 - Con: Chaotic, hard to follow in demos
-- Con: Doesn't emphasize composition (the core PEAT value)
+- Con: Doesn't emphasize composition (the core Peat value)
 - Con: Favors micro-management over thoughtful coordination
 
 ### Pure Chess - Rejected
@@ -639,7 +639,7 @@ The D&D-style mechanics support multiple themes:
 - Con: Abstract, not tangible for C2 demos
 
 ### D&D-Style Tactical RPG - Chosen
-- Pro: Party composition is the core mechanic (exactly PEAT)
+- Pro: Party composition is the core mechanic (exactly Peat)
 - Pro: Skill checks map directly to capability matching
 - Pro: Turn-based means audience can follow
 - Pro: DM role fits presenter perfectly
@@ -692,9 +692,9 @@ cargo run -p peat-commander
 - ADR-001: CAP Protocol POC
 - ADR-004: Human-Machine Squad Composition
 - ADR-014: Distributed Coordination Primitives
-- Industry Feedback: PEAT Hierarchy Visualization (2024-12-06)
+- Industry Feedback: Peat Hierarchy Visualization (2024-12-06)
 
 ---
 
-*Organization: (r)evolve - Revolve Team LLC*
-*URL: https://revolveteam.com*
+*Organization: Defense Unicorns*
+*URL: https://defenseunicorns.com*
