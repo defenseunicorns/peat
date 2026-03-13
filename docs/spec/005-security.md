@@ -1,14 +1,14 @@
-# PEAT Protocol Specification: Security Framework
+# Peat Protocol Specification: Security Framework
 
-**Spec ID**: PEAT-SPEC-005
+**Spec ID**: Peat-SPEC-005
 **Status**: Draft
 **Version**: 0.1.0
 **Date**: 2025-01-07
-**Authors**: (r)evolve - Revolve Team LLC
+**Authors**: Defense Unicorns
 
 ## Abstract
 
-This document specifies the security framework for PEAT Protocol. It defines device authentication, user authorization, encryption, key management, and audit logging requirements.
+This document specifies the security framework for Peat Protocol. It defines device authentication, user authorization, encryption, key management, and audit logging requirements.
 
 ## Table of Contents
 
@@ -30,7 +30,7 @@ This document specifies the security framework for PEAT Protocol. It defines dev
 
 ### 1.1 Purpose
 
-The PEAT security framework ensures that tactical mesh networks operate securely in contested environments. It provides:
+The Peat security framework ensures that tactical mesh networks operate securely in contested environments. It provides:
 - Device identity verification
 - Cell membership authentication
 - Role-based access control
@@ -522,7 +522,7 @@ message EncryptedKeyShare {
 
 ### 8.4 Forward Secrecy
 
-PEAT provides forward secrecy through:
+Peat provides forward secrecy through:
 1. **Ephemeral keys**: New X25519 keypair per session
 2. **Key ratcheting**: Group keys advance after member removal
 3. **MLS integration** (recommended): Full forward secrecy via tree-based key agreement

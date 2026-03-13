@@ -12,8 +12,8 @@
 #   chmod +x setup-labels.sh
 #   ./setup-labels.sh
 #
-# Organization: (r)evolve - Revolve Team LLC
-# https://revolveteam.com
+# Organization: Defense Unicorns
+# https://defenseunicorns.com
 
 set -e
 

@@ -1,4 +1,4 @@
-# Lab 4: Hierarchical PEAT CRDT - Testing Guide
+# Lab 4: Hierarchical Peat CRDT - Testing Guide
 
 **Purpose**: Prove hierarchical architecture enables O(log n) scaling with bounded latency and 95% bandwidth savings
 

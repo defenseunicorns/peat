@@ -136,7 +136,7 @@ impl OnnxRuntimeAdapter {
     /// Publish a detection product
     ///
     /// Call this after processing inference outputs to publish results
-    /// through the PEAT event system.
+    /// through the Peat event system.
     pub async fn publish_detection(
         &self,
         instance_id: &InstanceId,

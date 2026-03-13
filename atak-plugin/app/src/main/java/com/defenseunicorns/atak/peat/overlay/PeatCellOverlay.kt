@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ * Copyright (c) 2026 Defense Unicorns.  All rights reserved.
  */
 
 package com.defenseunicorns.atak.peat.overlay
@@ -20,7 +20,7 @@ import java.util.UUID
 import kotlin.math.*
 
 /**
- * Manages PEAT cell bounding circle visualizations on the ATAK map.
+ * Manages Peat cell bounding circle visualizations on the ATAK map.
  *
  * Cells are displayed as dynamic bounding circles that encompass all platforms
  * belonging to the cell. The circle updates as platforms move.
@@ -95,11 +95,11 @@ class PeatCellOverlay(private val mapView: MapView) {
             return
         }
 
-        // First, clean up any orphaned PEAT circles from anywhere in the map tree
+        // First, clean up any orphaned Peat circles from anywhere in the map tree
         // This handles circles that persist in ATAK's storage from previous sessions
         cleanupOrphanedCircles(rootGroup)
 
-        // Find or create PEAT Cells group under Drawing Objects
+        // Find or create Peat Cells group under Drawing Objects
         var drawingGroup = rootGroup.findMapGroup("Drawing Objects")
         if (drawingGroup == null) {
             drawingGroup = rootGroup.addGroup("Drawing Objects")
@@ -109,14 +109,14 @@ class PeatCellOverlay(private val mapView: MapView) {
         mapGroup = drawingGroup.findMapGroup(GROUP_NAME)
         if (mapGroup == null) {
             mapGroup = drawingGroup.addGroup(GROUP_NAME)
-            Log.i(TAG, "Created PEAT Cells map group")
+            Log.i(TAG, "Created Peat Cells map group")
         } else {
-            Log.d(TAG, "Found existing PEAT Cells map group")
+            Log.d(TAG, "Found existing Peat Cells map group")
         }
     }
 
     /**
-     * Recursively search and remove any orphaned PEAT cell circles from the map tree.
+     * Recursively search and remove any orphaned Peat cell circles from the map tree.
      * This handles circles persisted by ATAK from previous sessions.
      */
     private fun cleanupOrphanedCircles(group: MapGroup) {
@@ -124,11 +124,11 @@ class PeatCellOverlay(private val mapView: MapView) {
 
         // Check all items in this group
         group.items?.forEach { item ->
-            // Match by UID pattern, metadata, or title containing PEAT/Cell
+            // Match by UID pattern, metadata, or title containing Peat/Cell
             val uid = item.uid ?: ""
             val peatCellId = item.getMetaString("peatCellId", "")
             val title = item.title ?: ""
-            val isPeatCircle = uid.startsWith("PEAT-CELL-CIRCLE-") ||
+            val isPeatCircle = uid.startsWith("Peat-CELL-CIRCLE-") ||
                     peatCellId.isNotEmpty() ||
                     (item is DrawingCircle && (title.contains("ALPHA") || title.contains("BRAVO") ||
                      title.contains("CHARLIE") || title.contains("Cell")))
@@ -143,7 +143,7 @@ class PeatCellOverlay(private val mapView: MapView) {
             if (item is DrawingCircle) {
                 item.dispose()
             }
-            Log.i(TAG, "Removed orphaned PEAT circle: ${item.uid} (title: ${item.title})")
+            Log.i(TAG, "Removed orphaned Peat circle: ${item.uid} (title: ${item.title})")
         }
 
         // Recursively check child groups
@@ -261,7 +261,7 @@ class PeatCellOverlay(private val mapView: MapView) {
 
         try {
             val (centerLat, centerLon, radius) = calculateBoundingCircle(platforms)
-            val uid = "PEAT-CELL-CIRCLE-$cellId"
+            val uid = "Peat-CELL-CIRCLE-$cellId"
 
             val circle = DrawingCircle(mapView, uid)
             circle.setCenterPoint(GeoPointMetaData.wrap(GeoPoint(centerLat, centerLon)))

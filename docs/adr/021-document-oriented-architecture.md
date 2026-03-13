@@ -24,7 +24,7 @@ This represents a **20× bandwidth amplification** where we're recreating docume
 
 ### The Core Architectural Principle
 
-PEAT Protocol is designed around a **document-oriented architecture** where:
+Peat Protocol is designed around a **document-oriented architecture** where:
 
 1. **Each entity is represented by exactly ONE living document**
    - Soldier/Platform/UAV → `sim_doc_{node_id}` (1 document)
@@ -550,7 +550,7 @@ async fn test_document_lifecycle_invariant() {
 
 ## Related Decisions
 
-- **ADR-001 (PEAT Protocol POC):** Defined CRDT-based architecture, implied but didn't mandate update semantics
+- **ADR-001 (Peat Protocol POC):** Defined CRDT-based architecture, implied but didn't mandate update semantics
 - **ADR-009 (Bidirectional Hierarchical Flows):** Covered flow direction, not document lifecycle
 - **ADR-011 (Ditto vs Automerge/Iroh):** Chose Ditto for CRDT support - must use properly
 - **ADR-015 (Hierarchical Aggregation):** Identified full replication vs aggregation concern, didn't specify document semantics

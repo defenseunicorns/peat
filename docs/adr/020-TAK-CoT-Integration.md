@@ -54,25 +54,25 @@
 - Standardized types enable automatic symbol rendering
 
 **CoT Message Characteristics:**
-- **Size**: XML format up to 40KB per message (larger than PEAT's differential sync)
+- **Size**: XML format up to 40KB per message (larger than Peat's differential sync)
 - **Transport**: UDP/TCP, optionally Protobuf-encoded for bandwidth efficiency
 - **Update Rate**: Typically 1-5 second position updates
 - **Network**: Designed for IP-based networks (not optimized for contested/DIL environments)
 
-### Strategic Importance for PEAT
+### Strategic Importance for Peat
 
 **AUKUS Integration Requirement:**
 - TAK is extensively used within AUKUS partners (US, UK, Australia)
 - AUKUS Pillar II emphasizes technology interoperability
-- **Requirement**: PEAT must integrate with existing TAK infrastructure to enable adoption
+- **Requirement**: Peat must integrate with existing TAK infrastructure to enable adoption
 
 **Ecosystem Benefits:**
-1. **Common Operating Picture**: PEAT-coordinated assets visible in TAK
-2. **Human-Machine Interface**: TAK serves as operator interface for PEAT teams
-3. **Interoperability**: PEAT coordinates autonomy; TAK provides situational awareness to C2
-4. **Gradual Adoption**: Organizations can integrate PEAT without replacing TAK infrastructure
+1. **Common Operating Picture**: Peat-coordinated assets visible in TAK
+2. **Human-Machine Interface**: TAK serves as operator interface for Peat teams
+3. **Interoperability**: Peat coordinates autonomy; TAK provides situational awareness to C2
+4. **Gradual Adoption**: Organizations can integrate Peat without replacing TAK infrastructure
 
-**Challenge**: TAK's all-to-all event streaming model conflicts with PEAT's hierarchical aggregation approach.
+**Challenge**: TAK's all-to-all event streaming model conflicts with Peat's hierarchical aggregation approach.
 
 ### The Integration Problem
 
@@ -88,7 +88,7 @@
  [ATAK]   [WinTAK]  [ATAK]   [ATAK]   [ATAK]
 ```
 
-**PEAT's Architecture (Hierarchical Aggregation)**:
+**Peat's Architecture (Hierarchical Aggregation)**:
 ```
 ┌─────────────────────────────────────────────────────────┐
 │              Company HQ (Aggregated View)               │
@@ -105,13 +105,13 @@
 
 **Architectural Tension:**
 - TAK expects all position updates from all platforms
-- PEAT provides aggregated capabilities and filtered/summarized position data
-- **Risk**: Naively bridging PEAT → TAK could saturate network with O(n²) messages
-- **Opportunity**: TAK can display PEAT's hierarchical abstractions as cells/formations
+- Peat provides aggregated capabilities and filtered/summarized position data
+- **Risk**: Naively bridging Peat → TAK could saturate network with O(n²) messages
+- **Opportunity**: TAK can display Peat's hierarchical abstractions as cells/formations
 
 ## Decision
 
-We will implement **bidirectional integration between PEAT Protocol and TAK ecosystem** through a **three-tier integration architecture**:
+We will implement **bidirectional integration between Peat Protocol and TAK ecosystem** through a **three-tier integration architecture**:
 
 ### Tier 1: CoT Message Schema Integration (cap-schema layer)
 
@@ -124,43 +124,43 @@ cap-schema/
 │   └── ...
 ├── src/
 │   ├── cot/
-│   │   ├── encoder.rs         # PEAT → CoT XML/Protobuf
-│   │   ├── decoder.rs         # CoT → PEAT messages
+│   │   ├── encoder.rs         # Peat → CoT XML/Protobuf
+│   │   ├── decoder.rs         # CoT → Peat messages
 │   │   ├── types.rs           # CoT type hierarchy mapping
 │   │   └── validation.rs      # CoT schema validation
 ```
 
 **Bidirectional Message Mapping:**
 
-| PEAT Concept | CoT Representation | Direction | Notes |
+| Peat Concept | CoT Representation | Direction | Notes |
 |--------------|-------------------|-----------|-------|
-| Platform Position | CoT Event (type: a-f-G-U-C) | PEAT → TAK | Individual platform tracks |
-| Squad Formation | CoT Event + detail/link | PEAT → TAK | Cell as tactical graphic |
-| Capability Aggregate | CoT Event (custom detail) | PEAT → TAK | Squad-level capability summary |
-| Command Intent | CoT Event (type: t-x-m) | TAK → PEAT | Mission tasking from C2 |
-| Geofence/ROZ | CoT Event (type: u-d-r) | TAK → PEAT | Operational boundaries |
+| Platform Position | CoT Event (type: a-f-G-U-C) | Peat → TAK | Individual platform tracks |
+| Squad Formation | CoT Event + detail/link | Peat → TAK | Cell as tactical graphic |
+| Capability Aggregate | CoT Event (custom detail) | Peat → TAK | Squad-level capability summary |
+| Command Intent | CoT Event (type: t-x-m) | TAK → Peat | Mission tasking from C2 |
+| Geofence/ROZ | CoT Event (type: u-d-r) | TAK → Peat | Operational boundaries |
 | Chat/Text | CoT Event (type: b-t-f) | Bidirectional | Text messaging |
 
 **MIL-STD-2525 Entity Type Mappings** (from M1 POC):
 
-| PEAT Entity | CoT Type | MIL-STD-2525 Description |
+| Peat Entity | CoT Type | MIL-STD-2525 Description |
 |-------------|----------|--------------------------|
 | Tracked Person (POI) | `a-f-G-E-S` | Friendly Ground Equipment - Sensor |
 | Tracked Vehicle | `a-f-G-E-V` | Friendly Ground Equipment - Vehicle |
 | Unknown Track | `a-u-G` | Unknown Ground |
 | Hostile Track | `a-h-G` | Hostile Ground |
-| PEAT Platform (UGV) | `a-f-G-U-C` | Friendly Ground Unit - Combat |
-| PEAT Platform (UAV) | `a-f-A-M-F-Q` | Friendly Air - Military Fixed Wing - UAV |
-| PEAT Operator | `a-f-G-U-C-I` | Friendly Ground Unit - Infantry |
-| PEAT Cell/Team | `a-f-G-U-C` + links | Friendly Ground Unit with subordinates |
+| Peat Platform (UGV) | `a-f-G-U-C` | Friendly Ground Unit - Combat |
+| Peat Platform (UAV) | `a-f-A-M-F-Q` | Friendly Air - Military Fixed Wing - UAV |
+| Peat Operator | `a-f-G-U-C-I` | Friendly Ground Unit - Infantry |
+| Peat Cell/Team | `a-f-G-U-C` + links | Friendly Ground Unit with subordinates |
 | Formation | `a-f-G-U-C` + links | Higher echelon unit |
 | Geofence/ROZ | `u-d-r` | Drawing - Route/Area |
 | Mission Tasking | `t-x-m-c` | Tasking - Mission - Track |
-| Handoff Event | `a-x-h-h` | Custom - PEAT Handoff |
+| Handoff Event | `a-x-h-h` | Custom - Peat Handoff |
 
 **Hierarchy Encoding via CoT Links:**
 
-PEAT's hierarchical relationships map to CoT `<link>` elements with relation types:
+Peat's hierarchical relationships map to CoT `<link>` elements with relation types:
 
 ```xml
 <!-- Platform belongs to cell -->
@@ -181,7 +181,7 @@ PEAT's hierarchical relationships map to CoT `<link>` elements with relation typ
 | `o-o` | Observing | Sensor→track relationship |
 
 **Key Design Principles:**
-1. **Semantic Preservation**: PEAT capabilities map to appropriate CoT detail sub-schemas
+1. **Semantic Preservation**: Peat capabilities map to appropriate CoT detail sub-schemas
 2. **Minimal Overhead**: Only send necessary data; leverage CoT's extensible detail fields
 3. **Standard Compliance**: Use existing CoT sub-schemas where possible (flow-tags, sensor, etc.)
 4. **Hierarchy Encoding**: Use CoT link elements to represent squad→platform relationships
@@ -220,7 +220,7 @@ pub struct TakConfig {
 #[async_trait]
 impl MessageTransport for TakTransport {
     async fn send(&self, message: &dyn CapMessage, ...) -> Result<...> {
-        // 1. Convert PEAT message to CoT event
+        // 1. Convert Peat message to CoT event
         let cot_event = self.cot_encoder.encode(message)?;
         
         // 2. Serialize to XML or Protobuf
@@ -241,7 +241,7 @@ impl MessageTransport for TakTransport {
         // 1. Subscribe to CoT messages from TAK
         let cot_stream = self.client.subscribe().await?;
         
-        // 2. Filter and decode into PEAT messages
+        // 2. Filter and decode into Peat messages
         let peat_stream = cot_stream
             .filter_map(|cot_event| self.cot_decoder.decode::<M>(cot_event))
             .filter(|msg| filter.matches(msg));
@@ -270,7 +270,7 @@ impl MessageTransport for TakTransport {
 
 ### Tier 3: Hierarchical Filtering & Aggregation Bridge
 
-**Implement PEAT-specific logic to bridge hierarchical model with TAK's flat model:**
+**Implement Peat-specific logic to bridge hierarchical model with TAK's flat model:**
 
 ```rust
 // cap-protocol/src/tak_bridge.rs
@@ -292,13 +292,13 @@ pub enum AggregationPolicy {
     /// Recipients see detail appropriate to their echelon
     HierarchicalFiltering,
 
-    /// Custom filtering based on CoT type, recipient, and PEAT cell membership
+    /// Custom filtering based on CoT type, recipient, and Peat cell membership
     CustomFilters(Vec<FilterRule>),
 
     // === Additional policies from M1 POC feedback ===
 
     /// Track-focused: Only active tracks visible, not platform positions
-    /// Useful when operators care about targets, not PEAT assets
+    /// Useful when operators care about targets, not Peat assets
     TracksOnly,
 
     /// Capability-focused: Formation capabilities only, not positions
@@ -316,10 +316,10 @@ pub enum AggregationPolicy {
 
 /// QoS Priority to CoT Flow-Tags Mapping (ADR-019 integration)
 ///
-/// Maps PEAT QoS priorities to CoT `_flow-tags_` for TAK-side prioritization.
+/// Maps Peat QoS priorities to CoT `_flow-tags_` for TAK-side prioritization.
 /// TAK servers that honor flow-tags will process messages accordingly.
 ///
-/// | PEAT Priority | CoT Flow-Tag | TAK Behavior |
+/// | Peat Priority | CoT Flow-Tag | TAK Behavior |
 /// |---------------|--------------|--------------|
 /// | P1 (Critical) | `priority=flash` | Immediate delivery |
 /// | P2 (High) | `priority=immediate` | High priority queue |
@@ -337,7 +337,7 @@ pub fn priority_to_flow_tag(priority: Priority) -> &'static str {
 }
 
 impl PeatTakBridge {
-    /// Publish PEAT state to TAK
+    /// Publish Peat state to TAK
     pub async fn publish_to_tak(&self) -> Result<()> {
         match self.aggregation_policy {
             AggregationPolicy::HierarchicalFiltering => {
@@ -355,7 +355,7 @@ impl PeatTakBridge {
         Ok(())
     }
     
-    /// Ingest TAK events into PEAT
+    /// Ingest TAK events into Peat
     pub async fn ingest_from_tak(&self) -> Result<()> {
         let mut tak_stream = self.tak_transport.subscribe::<CotEvent>(
             MessageFilter::default()
@@ -364,17 +364,17 @@ impl PeatTakBridge {
         while let Some(cot_event) = tak_stream.next().await {
             match cot_event.event_type {
                 CotType::MissionTasking => {
-                    // Convert TAK mission tasking to PEAT command
+                    // Convert TAK mission tasking to Peat command
                     let command = self.convert_to_peat_command(cot_event)?;
                     self.peat_node.execute_command(command).await?;
                 },
                 CotType::Geofence => {
-                    // Import geofence as PEAT operational constraint
+                    // Import geofence as Peat operational constraint
                     let constraint = self.convert_to_constraint(cot_event)?;
                     self.peat_node.add_constraint(constraint).await?;
                 },
                 CotType::FriendlyPosition => {
-                    // Track external friendly units in PEAT
+                    // Track external friendly units in Peat
                     self.peat_node.update_external_track(cot_event).await?;
                 },
                 _ => {
@@ -396,21 +396,21 @@ impl PeatTakBridge {
               │ (Filtered CoT messages)
               │
     ┌─────────▼─────────┐
-    │  PEAT TAK Bridge  │
+    │  Peat TAK Bridge  │
     │  (Aggregation +   │
     │   Filtering)      │
     └─────────┬─────────┘
               │
-              │ (PEAT internal protocol - differential sync)
+              │ (Peat internal protocol - differential sync)
               │
     ┌─────────▼─────────┐
-    │    PEAT Network   │
+    │    Peat Network   │
     │  (Hierarchical)   │
     └───────────────────┘
 ```
 
 **Filtering Rules:**
-- **Geographic**: Only forward CoT events within PEAT cell's area of operations
+- **Geographic**: Only forward CoT events within Peat cell's area of operations
 - **Temporal**: Stale events (beyond stale time) filtered out
 - **Type-Based**: Only relevant CoT types forwarded (filter out irrelevant chat, admin messages)
 - **Authority-Based**: Mission commands only accepted from authorized TAK users
@@ -418,22 +418,22 @@ impl PeatTakBridge {
 
 ### Integration Deployment Models
 
-**Model 1: PEAT as TAK Plugin (Tight Integration)**
-- Develop ATAK plugin that exposes PEAT capabilities
-- Plugin displays PEAT cell formations, hierarchical summaries
-- Operators send commands to PEAT via TAK UI
+**Model 1: Peat as TAK Plugin (Tight Integration)**
+- Develop ATAK plugin that exposes Peat capabilities
+- Plugin displays Peat cell formations, hierarchical summaries
+- Operators send commands to Peat via TAK UI
 - **Pros**: Seamless UX, no separate infrastructure
 - **Cons**: Limited to Android devices, plugin development complexity
 
-**Model 2: PEAT TAK Bridge Node (Federated)**
-- Standalone PEAT node acts as TAK federation member
+**Model 2: Peat TAK Bridge Node (Federated)**
+- Standalone Peat node acts as TAK federation member
 - Appears as TAK server to TAK clients
-- Translates between PEAT and TAK protocols
+- Translates between Peat and TAK protocols
 - **Pros**: Works with all TAK clients (ATAK, WinTAK, iTAK)
 - **Cons**: Additional infrastructure, configuration complexity
 
-**Model 3: Hybrid - PEAT Core + TAK Interface Layer**
-- PEAT operates independently with native protocol
+**Model 3: Hybrid - Peat Core + TAK Interface Layer**
+- Peat operates independently with native protocol
 - TAK transport adapter provides bidirectional bridge
 - Multiple TAK bridges for scalability
 - **Pros**: Best performance, flexibility, supports multiple deployment scenarios
@@ -449,7 +449,7 @@ impl PeatTakBridge {
 
 **Tasks**:
 1. Survey TAK deployment patterns within AUKUS partners
-2. Identify critical CoT message types for PEAT integration
+2. Identify critical CoT message types for Peat integration
 3. Define success criteria for integration (latency, bandwidth, usability)
 4. Document security requirements (PKI, certificate management)
 
@@ -461,18 +461,18 @@ impl PeatTakBridge {
 
 ### Phase 1: CoT Schema Adapter (Weeks 3-4)
 
-**Goal**: Implement bidirectional CoT ↔ PEAT message conversion in `cap-schema`
+**Goal**: Implement bidirectional CoT ↔ Peat message conversion in `cap-schema`
 
 **Tasks**:
 1. Implement CoT XML parser/generator
 2. Implement CoT Protobuf encoder/decoder
-3. Create PEAT → CoT message mappings (platform position, squad formation, etc.)
-4. Create CoT → PEAT message mappings (mission tasking, geofences, etc.)
+3. Create Peat → CoT message mappings (platform position, squad formation, etc.)
+4. Create CoT → Peat message mappings (mission tasking, geofences, etc.)
 5. Unit tests for all conversions
 
 **Success Criteria**:
-- [ ] PEAT platform position converts to valid CoT event (MIL-STD-2525 type)
-- [ ] CoT mission tasking converts to PEAT command
+- [ ] Peat platform position converts to valid CoT event (MIL-STD-2525 type)
+- [ ] CoT mission tasking converts to Peat command
 - [ ] Round-trip conversion preserves semantic meaning
 - [ ] Validation catches malformed CoT messages
 
@@ -493,7 +493,7 @@ impl PeatTakBridge {
 - [ ] Mesh SA mode works in local network
 - [ ] Handles connection failures gracefully
 
-### Phase 3: PEAT-TAK Bridge Logic (Weeks 8-10)
+### Phase 3: Peat-TAK Bridge Logic (Weeks 8-10)
 
 **Goal**: Implement hierarchical filtering and aggregation bridge
 
@@ -502,29 +502,29 @@ impl PeatTakBridge {
 2. Add hierarchical filtering logic (echelon-based visibility)
 3. Implement bandwidth-aware throttling
 4. Create configuration system for filtering rules
-5. End-to-end testing with PEAT + TAK ecosystem
+5. End-to-end testing with Peat + TAK ecosystem
 
 **Success Criteria**:
 - [ ] Company HQ in TAK sees platoon summaries, not individual platforms
 - [ ] Squad leaders in TAK see full platform details
-- [ ] Mission commands from TAK correctly execute in PEAT
+- [ ] Mission commands from TAK correctly execute in Peat
 - [ ] Bandwidth usage < 10% of full event streaming
 
 ### Phase 4: ATAK Plugin Development (Weeks 11-14) [Optional]
 
-**Goal**: Create native ATAK plugin for PEAT integration
+**Goal**: Create native ATAK plugin for Peat integration
 
 **Tasks**:
 1. ATAK plugin skeleton (Java/Kotlin)
-2. Display PEAT cell formations on map
+2. Display Peat cell formations on map
 3. Display aggregated capabilities in UI
-4. Send commands to PEAT via plugin
+4. Send commands to Peat via plugin
 5. User acceptance testing with operators
 
 **Success Criteria**:
 - [ ] Plugin installs on ATAK devices
-- [ ] PEAT squad formations visible on map
-- [ ] Operators can task PEAT cells via natural interface
+- [ ] Peat squad formations visible on map
+- [ ] Operators can task Peat cells via natural interface
 - [ ] Performance acceptable on tactical devices
 
 ### Phase 5: Field Validation (Weeks 15-16)
@@ -539,8 +539,8 @@ impl PeatTakBridge {
 5. Documentation and training materials
 
 **Success Criteria**:
-- [ ] PEAT-coordinated assets visible in TAK common operating picture
-- [ ] Operators successfully task PEAT via TAK
+- [ ] Peat-coordinated assets visible in TAK common operating picture
+- [ ] Operators successfully task Peat via TAK
 - [ ] Performance meets operational requirements
 - [ ] Security audit passes with no critical findings
 
@@ -548,20 +548,20 @@ impl PeatTakBridge {
 
 ### Positive
 
-1. **AUKUS Interoperability**: Enables PEAT adoption within existing TAK infrastructure
+1. **AUKUS Interoperability**: Enables Peat adoption within existing TAK infrastructure
 2. **Operator Familiarity**: Leverages existing TAK training and muscle memory
-3. **Ecosystem Access**: Connects PEAT to broader TAK plugin ecosystem
-4. **Gradual Adoption**: Organizations can integrate PEAT incrementally
-5. **Common Operating Picture**: PEAT assets visible alongside traditional C2
+3. **Ecosystem Access**: Connects Peat to broader TAK plugin ecosystem
+4. **Gradual Adoption**: Organizations can integrate Peat incrementally
+5. **Common Operating Picture**: Peat assets visible alongside traditional C2
 6. **Standards Alignment**: Uses widely-adopted CoT message format
 7. **Multi-National Collaboration**: TAK used across NATO and AUKUS partners
-8. **Bidirectional Data Flow**: Both PEAT → TAK (awareness) and TAK → PEAT (tasking)
+8. **Bidirectional Data Flow**: Both Peat → TAK (awareness) and TAK → Peat (tasking)
 
 ### Negative
 
 1. **Complexity**: Additional abstraction layer increases system complexity
-2. **Bandwidth Overhead**: CoT messages larger than PEAT's differential sync
-3. **Impedance Mismatch**: TAK's flat model vs PEAT's hierarchical model requires careful bridging
+2. **Bandwidth Overhead**: CoT messages larger than Peat's differential sync
+3. **Impedance Mismatch**: TAK's flat model vs Peat's hierarchical model requires careful bridging
 4. **Security Surface**: Additional attack vectors through TAK integration points
 5. **Dependency**: Adds TAK ecosystem as external dependency
 6. **Testing Burden**: Must test against multiple TAK server implementations
@@ -570,7 +570,7 @@ impl PeatTakBridge {
 
 ### Risks and Mitigations
 
-**Risk 1**: TAK event flooding overwhelms PEAT network
+**Risk 1**: TAK event flooding overwhelms Peat network
 - **Mitigation**: Hierarchical filtering prevents O(n²) message forwarding
 - **Mitigation**: Bandwidth monitoring with dynamic throttling
 - **Mitigation**: Configurable aggregation policies
@@ -584,7 +584,7 @@ impl PeatTakBridge {
 - **Mitigation**: PKI-based authentication for TAK connections
 - **Mitigation**: Message signing for commands (ADR-006 integration)
 - **Mitigation**: Security audit before operational deployment
-- **Mitigation**: Network segmentation between TAK and PEAT domains
+- **Mitigation**: Network segmentation between TAK and Peat domains
 
 **Risk 4**: TAK server federation complexity
 - **Mitigation**: Start with single TAK server deployments
@@ -600,7 +600,7 @@ impl PeatTakBridge {
 
 ### Alternative 1: Ignore TAK Ecosystem
 
-**Approach**: PEAT operates entirely independently, no TAK integration
+**Approach**: Peat operates entirely independently, no TAK integration
 
 **Rejected Because**:
 - Blocks AUKUS adoption (TAK is deeply entrenched)
@@ -608,9 +608,9 @@ impl PeatTakBridge {
 - Loses access to TAK's extensive plugin ecosystem
 - Misses opportunity for common operating picture
 
-### Alternative 2: Replace TAK with PEAT-Native UI
+### Alternative 2: Replace TAK with Peat-Native UI
 
-**Approach**: Build PEAT's own mobile/desktop UI instead of TAK integration
+**Approach**: Build Peat's own mobile/desktop UI instead of TAK integration
 
 **Rejected Because**:
 - Massive development effort (ATAK took years to mature)
@@ -620,13 +620,13 @@ impl PeatTakBridge {
 
 ### Alternative 3: TAK-Only Mode (No Hierarchical Optimization)
 
-**Approach**: Naive bridge that forwards all PEAT events to TAK without filtering
+**Approach**: Naive bridge that forwards all Peat events to TAK without filtering
 
 **Rejected Because**:
-- Defeats PEAT's core value proposition (hierarchical scaling)
-- Would recreate O(n²) problem PEAT solves
+- Defeats Peat's core value proposition (hierarchical scaling)
+- Would recreate O(n²) problem Peat solves
 - Unacceptable bandwidth usage at scale
-- Doesn't leverage PEAT's aggregation capabilities
+- Doesn't leverage Peat's aggregation capabilities
 
 ### Alternative 4: Custom Protocol Instead of CoT
 
@@ -641,20 +641,20 @@ impl PeatTakBridge {
 ## Success Metrics
 
 1. **Integration Completeness**:
-   - [ ] Bidirectional message flow works (PEAT ↔ TAK)
+   - [ ] Bidirectional message flow works (Peat ↔ TAK)
    - [ ] 5+ CoT message types supported in each direction
    - [ ] Works with TAK Server, FreeTakServer, and Mesh SA
 
 2. **Performance**:
    - [ ] Message translation latency < 10ms
    - [ ] Bandwidth usage < 10% of naive event streaming
-   - [ ] Supports 100+ PEAT platforms visible in TAK
-   - [ ] TAK UI remains responsive with PEAT integration
+   - [ ] Supports 100+ Peat platforms visible in TAK
+   - [ ] TAK UI remains responsive with Peat integration
 
 3. **Operational Validation**:
    - [ ] Successfully demonstrated in AUKUS context
-   - [ ] Operators can task PEAT teams via TAK
-   - [ ] PEAT status updates visible in TAK within 2 seconds
+   - [ ] Operators can task Peat teams via TAK
+   - [ ] Peat status updates visible in TAK within 2 seconds
    - [ ] Works in contested network conditions (30% packet loss)
 
 4. **Developer Experience**:
@@ -691,7 +691,7 @@ impl PeatTakBridge {
 
 5. **Related ADRs**:
    - **ADR-012**: Defines cap-schema and cap-transport abstractions that enable TAK integration
-   - **ADR-009**: Bidirectional flows architecture aligns with TAK ↔ PEAT communication
+   - **ADR-009**: Bidirectional flows architecture aligns with TAK ↔ Peat communication
    - **ADR-006**: Security architecture extends to TAK authentication
 
 ## References
@@ -710,10 +710,10 @@ impl PeatTakBridge {
 | 2025-11-17 | Proposed TAK/CoT integration | AUKUS interoperability requirement |
 | 2025-11-17 | Selected Hybrid deployment model (Model 3) | Maximum flexibility, aligns with cap-transport |
 | 2025-11-17 | Hierarchical filtering mandatory | Prevents O(n²) message explosion |
-| 2025-11-26 | Added `_peat_` CoT extension schema (ADR-028) | M1 POC integrator feedback - preserve PEAT semantics |
+| 2025-11-26 | Added `_peat_` CoT extension schema (ADR-028) | M1 POC integrator feedback - preserve Peat semantics |
 | 2025-11-26 | Added MIL-STD-2525 entity type mappings | M1 POC integrator feedback - concrete type codes |
 | 2025-11-26 | Added QoS→flow-tags mapping | ADR-019 integration for TAK-side prioritization |
-| 2025-11-26 | Resolved Q5: No model distribution via TAK | Keep on PEAT blob transport (size limits, hash verification) |
+| 2025-11-26 | Resolved Q5: No model distribution via TAK | Keep on Peat blob transport (size limits, hash verification) |
 | 2025-11-26 | Resolved Q7: Yes, cells as TAK groups | Natural fit for operator workflow |
 | 2025-11-26 | Formation-level track correlation | Hierarchical aggregation before TAK bridge |
 | 2025-11-26 | Created ADR-029 for TAK Transport Adapter | DIL message queuing, separate architectural component |
@@ -723,16 +723,16 @@ impl PeatTakBridge {
 
 ### Resolved (M1 POC Feedback - 2025-11-26)
 
-**Q5: Should PEAT AI models distribute via TAK data packages?**
-- **Answer**: **No** - Keep model distribution on PEAT's content-addressed blob transport.
+**Q5: Should Peat AI models distribute via TAK data packages?**
+- **Answer**: **No** - Keep model distribution on Peat's content-addressed blob transport.
 - **Rationale**:
   - TAK data packages have size limits (~50MB typical)
-  - PEAT's Iroh-based blob transport provides hash verification, resumable transfers
+  - Peat's Iroh-based blob transport provides hash verification, resumable transfers
   - Model updates are P5 (bulk) priority - shouldn't compete with tactical data on TAK
-  - Separation of concerns: TAK for SA, PEAT for autonomy coordination
+  - Separation of concerns: TAK for SA, Peat for autonomy coordination
 
-**Q7: Should PEAT cells appear as TAK "groups"?**
-- **Answer**: **Yes** - Map PEAT cells to TAK contact groups.
+**Q7: Should Peat cells appear as TAK "groups"?**
+- **Answer**: **Yes** - Map Peat cells to TAK contact groups.
 - **Rationale**:
   - Natural fit for operators managing multiple teams
   - Enables group messaging to cells
@@ -748,15 +748,15 @@ impl PeatTakBridge {
 **Q (New): How to handle track correlation across teams?**
 - **Answer**: **Formation correlates** (Option 3)
 - **Context**: In M1 vignette, Alpha and Bravo teams may independently detect the same POI.
-- **Rationale**: Aligns with PEAT's hierarchical aggregation philosophy - coordinator correlates before bridge, single track to TAK.
+- **Rationale**: Aligns with Peat's hierarchical aggregation philosophy - coordinator correlates before bridge, single track to TAK.
 
 ### Still Open
 
-1. **Should PEAT support TAK federation directly?** Or only single TAK server connections?
+1. **Should Peat support TAK federation directly?** Or only single TAK server connections?
 2. ~~How do we handle TAK server outages?~~ → Resolved: DIL Message Queuing (see ADR-029)
 3. **What is the priority for ATAK plugin vs standalone bridge?** Resource allocation?
-4. **Should we support TAK's video streaming features?** Integration with PEAT sensor data?
-6. **Do we need CoT→PEAT conversion for all CoT types?** Or subset initially?
+4. **Should we support TAK's video streaming features?** Integration with Peat sensor data?
+6. **Do we need CoT→Peat conversion for all CoT types?** Or subset initially?
 
 ## Next Steps
 
@@ -790,7 +790,7 @@ impl PeatTakBridge {
 
 **Navy NIWC PAC Proposal**:
 - TAK integration addresses Maritime Big Play requirements
-- Enables PEAT adoption within existing USN TAK infrastructure
+- Enables Peat adoption within existing USN TAK infrastructure
 - Demonstrates interoperability with allied systems
 
 **BlackFlag.vc Seed Round**:
@@ -800,6 +800,6 @@ impl PeatTakBridge {
 
 ---
 
-**Critical Success Factor**: TAK integration must be **demonstrably operational** before major NATO STANAG proposals. Working TAK bridge provides credibility and shows PEAT complements (rather than replaces) existing C2 infrastructure.
+**Critical Success Factor**: TAK integration must be **demonstrably operational** before major NATO STANAG proposals. Working TAK bridge provides credibility and shows Peat complements (rather than replaces) existing C2 infrastructure.
 
-**Author's Note**: This ADR represents a strategic integration that enables PEAT adoption within the existing TAK ecosystem prevalent in AUKUS and broader DoD/NATO operations. The hierarchical filtering bridge is essential—naive event forwarding would recreate the O(n²) problem PEAT solves. By treating TAK as a first-class integration target, we position PEAT as complementary infrastructure that enhances existing situational awareness tools rather than competing with them.
+**Author's Note**: This ADR represents a strategic integration that enables Peat adoption within the existing TAK ecosystem prevalent in AUKUS and broader DoD/NATO operations. The hierarchical filtering bridge is essential—naive event forwarding would recreate the O(n²) problem Peat solves. By treating TAK as a first-class integration target, we position Peat as complementary infrastructure that enhances existing situational awareness tools rather than competing with them.

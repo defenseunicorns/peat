@@ -1326,7 +1326,7 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 1. **Schema Clarity**: Message schemas are first-class artifacts, not buried in code
 2. **Type Safety**: Code generation prevents schema drift across languages
 3. **Extensibility**: New transports can be added without modifying core protocol
-4. **Integration**: External systems can adopt CAP messages without PEAT protocol
+4. **Integration**: External systems can adopt CAP messages without Peat protocol
 5. **Tooling**: Standard schema enables validation, visualization, debugging tools
 6. **Multi-Language**: Python, JavaScript, Java, C++ can all use CAP messages natively
 7. **Versioning**: Protobuf supports schema evolution with backward compatibility
@@ -1446,11 +1446,11 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
    - [ ] Validation catches 90%+ of schema errors at compile-time
    - [ ] Documentation rated "good" or better by external developers
 
-## Appendix: PEAT Protocol Schemas (v1)
+## Appendix: Peat Protocol Schemas (v1)
 
-> **Added 2025-11-25**: These schemas define the core PEAT Protocol primitives for software distribution, capability advertisement, and event routing. They supersede the earlier example schemas above and represent the canonical protocol definitions.
+> **Added 2025-11-25**: These schemas define the core Peat Protocol primitives for software distribution, capability advertisement, and event routing. They supersede the earlier example schemas above and represent the canonical protocol definitions.
 >
-> **Design Principle**: PEAT Protocol defines the envelope, applications define the contents. All payloads use `google.protobuf.Any` or `google.protobuf.Struct` to remain application-agnostic.
+> **Design Principle**: Peat Protocol defines the envelope, applications define the contents. All payloads use `google.protobuf.Any` or `google.protobuf.Struct` to remain application-agnostic.
 
 ### A.1 Blob Reference (ADR-025)
 
@@ -1464,7 +1464,7 @@ message BlobReference {
   string hash_algorithm = 2;    // "sha256", "blake3"
   uint64 size_bytes = 3;
 
-  // Application-defined metadata (opaque to PEAT)
+  // Application-defined metadata (opaque to Peat)
   map<string, string> metadata = 10;
 }
 ```
@@ -1531,7 +1531,7 @@ message AggregatedCapability {
 }
 ```
 
-### A.3 PEAT Event (Products, Anomalies, Telemetry)
+### A.3 Peat Event (Products, Anomalies, Telemetry)
 
 ```protobuf
 syntax = "proto3";
@@ -1667,7 +1667,7 @@ enum DeploymentState {
 
 ### A.5 Protocol Behavior Summary
 
-| Schema | Direction | Aggregation | PEAT Responsibility |
+| Schema | Direction | Aggregation | Peat Responsibility |
 |--------|-----------|-------------|---------------------|
 | BlobReference | N/A | N/A | Transfer bytes, verify hash |
 | CapabilityAdvertisement | ↑ Upward | Summarize at echelons | Route through hierarchy |
@@ -1677,14 +1677,14 @@ enum DeploymentState {
 
 ### A.6 Extension Points
 
-Applications extend PEAT by:
+Applications extend Peat by:
 1. **Defining capability attributes** (`Capability.attributes`)
 2. **Defining event payloads** (`PeatEvent.payload`)
 3. **Defining artifact types** (`DeploymentDirective.artifact_type`)
 4. **Defining deployment config** (`DeploymentDirective.config`)
 5. **Defining custom filters** (`CapabilityFilter.custom_filters`)
 
-PEAT routes, aggregates, and enforces policies without understanding application semantics.
+Peat routes, aggregates, and enforces policies without understanding application semantics.
 
 ---
 

@@ -1,6 +1,6 @@
 //! Tasking validators (AI/ML Detection Tasks)
 //!
-//! Validates DetectionTask messages and related configuration for PEAT Protocol.
+//! Validates DetectionTask messages and related configuration for Peat Protocol.
 
 use super::{ValidationError, ValidationResult};
 use crate::tasking::v1::{

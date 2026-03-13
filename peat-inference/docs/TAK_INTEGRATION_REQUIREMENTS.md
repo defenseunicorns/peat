@@ -1,9 +1,9 @@
-# TAK Integration Requirements for PEAT Protocol
+# TAK Integration Requirements for Peat Protocol
 
 **Document Type**: Requirements & Recommendations for ADR-020
 **Date**: 2025-11-26
 **Source**: peat-m1-poc implementation experience
-**Target**: PEAT Core Team (cap repository)
+**Target**: Peat Core Team (cap repository)
 
 ## Executive Summary
 
@@ -13,11 +13,11 @@ This document captures requirements and recommendations derived from implementin
 
 ## 1. Schema Layer Requirements (cap-schema)
 
-### 1.1 PEAT Custom Detail Extension Schema
+### 1.1 Peat Custom Detail Extension Schema
 
-**Requirement**: Define a standardized `<_peat_>` CoT detail extension for preserving PEAT-specific semantics in CoT messages.
+**Requirement**: Define a standardized `<_peat_>` CoT detail extension for preserving Peat-specific semantics in CoT messages.
 
-**Rationale**: PEAT messages contain rich context (model versions, confidence scores, cell membership) that TAK operators need but CoT doesn't natively support.
+**Rationale**: Peat messages contain rich context (model versions, confidence scores, cell membership) that TAK operators need but CoT doesn't natively support.
 
 **Proposed Schema**:
 
@@ -55,20 +55,20 @@ This document captures requirements and recommendations derived from implementin
 
 ### 1.2 MIL-STD-2525 Symbol Type Mappings
 
-**Requirement**: Define canonical CoT type codes for PEAT entity classes.
+**Requirement**: Define canonical CoT type codes for Peat entity classes.
 
 **Proposed Mappings**:
 
-| PEAT Entity | CoT Type | MIL-STD-2525 Description |
+| Peat Entity | CoT Type | MIL-STD-2525 Description |
 |-------------|----------|--------------------------|
 | Tracked Person (POI) | `a-f-G-E-S` | Friendly Ground Equipment - Sensor |
 | Tracked Vehicle | `a-f-G-E-V` | Friendly Ground Equipment - Vehicle |
 | Unknown Track | `a-u-G` | Unknown Ground |
 | Hostile Track | `a-h-G` | Hostile Ground |
-| PEAT Platform (UGV) | `a-f-G-U-C` | Friendly Ground Unit - Combat |
-| PEAT Platform (UAV) | `a-f-A-M-F-Q` | Friendly Air - Military Fixed Wing - UAV |
-| PEAT Operator | `a-f-G-U-C-I` | Friendly Ground Unit - Infantry |
-| PEAT Cell/Team | `a-f-G-U-C` + links | Friendly Ground Unit with subordinates |
+| Peat Platform (UGV) | `a-f-G-U-C` | Friendly Ground Unit - Combat |
+| Peat Platform (UAV) | `a-f-A-M-F-Q` | Friendly Air - Military Fixed Wing - UAV |
+| Peat Operator | `a-f-G-U-C-I` | Friendly Ground Unit - Infantry |
+| Peat Cell/Team | `a-f-G-U-C` + links | Friendly Ground Unit with subordinates |
 | Formation | `a-f-G-U-C` + links | Higher echelon unit |
 | Geofence/ROZ | `u-d-r` | Drawing - Route/Area |
 | Mission Tasking | `t-x-m` | Tasking - Mission |
@@ -80,7 +80,7 @@ This document captures requirements and recommendations derived from implementin
 
 ### 1.3 Hierarchy Encoding in CoT Links
 
-**Requirement**: Standardize how PEAT's hierarchical relationships map to CoT `<link>` elements.
+**Requirement**: Standardize how Peat's hierarchical relationships map to CoT `<link>` elements.
 
 **Proposed Convention**:
 
@@ -192,7 +192,7 @@ pub enum TakProtocol {
 **Proposed Behavior**:
 1. Queue messages when disconnected (up to configurable limit)
 2. Replay queued messages on reconnection (with staleness filtering)
-3. Prioritize by PEAT priority level (P1 messages first)
+3. Prioritize by Peat priority level (P1 messages first)
 4. Drop stale messages (past CoT `stale` time)
 
 **Action Items**:
@@ -240,11 +240,11 @@ pub enum AggregationPolicy {
 
 ### 3.2 Priority to CoT Flow-Tags Mapping
 
-**Requirement**: Map PEAT QoS priorities (ADR-019) to CoT `_flow-tags_` for TAK-side prioritization.
+**Requirement**: Map Peat QoS priorities (ADR-019) to CoT `_flow-tags_` for TAK-side prioritization.
 
 **Proposed Mapping**:
 
-| PEAT Priority | CoT Flow-Tag | TAK Behavior |
+| Peat Priority | CoT Flow-Tag | TAK Behavior |
 |---------------|--------------|--------------|
 | P1 (Critical) | `priority=flash` | Immediate delivery |
 | P2 (High) | `priority=immediate` | High priority |
@@ -281,7 +281,7 @@ pub enum AggregationPolicy {
 ```
 
 **Status Values**:
-| PEAT Status | CoT Representation | TAK Display |
+| Peat Status | CoT Representation | TAK Display |
 |-------------|-------------------|-------------|
 | `Ready` | `operational="READY"` | Green indicator |
 | `Active` | `operational="ACTIVE"` | Blue/active indicator |
@@ -301,10 +301,10 @@ pub enum AggregationPolicy {
 
 **Requirement**: Cryptographically verify commands received from TAK before execution.
 
-**Rationale**: CoT mission tasking (`t-x-m`) received via TAK could be spoofed. PEAT must verify command authority.
+**Rationale**: CoT mission tasking (`t-x-m`) received via TAK could be spoofed. Peat must verify command authority.
 
 **Proposed Approach**:
-1. TAK client certificate identity maps to PEAT authority level
+1. TAK client certificate identity maps to Peat authority level
 2. Commands require valid certificate from authorized source
 3. Maintain allowlist of authorized TAK users/certificates
 4. Log all command sources for audit
@@ -337,21 +337,21 @@ pub enum AggregationPolicy {
 
 These questions from ADR-020 warrant resolution based on M1 POC experience:
 
-### Q5: Should PEAT AI models distribute via TAK data packages?
+### Q5: Should Peat AI models distribute via TAK data packages?
 
-**Recommendation**: No, keep model distribution on PEAT's content-addressed blob transport.
+**Recommendation**: No, keep model distribution on Peat's content-addressed blob transport.
 
 **Rationale**:
 - TAK data packages have size limits (~50MB typical)
-- PEAT's Iroh-based blob transport provides hash verification, resumable transfers
+- Peat's Iroh-based blob transport provides hash verification, resumable transfers
 - Model updates are P5 (bulk) priority - shouldn't compete with tactical data on TAK
-- Keep separation of concerns: TAK for SA, PEAT for autonomy coordination
+- Keep separation of concerns: TAK for SA, Peat for autonomy coordination
 
-**Action**: Add explicit statement to ADR-020 that model distribution remains PEAT-internal.
+**Action**: Add explicit statement to ADR-020 that model distribution remains Peat-internal.
 
-### Q7: Should PEAT cells appear as TAK "groups"?
+### Q7: Should Peat cells appear as TAK "groups"?
 
-**Recommendation**: Yes, map PEAT cells to TAK contact groups.
+**Recommendation**: Yes, map Peat cells to TAK contact groups.
 
 **Rationale**:
 - Natural fit for operators managing multiple teams
@@ -377,7 +377,7 @@ These questions from ADR-020 warrant resolution based on M1 POC experience:
 2. **TAK correlates**: Multiple tracks with same description, operator correlates
 3. **Formation correlates**: Coordinator correlates before bridge, single track to TAK
 
-**Recommendation**: Option 3 (Formation correlates). This aligns with PEAT's hierarchical aggregation philosophy.
+**Recommendation**: Option 3 (Formation correlates). This aligns with Peat's hierarchical aggregation philosophy.
 
 ---
 
@@ -387,7 +387,7 @@ Based on M1 POC findings, recommend creating:
 
 ### ADR-0XX: CoT Custom Detail Extension Schema
 
-**Scope**: Define the `_peat_` XML namespace and schema for embedding PEAT metadata in CoT messages.
+**Scope**: Define the `_peat_` XML namespace and schema for embedding Peat metadata in CoT messages.
 
 **Why Separate ADR**: This is a contract with external systems (TAK ecosystem) and warrants dedicated documentation and versioning.
 
@@ -399,9 +399,9 @@ Based on M1 POC findings, recommend creating:
 
 ### ADR-0XX: Track Correlation and Deduplication
 
-**Scope**: Define how PEAT correlates tracks from multiple sources before external publication.
+**Scope**: Define how Peat correlates tracks from multiple sources before external publication.
 
-**Why Separate ADR**: Affects both internal PEAT behavior and external representations in TAK.
+**Why Separate ADR**: Affects both internal Peat behavior and external representations in TAK.
 
 ---
 
@@ -442,7 +442,7 @@ Based on M1 vignette requirements:
 | Test | Description | Success Criteria |
 |------|-------------|------------------|
 | TC-01 | TrackUpdate → CoT → ATAK | Track visible on ATAK map within 2s |
-| TC-02 | ATAK mission task → TrackCommand | Command received by PEAT team |
+| TC-02 | ATAK mission task → TrackCommand | Command received by Peat team |
 | TC-03 | Capability advertisement | Platform capabilities visible in ATAK |
 | TC-04 | Track handoff | Handoff link visible, track transfers |
 | TC-05 | DIL resilience | Messages queue, replay on reconnect |
@@ -453,7 +453,7 @@ Based on M1 vignette requirements:
 ## References
 
 - [ADR-020: TAK-CoT Integration](../../../cap/docs/adr/020-TAK-CoT-Integration.md)
-- [M1 Vignette Use Case](./PEAT-Vignette-M1/VIGNETTE_USE_CASE.md)
+- [M1 Vignette Use Case](./Peat-Vignette-M1/VIGNETTE_USE_CASE.md)
 - [CoT Schema Mapping](./COT_SCHEMA_MAPPING.md) (companion document)
 - [cottak crate](https://docs.rs/cottak/latest/cottak/)
 - [CoT Developer's Guide](https://tutorials.techrad.co.za/wp-content/uploads/2021/06/The-Developers-Guide-to-Cursor-on-Target-1.pdf)

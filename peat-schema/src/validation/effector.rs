@@ -1,6 +1,6 @@
 //! Effector validators
 //!
-//! Validates EffectorSpec, EffectorStateUpdate, and EffectorCommand messages for PEAT Protocol.
+//! Validates EffectorSpec, EffectorStateUpdate, and EffectorCommand messages for Peat Protocol.
 
 use super::{ValidationError, ValidationResult};
 use crate::effector::v1::{

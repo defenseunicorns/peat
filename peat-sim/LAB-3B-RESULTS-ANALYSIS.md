@@ -1,4 +1,4 @@
-# Lab 3b Results Analysis - P2P Flat Mesh with PEAT CRDT
+# Lab 3b Results Analysis - P2P Flat Mesh with Peat CRDT
 
 **Date**: 2025-11-23
 **Test Suite**: peat-flat-mesh-20251123-162440
@@ -170,7 +170,7 @@ Based on P95 latency targets:
 
 **Problem**: Flat mesh O(n²) connection growth makes CRDT sync untenable at scale.
 
-**Solution**: Hierarchical PEAT CRDT (Lab 4)
+**Solution**: Hierarchical Peat CRDT (Lab 4)
 - Squad (5-10 nodes): Local CRDT sync (low latency)
 - Platoon leader: Aggregates 3-4 squads
 - Company HQ: Aggregates multiple platoons
@@ -229,7 +229,7 @@ Lab 4 will test whether hierarchy can maintain <50ms P95 at 100+ nodes.
 3. **Squad size: 8-10 nodes maximum** - keeps latency <30ms P95
 4. **Bandwidth requirement: ≥1Mbps per node** for acceptable performance
 
-### For Lab 4 (Hierarchical PEAT CRDT)
+### For Lab 4 (Hierarchical Peat CRDT)
 
 1. **Test 96-node hierarchy** (4 platoons × 4 squads × 6 soldiers)
 2. **Target: <50ms P95 end-to-end** across entire network
@@ -262,7 +262,7 @@ Lab 4 will test whether hierarchy can maintain <50ms P95 at 100+ nodes.
 
 ## Conclusion
 
-Lab 3b successfully quantified **CRDT synchronization overhead** in flat mesh topology. Results validate core PEAT protocol design decisions:
+Lab 3b successfully quantified **CRDT synchronization overhead** in flat mesh topology. Results validate core Peat protocol design decisions:
 
 ✅ **Flat mesh works at small scale** (≤15 nodes, <10ms P95)
 ✅ **Hierarchy is required beyond platoon size** (>20 nodes)

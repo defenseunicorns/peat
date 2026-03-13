@@ -17,7 +17,7 @@ gh issue create --repo $REPO \
 **Phase**: Phase 1 - Initialization & Capability Advertisement
 
 ### Purpose
-Define the JSON schema for AI model capability advertisements that flow from edge nodes (Jetson) through the PEAT hierarchy to C2.
+Define the JSON schema for AI model capability advertisements that flow from edge nodes (Jetson) through the Peat hierarchy to C2.
 
 ### Required Fields
 - platform_id
@@ -44,7 +44,7 @@ gh issue create --repo $REPO \
 **Phase**: Phase 3 - Active Tracking
 
 ### Purpose
-Define the JSON schema for track updates that flow from AI inference (Jetson) through PEAT to C2/TAK.
+Define the JSON schema for track updates that flow from AI inference (Jetson) through Peat to C2/TAK.
 
 ### Required Fields
 - track_id
@@ -75,7 +75,7 @@ gh issue create --repo $REPO \
 **Phase**: Phase 2 - Mission Tasking
 
 ### Purpose
-Define the JSON schema for mission tasks that flow downward from C2 (via TAK) through PEAT to teams.
+Define the JSON schema for mission tasks that flow downward from C2 (via TAK) through Peat to teams.
 
 ### Required Fields
 - task_id
@@ -102,7 +102,7 @@ gh issue create --repo $REPO \
   --body "## Feature: Automerge Document Sync
 
 ### Purpose
-Implement the foundational Automerge + Iroh sync mechanism for PEAT Protocol documents.
+Implement the foundational Automerge + Iroh sync mechanism for Peat Protocol documents.
 
 ### Requirements
 - [ ] Create/open Automerge documents
@@ -125,7 +125,7 @@ gh issue create --repo $REPO \
   --body "## Feature: Schema Validation Library
 
 ### Purpose
-Provide a validation function/library that all teams can use to validate messages against PEAT schemas.
+Provide a validation function/library that all teams can use to validate messages against Peat schemas.
 
 ### Requirements
 - [ ] validate_capability(json) -> Result
@@ -161,17 +161,17 @@ Set up the Android development environment for ATAK plugin development.
 - [ ] Plugin loads in ATAK"
 
 gh issue create --repo $REPO \
-  --title "[CONTRACT] Define CoT ↔ PEAT message mapping" \
+  --title "[CONTRACT] Define CoT ↔ Peat message mapping" \
   --label "team/atak,type/contract,type/integration,priority/p1-critical" \
-  --body "## Contract: CoT ↔ PEAT Mapping
+  --body "## Contract: CoT ↔ Peat Mapping
 
 ### Purpose
-Define the mapping between PEAT Protocol messages and Cursor-on-Target (CoT) XML.
+Define the mapping between Peat Protocol messages and Cursor-on-Target (CoT) XML.
 
 ### Mappings Needed
-1. TrackUpdate (PEAT) → Position Event (CoT)
-2. CapabilityAdvertisement (PEAT) → Registration (CoT)
-3. Mission Task (CoT) → MissionTask (PEAT)
+1. TrackUpdate (Peat) → Position Event (CoT)
+2. CapabilityAdvertisement (Peat) → Registration (CoT)
+3. Mission Task (CoT) → MissionTask (Peat)
 
 ### Deliverable
 Mapping table in contract document
@@ -182,16 +182,16 @@ Mapping table in contract document
 - CoT specification"
 
 gh issue create --repo $REPO \
-  --title "[FEATURE] Scaffold PEAT-TAK Bridge application" \
+  --title "[FEATURE] Scaffold Peat-TAK Bridge application" \
   --label "team/atak,type/enhancement,component/tak-bridge,priority/p1-critical" \
-  --body "## Feature: PEAT-TAK Bridge Scaffold
+  --body "## Feature: Peat-TAK Bridge Scaffold
 
 ### Purpose
-Create the skeleton application for the PEAT-TAK Bridge that will translate between protocols.
+Create the skeleton application for the Peat-TAK Bridge that will translate between protocols.
 
 ### Requirements
 - [ ] Application structure
-- [ ] PEAT client connection (placeholder)
+- [ ] Peat client connection (placeholder)
 - [ ] TAK Server connection (CoT/TCP)
 - [ ] Configuration file support
 
@@ -205,7 +205,7 @@ gh issue create --repo $REPO \
   --body "## Integration: Bridge → TAK Server
 
 ### Purpose
-Establish connection from PEAT-TAK Bridge to TAK Server and send/receive CoT.
+Establish connection from Peat-TAK Bridge to TAK Server and send/receive CoT.
 
 ### Requirements
 - [ ] Connect to TAK Server (CoT/TCP)
@@ -408,11 +408,11 @@ If you prefer to create issues manually, use the following information:
 - Labels: `team/atak`, `type/enhancement`, `priority/p1-critical`
 - Milestone: Sprint 1
 
-**Issue 7: [CONTRACT] Define CoT ↔ PEAT message mapping**
+**Issue 7: [CONTRACT] Define CoT ↔ Peat message mapping**
 - Labels: `team/atak`, `type/contract`, `type/integration`, `priority/p1-critical`
 - Milestone: Sprint 1
 
-**Issue 8: [FEATURE] Scaffold PEAT-TAK Bridge application**
+**Issue 8: [FEATURE] Scaffold Peat-TAK Bridge application**
 - Labels: `team/atak`, `type/enhancement`, `component/tak-bridge`, `priority/p1-critical`
 - Milestone: Sprint 1
 

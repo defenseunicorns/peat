@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// PEAT ATAK Plugin Build Configuration
+// Peat ATAK Plugin Build Configuration
 // Based on ATAK-CIV SDK 5.6.0 plugintemplate-compose
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -170,7 +170,7 @@ android {
 
     sourceSets {
         main {
-            setProperty("archivesBaseName", "ATAK-Plugin-PEAT-" + PLUGIN_VERSION + "-" + getVersionName() + "-" + ATAK_VERSION)
+            setProperty("archivesBaseName", "ATAK-Plugin-Peat-" + PLUGIN_VERSION + "-" + getVersionName() + "-" + ATAK_VERSION)
             defaultConfig.versionCode = getVersionCode()
             defaultConfig.versionName = PLUGIN_VERSION + " (" + getVersionName() + ") - [" + ATAK_VERSION + "]"
 
@@ -222,7 +222,7 @@ dependencies {
         exclude group: 'org.jetbrains', module: 'annotations'
     }
 
-    // PEAT BLE mesh transport (for WearTAK sync)
+    // Peat BLE mesh transport (for WearTAK sync)
     // Use Maven dependency so composite build substitution works
     implementation 'com.defenseunicorns:peat:0.0.10'
 

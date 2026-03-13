@@ -1,13 +1,13 @@
 /*
- * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ * Copyright (c) 2026 Defense Unicorns.  All rights reserved.
  */
 
 package com.defenseunicorns.atak.peat.model
 
 /**
- * Represents a track detected/maintained by PEAT for display in ATAK.
+ * Represents a track detected/maintained by Peat for display in ATAK.
  *
- * Tracks are entities detected by PEAT platforms (persons, vehicles, etc.)
+ * Tracks are entities detected by Peat platforms (persons, vehicles, etc.)
  * and correlated across multiple sensors.
  */
 data class PeatTrack(
@@ -85,7 +85,7 @@ data class PeatTrack(
     /**
      * Generate a CoT UID for this track
      */
-    fun toCotUid(): String = "PEAT-TRACK-$id"
+    fun toCotUid(): String = "Peat-TRACK-$id"
 
     /**
      * Get CoT type from classification or derive from category

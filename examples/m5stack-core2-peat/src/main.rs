@@ -1,4 +1,4 @@
-//! PEAT-Lite BLE Alert/Ack Demo for M5Stack Core2
+//! Peat-Lite BLE Alert/Ack Demo for M5Stack Core2
 //!
 //! Tactical alert system over BLE mesh:
 //! - Double tap: Send EMERGENCY alert to all peers (they buzz)
@@ -160,7 +160,7 @@ fn get_node_id_from_mac() -> NodeId {
 fn print_status(mesh: &PeatMesh, connected: bool, status: &str) {
     let conn_sym = if connected { "●" } else { "○" };
     info!("========================================");
-    info!("  PEAT-Lite BLE Sync Demo (PeatMesh)");
+    info!("  Peat-Lite BLE Sync Demo (PeatMesh)");
     info!("----------------------------------------");
     info!(
         "  Node: {:08X}  v{}  BLE:{}",
@@ -461,8 +461,8 @@ where
     let gray = MonoTextStyle::new(&FONT_10X20, Rgb565::CSS_GRAY);
     let cyan = MonoTextStyle::new(&FONT_10X20, Rgb565::CYAN);
 
-    // Top bar: battery | PEAT:MESH | build + hw version
-    let title = format!("PEAT:{}", MESH_ID);
+    // Top bar: battery | Peat:MESH | build + hw version
+    let title = format!("Peat:{}", MESH_ID);
     let _ = Text::new(&title, Point::new(110, 25), cyan).draw(display);
     // Show build number and detected hardware version
     let hw_str = unsafe {
@@ -712,7 +712,7 @@ fn main() -> anyhow::Result<()> {
 
     info!("");
     info!("=========================================");
-    info!("  PEAT-Lite BLE Sync - M5Stack Core2");
+    info!("  Peat-Lite BLE Sync - M5Stack Core2");
     info!("=========================================");
     info!("");
 

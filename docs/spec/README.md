@@ -1,4 +1,4 @@
-# PEAT Protocol Specifications
+# Peat Protocol Specifications
 
 **Status**: Draft
 **Target**: IETF Informational RFC
@@ -6,7 +6,7 @@
 
 ## Overview
 
-This directory contains formal protocol specifications for PEAT (Hierarchical Intelligence for Virtual Environments). These documents are intended to evolve toward IETF RFC-style specifications suitable for public review and interoperability testing.
+This directory contains formal protocol specifications for Peat (Hierarchical Intelligence for Virtual Environments). These documents are intended to evolve toward IETF RFC-style specifications suitable for public review and interoperability testing.
 
 ## Document Status
 

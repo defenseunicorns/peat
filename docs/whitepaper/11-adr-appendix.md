@@ -1,10 +1,9 @@
-
-# ADR-001: PEAT Protocol Proof-of-Concept Architecture
+# ADR-001: Peat Protocol Proof-of-Concept Architecture
 
 **Status:** Proposed  
 **Date:** 2025-10-28  
 **Decision Makers:** Research Team  
-**Technical Story:** Implement PEAT protocol to demonstrate hierarchical capability composition at scale
+**Technical Story:** Implement Peat protocol to demonstrate hierarchical capability composition at scale
 
 ## Context and Problem Statement
 
@@ -84,7 +83,7 @@ Build a Rust library + reference application that demonstrates:
 └─────────────────────────────────────────────────────────┘
                             │
 ┌─────────────────────────────────────────────────────────┐
-│                    PEAT Protocol Library                  │
+│                    Peat Protocol Library                  │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
 │  │   Phase 1:   │  │   Phase 2:   │  │   Phase 3:   │ │
 │  │  Discovery   │→ │    Cell     │→ │ Hierarchical │ │
@@ -510,18 +509,17 @@ proptest = "1"              # Property testing
 **Last Updated:** 2025-10-28  
 **Next Review:** After Week 4 implementation
 
----
 
 # ADR-002: Beacon Storage Architecture for Geographic Discovery
 
 **Status**: Accepted
 **Date**: 2025-10-29
-**Decision Makers**: PEAT Protocol Team
+**Decision Makers**: Peat Protocol Team
 **Related**: E3.1 Geographic Self-Organization
 
 ## Context
 
-The PEAT protocol's geographic discovery system requires nodes to continuously broadcast their position and status as "beacons" across a Ditto mesh network. Each node must be able to discover nearby nodes to autonomously form cells during the discovery phase.
+The Peat protocol's geographic discovery system requires nodes to continuously broadcast their position and status as "beacons" across a Ditto mesh network. Each node must be able to discover nearby nodes to autonomously form cells during the discovery phase.
 
 Two architectural approaches were considered for beacon storage:
 
@@ -717,7 +715,7 @@ tokio::spawn(async move {
 
 - [Ditto TTL Documentation](https://docs.ditto.live/concepts/document-ttl)
 - [Ditto Query Language](https://docs.ditto.live/concepts/dql)
-- PEAT Protocol Specification: Discovery Phase (E3.1)
+- Peat Protocol Specification: Discovery Phase (E3.1)
 - Swarm Robotics Patterns: Decentralized State Management
 
 ## Notes
@@ -735,7 +733,6 @@ tokio::spawn(async move {
   - Fast-moving nodes: shorter TTL (more frequent updates)
   - Stationary nodes: longer TTL (reduce bandwidth)
 
----
 
 # ADR 004: Human-Machine Cell Composition and Authority Model
 
@@ -1193,11 +1190,11 @@ cell_variants:
 ## Decision Makers
 
 - @kitplummer (Project Lead)
-- Codex (AI Assistant providing technical analysis)
+- Claude Code (AI Assistant providing technical analysis)
 
 ## Notes
 
-This is a foundational architectural decision that affects all subsequent work. Taking 2-3 days now to implement properly will save weeks of refactoring later and enable realistic demonstrations of the PEAT protocol in human-machine teaming scenarios.
+This is a foundational architectural decision that affects all subsequent work. Taking 2-3 days now to implement properly will save weeks of refactoring later and enable realistic demonstrations of the Peat protocol in human-machine teaming scenarios.
 
 The tunable configuration system is critical for research - allows experimentation with different authority policies to find optimal human-machine teaming strategies.
 
@@ -1426,18 +1423,17 @@ Cell Leader Intent → Cell Message Bus → Node Receives → Human Display
    - Physical fitness (impacts mobility, endurance)
    - Add as new `CapabilityType::HumanSkill`?
 
----
 
 # ADR-005: Data Synchronization Abstraction Layer
 
 **Status**: Proposed
 **Date**: 2025-11-04
-**Authors**: Codex, Kit Plummer
+**Authors**: Claude, Kit Plummer
 **Supersedes**: ADR-002 (Beacon Storage Architecture)
 
 ## Context
 
-PEAT Protocol currently has a hard dependency on Ditto SDK for CRDT synchronization, peer discovery, and data persistence. While Ditto provides excellent P2P mesh capabilities, we've encountered several limitations:
+Peat Protocol currently has a hard dependency on Ditto SDK for CRDT synchronization, peer discovery, and data persistence. While Ditto provides excellent P2P mesh capabilities, we've encountered several limitations:
 
 ### Issues with Current Ditto Integration
 
@@ -1463,7 +1459,7 @@ The new `crdt-edge` implementation plan (see `CAP_Rust_Implementation_Plan.md`) 
 
 ## Decision
 
-We will define a **Data Synchronization Abstraction Layer** consisting of four core traits that completely isolate PEAT Protocol business logic from the underlying sync engine:
+We will define a **Data Synchronization Abstraction Layer** consisting of four core traits that completely isolate Peat Protocol business logic from the underlying sync engine:
 
 ### Core Abstraction Traits
 
@@ -1942,18 +1938,17 @@ Follow `CAP_Rust_Implementation_Plan.md` phases 1-3:
 4. Begin Phase 1 of custom backend implementation
 5. Schedule regular A/B testing checkpoints
 
----
 
-# ADR-006: Security, Authentication, and Authorization for PEAT Protocol
+# ADR-006: Security, Authentication, and Authorization for Peat Protocol
 
 **Status**: Proposed
 **Date**: 2025-11-04
-**Authors**: Codex, Kit Plummer
+**Authors**: Claude, Kit Plummer
 **Related**: ADR-005 (Data Sync Abstraction Layer), ADR-004 (Human-Machine Cell Composition)
 
 ## Context
 
-PEAT Protocol coordinates autonomous platforms in tactical military environments where security failures can result in:
+Peat Protocol coordinates autonomous platforms in tactical military environments where security failures can result in:
 - **Loss of life** (compromised UAVs, corrupted mission data)
 - **Mission failure** (adversary disruption of coordination)
 - **Tactical disadvantage** (enemy intelligence gathering)
@@ -1979,7 +1974,7 @@ Current implementation has **no authentication or authorization**. All nodes tru
 
 ### Security Requirements
 
-PEAT Protocol must provide:
+Peat Protocol must provide:
 
 1. **Device Authentication** - Cryptographically verify device identity
 2. **User Authentication** - Verify human operator credentials (for C2 apps)
@@ -2282,7 +2277,7 @@ impl ApplicationAuthenticator {
 Control what each authenticated entity can do.
 
 ```rust
-/// Roles in PEAT Protocol
+/// Roles in Peat Protocol
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Role {
     /// Squad/cell leader - can command cell, set objectives
@@ -2425,7 +2420,7 @@ pub struct AuthorizationContext {
     pub cell_store: Arc<dyn CellStoreReader>,
 }
 
-/// Default authorization policy for PEAT Protocol
+/// Default authorization policy for Peat Protocol
 impl AuthorizationPolicy {
     pub fn default_policy() -> Self {
         let mut policy = AuthorizationPolicy::new();
@@ -2469,7 +2464,7 @@ impl AuthorizationPolicy {
 Encrypt all data in transit and at rest.
 
 ```rust
-/// Encryption manager for PEAT Protocol
+/// Encryption manager for Peat Protocol
 pub struct EncryptionManager {
     /// Device's encryption keypair
     keypair: EncryptionKeypair,
@@ -2562,7 +2557,7 @@ impl EncryptionManager {
 
 Security must integrate with the abstraction layer from ADR-005.
 
-**Critical Requirement**: Following the Ports & Adapters pattern from ADR-005/ADR-011, the security layer **must be backend-agnostic**. The PEAT Protocol API should work identically regardless of whether Ditto or AutomergeIroh is the underlying backend.
+**Critical Requirement**: Following the Ports & Adapters pattern from ADR-005/ADR-011, the security layer **must be backend-agnostic**. The Peat Protocol API should work identically regardless of whether Ditto or AutomergeIroh is the underlying backend.
 
 #### Backend Implementation Notes
 
@@ -2792,7 +2787,7 @@ impl AuditLogger for FileAuditLogger {
 }
 ```
 
-## Integration with PEAT Protocol Phases
+## Integration with Peat Protocol Phases
 
 ### Phase 1: Discovery → Requires Device Authentication
 
@@ -2931,7 +2926,7 @@ if !user.has_clearance_for_level(HierarchyLevel::Platoon) {
 
 ## Compliance Considerations
 
-PEAT Protocol security must align with:
+Peat Protocol security must align with:
 
 - **NIST SP 800-53** - Security and Privacy Controls for Information Systems
 - **DoD 8500 Series** - Cybersecurity for DoD Information Systems
@@ -3034,14 +3029,13 @@ See `docs/research/MULTI_HOP_SYNC_INVESTIGATION.md` for full analysis of Ditto f
 4. Integrate with ADR-005 abstraction layer
 5. Define cryptographic cipher suites and key sizes
 
----
 
 # ADR-007: CRDT-Based Sync Engine - Automerge vs Loro Evaluation
 
 **Status**: Under Evaluation (E8 Phase)
 **Date**: 2025-11-05 (Updated)
 **Original Date**: 2025-11-04
-**Authors**: Codex, Kit Plummer
+**Authors**: Claude, Kit Plummer
 **Supersedes**: ADR-005 (Data Sync Abstraction Layer)
 **Replaces**: ADR-002 (Beacon Storage Architecture - Ditto-based)
 
@@ -3069,7 +3063,7 @@ This ADR proposes evaluating **both Automerge and Loro** as CRDT backend options
 
 **Government Off-The-Shelf (GOTS) Opportunity**
 
-An open-source, Automerge-based sync engine positions PEAT Protocol as **Government Off-The-Shelf (GOTS)** software, providing critical advantages:
+An open-source, Automerge-based sync engine positions Peat Protocol as **Government Off-The-Shelf (GOTS)** software, providing critical advantages:
 
 1. **Open Architecture Compliance**
    - Aligns with DoD's **Modular Open Systems Approach (MOSA)**
@@ -3078,7 +3072,7 @@ An open-source, Automerge-based sync engine positions PEAT Protocol as **Governm
    - Facilitates competition and innovation in tactical autonomous systems
 
 2. **NATO Standardization Path**
-   - **STANAG Candidate**: PEAT Protocol + automerge-edge could become a NATO standard for autonomous platform coordination
+   - **STANAG Candidate**: Peat Protocol + automerge-edge could become a NATO standard for autonomous platform coordination
    - **Interoperability**: Allied forces can adopt without licensing barriers
    - **Multi-National Development**: NATO members can contribute improvements
    - **Coalition Operations**: Shared technology base for combined operations
@@ -3119,7 +3113,7 @@ Historical examples of successful defense technology standardization:
 3. **ATDL-1/VMF (STANAG 5500)** - Variable message format for tactical messaging
 4. **ASTERIX (STANAG 4761)** - Air traffic surveillance data format
 
-**PEAT Protocol + automerge-edge** could become the **STANAG for autonomous platform coordination**, analogous to how Link 16 standardized data sharing between manned platforms.
+**Peat Protocol + automerge-edge** could become the **STANAG for autonomous platform coordination**, analogous to how Link 16 standardized data sharing between manned platforms.
 
 ### Open Architecture Alignment
 
@@ -3338,7 +3332,7 @@ Open-source approach enables broader innovation ecosystem:
 
 **Proposed Timeline**:
 
-1. **Year 1: Demonstrate in PEAT Protocol**
+1. **Year 1: Demonstrate in Peat Protocol**
    - Prove capability in US tactical autonomous systems
    - Publish performance benchmarks and test results
    - Present at DoD and NATO conferences
@@ -4476,9 +4470,9 @@ impl Collection {
 }
 ```
 
-## PEAT Protocol Integration
+## Peat Protocol Integration
 
-PEAT Protocol uses `automerge-edge` as a library:
+Peat Protocol uses `automerge-edge` as a library:
 
 ```rust
 // In peat-protocol/Cargo.toml
@@ -4540,7 +4534,7 @@ Tasks:
 
 ### Phase 2: Feature Parity with Ditto (Weeks 9-16)
 
-**Goal**: Match capabilities currently used by PEAT Protocol
+**Goal**: Match capabilities currently used by Peat Protocol
 
 Tasks:
 - [ ] Collection queries (find, find_one, update)
@@ -4560,7 +4554,7 @@ Tasks:
 - [ ] Encrypted storage
 - [ ] **Milestone**: Secure sync with authenticated peers
 
-### Phase 4: Replace Ditto in PEAT Protocol (Weeks 21-24)
+### Phase 4: Replace Ditto in Peat Protocol (Weeks 21-24)
 
 **Goal**: Complete migration
 
@@ -4570,7 +4564,7 @@ Tasks:
 - [ ] Update E2E tests
 - [ ] Remove Ditto dependency
 - [ ] Performance benchmarks (vs Ditto baseline)
-- [ ] **Milestone**: PEAT Protocol fully operational without Ditto
+- [ ] **Milestone**: Peat Protocol fully operational without Ditto
 
 ### Phase 5: Publish and Promote (Weeks 25+)
 
@@ -4604,7 +4598,7 @@ Tasks:
 ### Ecosystem Benefits
 
 1. **Fills Gap**: Automerge lacks networking/discovery
-2. **General Purpose**: Useful beyond PEAT Protocol
+2. **General Purpose**: Useful beyond Peat Protocol
 3. **Production Ready**: Unlike many CRDT research projects
 4. **Modern Rust**: Idiomatic, async, type-safe
 5. **Open Source**: Apache-2.0 or MIT license
@@ -4649,7 +4643,7 @@ Tasks:
 2. **Performance Equivalent**: Within 20% of Ditto on key metrics
 3. **Test Coverage**: 80%+ coverage, all E2E tests passing
 4. **Documentation**: Complete API docs and tutorials
-5. **Zero Ditto Dependency**: PEAT Protocol compiles without Ditto
+5. **Zero Ditto Dependency**: Peat Protocol compiles without Ditto
 6. **Reusability**: At least one example of non-CAP usage
 
 ## References
@@ -4662,7 +4656,7 @@ Tasks:
 - [Loro Documentation](https://loro.dev/docs) - API reference and guides
 - [CRDT Benchmarks](https://github.com/dmonad/crdt-benchmarks) - Performance comparisons
 
-**PEAT Protocol:**
+**Peat Protocol:**
 - [CAP_Rust_Implementation_Plan.md](../CAP_Rust_Implementation_Plan.md) - Detailed design
 - [ADR-006](006-security-authentication-authorization.md) - Security integration
 - [ADR-009](009-bidirectional-hierarchical-flows.md) - Hierarchical communication
@@ -4796,7 +4790,7 @@ Tasks:
    - Update ADR-007 with final choice
    - Remove non-selected backend code
    - Update architecture diagrams
-   - Plan integration with PEAT Protocol
+   - Plan integration with Peat Protocol
 
 ### Short-term - Post-E8 (Weeks 3-12)
 
@@ -4861,7 +4855,7 @@ Tasks:
 ### Long-term - Standardization (1-3 Years)
 
 1. **NATO STANAG Path** (Years 1-2)
-   - Demonstrate in PEAT Protocol deployments
+   - Demonstrate in Peat Protocol deployments
    - Conduct multi-national trials
    - Gather feedback from allied systems
    - Publish technical specification
@@ -4927,7 +4921,7 @@ Tasks:
    - Recommendation: **Apache-2.0** (DoD-friendly, NATO-compatible, patent protection)
 
 7. **Should we target crates.io publication from day one?**
-   - Or keep private until proven in PEAT Protocol?
+   - Or keep private until proven in Peat Protocol?
    - Recommendation: **Public from day one**:
      - Builds community early
      - Attracts contributors
@@ -4955,7 +4949,7 @@ Tasks:
     - Too early risks premature specification
     - Too late misses opportunity for input
     - Recommendation: **Year 2** after:
-      - Proving capability in PEAT Protocol
+      - Proving capability in Peat Protocol
       - Gathering performance data
       - Before architecture solidifies
       - When ready for multi-national trials
@@ -4990,7 +4984,7 @@ Tasks:
 
 ### The Decision Framework
 
-**What We're Deciding**: Choose between Automerge and Loro as the CRDT foundation for PEAT Protocol's sync engine.
+**What We're Deciding**: Choose between Automerge and Loro as the CRDT foundation for Peat Protocol's sync engine.
 
 **Why This Matters**: 
 - Eliminates Ditto licensing constraints (both options)
@@ -5037,7 +5031,7 @@ Tasks:
 - ✅ Team alignment on selection
 
 **Long-term Success**:
-- ✅ PEAT Protocol operational without Ditto
+- ✅ Peat Protocol operational without Ditto
 - ✅ Performance meets tactical requirements
 - ✅ DoD/NATO certification achievable
 - ✅ Community adoption and contributions
@@ -5216,13 +5210,13 @@ See `docs/E9-NETWORK-TRANSPORT-LAYER-PLAN.md` for full details:
    - **Verdict**: Resource cost outweighs licensing concern at this stage
 
 4. **Licensing Constraint is Future Problem**
-   - PEAT Protocol is pre-production (no deployments yet)
+   - Peat Protocol is pre-production (no deployments yet)
    - Ditto licensing negotiable for government/defense use
    - NATO STANAG timeline is 12-24 months out
    - Abstraction layer makes future swap feasible
    - **Verdict**: Defer licensing decision until closer to production deployment
 
-5. **Focus on PEAT Protocol Innovation**
+5. **Focus on Peat Protocol Innovation**
    - CAP's value is in hierarchical capability composition, not CRDT implementation
    - Building network stack diverts from core research
    - Ditto enables faster iteration on cell formation logic
@@ -5239,7 +5233,7 @@ See `docs/E9-NETWORK-TRANSPORT-LAYER-PLAN.md` for full details:
 ### Updated Strategy
 
 **Immediate (Next 3 months)**:
-- ✅ Continue with Ditto for all PEAT Protocol development
+- ✅ Continue with Ditto for all Peat Protocol development
 - ✅ Focus on hierarchical composition rules (E6, E7)
 - ✅ Validate cell formation logic with E2E tests
 - ✅ Document Ditto-specific assumptions for future portability
@@ -5288,7 +5282,6 @@ The AutomergeBackend implementation (commit 94b7f10) is preserved in the reposit
 **Status**: Decided - Continue with Ditto (E8 Evaluation Complete)
 **Review Date**: 6 months (2025-05-06) - Reassess licensing and GOTS requirements
 
----
 
 # ADR-008: Network Simulation Layer (E8)
 
@@ -5299,7 +5292,7 @@ The AutomergeBackend implementation (commit 94b7f10) is preserved in the reposit
 
 ## Context and Problem Statement
 
-We have implemented the PEAT protocol's core synchronization mechanisms using Ditto (E1-E6) and a differential updates framework (E7). Before optimizing the integration between our protocol-level delta operations and Ditto's document model, we need to:
+We have implemented the Peat protocol's core synchronization mechanisms using Ditto (E1-E6) and a differential updates framework (E7). Before optimizing the integration between our protocol-level delta operations and Ditto's document model, we need to:
 
 1. **Establish baseline metrics** for current Ditto performance under realistic network conditions
 2. **Validate protocol behavior** across varying network quality (9.6Kbps - 1Mbps, 100ms - 5s latency)
@@ -5551,11 +5544,11 @@ impl SimulationHarness {
 ```
 
 #### 2. SimulatedNode
-**Purpose:** Represents a single PEAT protocol node with Ditto sync
+**Purpose:** Represents a single Peat protocol node with Ditto sync
 
 **Responsibilities:**
 - Wraps real Ditto store instance
-- Implements PEAT protocol logic (discovery, cell formation)
+- Implements Peat protocol logic (discovery, cell formation)
 - Tracks node-local metrics (bandwidth, message count)
 - Respects network constraints from NetworkSimulator
 
@@ -5730,7 +5723,7 @@ impl MetricsCollector {
 
 **Tasks:**
 - Implement Shadow YAML generator for scenarios
-- Build `peat-sim-node` binary (PEAT protocol + Ditto)
+- Build `peat-sim-node` binary (Peat protocol + Ditto)
 - Create simple scenario: Squad formation (12 nodes)
 - Run under Shadow, collect metrics
 
@@ -6112,7 +6105,7 @@ impl NetworkProfile {
 
 ## References
 
-- ADR-001: PEAT Protocol POC Architecture (network requirements)
+- ADR-001: Peat Protocol POC Architecture (network requirements)
 - ADR-002: Beacon Storage Architecture (Ditto integration patterns)
 - E7 Baseline Tests: `peat-protocol/tests/baseline_ditto_bandwidth_e2e.rs`
 - E2E Harness: `peat-protocol/src/testing/e2e_harness.rs`
@@ -6146,15 +6139,14 @@ E8 is complete when:
    - Real hardware validation
    - Field testing under actual tactical conditions
 
----
 
 # ADR-009: Bidirectional Hierarchical Flows - Command, Control, and Software Logistics
 
 **Status**: Accepted (Implementation in progress)
 **Date**: 2025-11-05
 **Updated**: 2025-11-18
-**Authors**: Codex, Kit Plummer
-**Relates to**: ADR-001 (PEAT Protocol), ADR-004 (Human-Machine Composition), ADR-007 (Automerge Sync), ADR-008 (Network Simulation), ADR-021 (Document-Oriented Architecture)
+**Authors**: Claude, Kit Plummer
+**Relates to**: ADR-001 (Peat Protocol), ADR-004 (Human-Machine Composition), ADR-007 (Automerge Sync), ADR-008 (Network Simulation), ADR-021 (Document-Oriented Architecture)
 
 ## Context
 
@@ -6708,7 +6700,7 @@ impl SharedContext {
 
 ## Related Decisions
 
-- **ADR-001 (PEAT Protocol POC)**: Establishes hierarchical architecture for upward flows
+- **ADR-001 (Peat Protocol POC)**: Establishes hierarchical architecture for upward flows
 - **ADR-004 (Human-Machine Composition)**: Defines authority model for decision delegation
 - **ADR-006 (Security)**: Cryptographic signatures for command authentication
 - **ADR-007 (Automerge Sync)**: CRDT foundation enables bidirectional sync
@@ -6797,9 +6789,8 @@ CAP is not just an upward capability aggregation protocol—it is a **full-duple
 
 This bidirectional architecture transforms CAP from a monitoring system into a complete distributed command and control framework for autonomous operations at scale.
 
----
 
-# ADR-010: Transport Layer - UDP vs TCP for PEAT Protocol
+# ADR-010: Transport Layer - UDP vs TCP for Peat Protocol
 
 **Status**: Superseded by ADR-011 (Automerge + Iroh Integration)
 **Date**: 2025-11-05
@@ -6833,7 +6824,7 @@ ADR-011 adopts **Iroh** for networking, which provides:
 
 ## Context and Problem Statement (Original)
 
-The PEAT protocol currently assumes TCP as the primary transport layer (via Tokio TcpStream). However, different types of data in the CAP ecosystem have fundamentally different delivery requirements:
+The Peat protocol currently assumes TCP as the primary transport layer (via Tokio TcpStream). However, different types of data in the CAP ecosystem have fundamentally different delivery requirements:
 
 ### The Transport Mismatch Problem
 
@@ -6953,7 +6944,7 @@ System automatically chooses transport based on message characteristics.
 
 **Adopt Option 3: Hybrid Transport with Per-Message Selection**
 
-Extend PEAT protocol to support both UDP and TCP transports, with explicit application control over which transport is used for each message type.
+Extend Peat protocol to support both UDP and TCP transports, with explicit application control over which transport is used for each message type.
 
 ## Design Details
 
@@ -7647,7 +7638,7 @@ For position updates where loss is acceptable, UDP provides 2.5-8x latency reduc
 
 ## References
 
-1. ADR-001: PEAT Protocol POC Architecture
+1. ADR-001: Peat Protocol POC Architecture
 2. ADR-007: Automerge-Based Sync Engine
 3. ADR-009: Bidirectional Hierarchical Flows
 4. RFC 768: User Datagram Protocol
@@ -7677,15 +7668,14 @@ For position updates where loss is acceptable, UDP provides 2.5-8x latency reduc
 **Last Updated**: 2025-11-05  
 **Next Review**: After Phase 2 implementation
 
----
 
 # ADR-011: CRDT + Networking Stack Selection - Ditto vs (Automerge/Loro + Iroh)
 
 **Status**: Proposed  
 **Date**: 2025-11-06  
-**Authors**: Codex, Kit Plummer  
+**Authors**: Claude, Kit Plummer  
 **Supersedes**: ADR-007 (Automerge-Based Sync Engine)  
-**Relates To**: ADR-001 (PEAT Protocol POC), ADR-005 (Data Sync Abstraction), ADR-006 (Security), ADR-010 (Transport Layer)
+**Relates To**: ADR-001 (Peat Protocol POC), ADR-005 (Data Sync Abstraction), ADR-006 (Security), ADR-010 (Transport Layer)
 
 ## Context
 
@@ -7718,7 +7708,7 @@ Initial analysis (ADR-007) assumed simplified Ethernet-only networking. **Real t
 
 ### Backend Architecture Design
 
-**Important Conceptual Clarification**: A "backend" in PEAT Protocol is a **complete, integrated solution** for storage, synchronization, and persistence - not individual components.
+**Important Conceptual Clarification**: A "backend" in Peat Protocol is a **complete, integrated solution** for storage, synchronization, and persistence - not individual components.
 
 #### What is a Backend?
 
@@ -7768,7 +7758,7 @@ A backend is the complete stack that provides:
 
 #### Capability-Based Architecture
 
-Rather than forcing all backends into one interface, PEAT Protocol uses **optional capability traits**:
+Rather than forcing all backends into one interface, Peat Protocol uses **optional capability traits**:
 
 ```rust
 // Required for all backends
@@ -7943,7 +7933,7 @@ Use Loro instead of Automerge as CRDT foundation, Iroh for networking.
 
 **Adopt Option 3: Automerge + Iroh**
 
-Build PEAT Protocol's sync and networking layers using:
+Build Peat Protocol's sync and networking layers using:
 - **Automerge** for CRDT foundation and delta sync
 - **Iroh** for multi-path QUIC networking and peer connectivity
 - **Custom glue code** for Repository/Collection API, discovery, storage, queries
@@ -8027,7 +8017,7 @@ impl CapMdnsDiscovery {
             &self.service_type,
             &format!("cap-{}", node_id),
             &format!("0.0.0.0:{}", port),
-            "PEAT Protocol Node",
+            "Peat Protocol Node",
         )?;
         self.daemon.register(service)?;
         Ok(())
@@ -9221,7 +9211,7 @@ impl MdnsDiscovery {
             &self.service_type,
             &format!("cap-{}", endpoint_id),
             &format!("0.0.0.0:{}", port),
-            "PEAT Protocol Node",
+            "Peat Protocol Node",
         )?;
         
         // Add EndpointId as TXT record
@@ -10172,7 +10162,7 @@ Result: 64x smaller updates for single-field changes
 
 ### Feature Parity (Week 18)
 
-- [x] All PEAT Protocol use cases supported
+- [x] All Peat Protocol use cases supported
 - [x] Performance within 20% of Ditto on key metrics
 - [x] Security layer integrated (PKI, encryption, authorization)
 - [x] Geohash-based proximity queries
@@ -10223,7 +10213,7 @@ The identified gaps are **manageable** with well-known libraries and straightfor
 6. [QUIC Multipath Extension](https://datatracker.ietf.org/doc/draft-ietf-quic-multipath/)
 7. [Loro CRDT](https://loro.dev/)
 8. [RocksDB](https://rocksdb.org/)
-9. ADR-001: PEAT Protocol POC Architecture
+9. ADR-001: Peat Protocol POC Architecture
 10. ADR-005: Data Synchronization Abstraction Layer
 11. ADR-006: Security, Authentication, and Authorization
 12. ADR-007: Automerge-Based Sync Engine
@@ -10332,13 +10322,12 @@ peat-sim --backend automerge --node-id node1
 
 This completes the simulator infrastructure needed for comprehensive backend evaluation and large-scale experimentation.
 
----
 
 # ADR-012: Schema Definition and Protocol Extensibility Architecture
 
 **Status**: Proposed  
 **Date**: 2025-11-06  
-**Authors**: Kit Plummer, Codex  
+**Authors**: Kit Plummer, Claude  
 **Blocks**: ADR-011 (Automerge + Iroh Integration)  
 **Influences**: ADR-005 (Data Sync Abstraction Layer), ADR-007 (Automerge-Based Sync Engine)
 
@@ -11662,7 +11651,7 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
 1. **Schema Clarity**: Message schemas are first-class artifacts, not buried in code
 2. **Type Safety**: Code generation prevents schema drift across languages
 3. **Extensibility**: New transports can be added without modifying core protocol
-4. **Integration**: External systems can adopt CAP messages without PEAT protocol
+4. **Integration**: External systems can adopt CAP messages without Peat protocol
 5. **Tooling**: Standard schema enables validation, visualization, debugging tools
 6. **Multi-Language**: Python, JavaScript, Java, C++ can all use CAP messages natively
 7. **Versioning**: Protobuf supports schema evolution with backward compatibility
@@ -11782,11 +11771,11 @@ This ADR **blocks ADR-011** because the schema and transport abstractions must b
    - [ ] Validation catches 90%+ of schema errors at compile-time
    - [ ] Documentation rated "good" or better by external developers
 
-## Appendix: PEAT Protocol Schemas (v1)
+## Appendix: Peat Protocol Schemas (v1)
 
-> **Added 2025-11-25**: These schemas define the core PEAT Protocol primitives for software distribution, capability advertisement, and event routing. They supersede the earlier example schemas above and represent the canonical protocol definitions.
+> **Added 2025-11-25**: These schemas define the core Peat Protocol primitives for software distribution, capability advertisement, and event routing. They supersede the earlier example schemas above and represent the canonical protocol definitions.
 >
-> **Design Principle**: PEAT Protocol defines the envelope, applications define the contents. All payloads use `google.protobuf.Any` or `google.protobuf.Struct` to remain application-agnostic.
+> **Design Principle**: Peat Protocol defines the envelope, applications define the contents. All payloads use `google.protobuf.Any` or `google.protobuf.Struct` to remain application-agnostic.
 
 ### A.1 Blob Reference (ADR-025)
 
@@ -11800,7 +11789,7 @@ message BlobReference {
   string hash_algorithm = 2;    // "sha256", "blake3"
   uint64 size_bytes = 3;
 
-  // Application-defined metadata (opaque to PEAT)
+  // Application-defined metadata (opaque to Peat)
   map<string, string> metadata = 10;
 }
 ```
@@ -11867,7 +11856,7 @@ message AggregatedCapability {
 }
 ```
 
-### A.3 PEAT Event (Products, Anomalies, Telemetry)
+### A.3 Peat Event (Products, Anomalies, Telemetry)
 
 ```protobuf
 syntax = "proto3";
@@ -12003,7 +11992,7 @@ enum DeploymentState {
 
 ### A.5 Protocol Behavior Summary
 
-| Schema | Direction | Aggregation | PEAT Responsibility |
+| Schema | Direction | Aggregation | Peat Responsibility |
 |--------|-----------|-------------|---------------------|
 | BlobReference | N/A | N/A | Transfer bytes, verify hash |
 | CapabilityAdvertisement | ↑ Upward | Summarize at echelons | Route through hierarchy |
@@ -12013,14 +12002,14 @@ enum DeploymentState {
 
 ### A.6 Extension Points
 
-Applications extend PEAT by:
+Applications extend Peat by:
 1. **Defining capability attributes** (`Capability.attributes`)
 2. **Defining event payloads** (`PeatEvent.payload`)
 3. **Defining artifact types** (`DeploymentDirective.artifact_type`)
 4. **Defining deployment config** (`DeploymentDirective.config`)
 5. **Defining custom filters** (`CapabilityFilter.custom_filters`)
 
-PEAT routes, aggregates, and enforces policies without understanding application semantics.
+Peat routes, aggregates, and enforces policies without understanding application semantics.
 
 ---
 
@@ -12106,13 +12095,12 @@ PEAT routes, aggregates, and enforces policies without understanding application
 
 **Recommendation**: Pause ADR-011 development and complete Phase 0 (Schema Definition) first. This 2-week investment establishes the foundation that makes everything else—sync engines, transport adapters, external integrations—significantly easier to implement correctly. The investment in proper abstraction now will pay dividends in reduced integration friction, enhanced interoperability, and a cleaner architecture for years to come.
 
----
 
 # ADR-013: Distributed Software and AI Operations - Capability-Focused Convergence
 
 **Status**: Proposed  
 **Date**: 2025-11-07  
-**Authors**: Codex, Kit Plummer  
+**Authors**: Claude, Kit Plummer  
 **Relates to**: ADR-006 (Security), ADR-007 (Automerge Sync), ADR-009 (Bidirectional Flows), ADR-010 (Transport Layer)
 
 ## Context
@@ -12964,7 +12952,7 @@ Every artifact must be cryptographically verifiable throughout distribution:
 
 ## References
 
-- ADR-001: PEAT Protocol PoC
+- ADR-001: Peat Protocol PoC
 - ADR-006: Security, Authentication, and Authorization
 - ADR-007: Automerge-Based Sync Engine
 - ADR-009: Bidirectional Hierarchical Flows
@@ -13005,7 +12993,6 @@ Every artifact must be cryptographically verifiable throughout distribution:
 
 **This ADR establishes the foundation for capability-focused distributed software and AI operations, enabling rapid convergence through differential propagation while maintaining security and provenance throughout the distribution hierarchy.**
 
----
 
 # ADR-014: Distributed Coordination Primitives for Tactical Operations
 
@@ -13801,7 +13788,6 @@ Implement **optimistic coordination with deterministic conflict resolution**:
 - "CAP Twelve Years Later: How the 'Rules' Have Changed" (Brewer 2012)
 - Military: Joint Pub 3-09 "Joint Fire Support" (coordination doctrine)
 
----
 
 # ADR-015: Experimental Validation Framework and Hierarchical Aggregation Requirements
 
@@ -13812,7 +13798,7 @@ Implement **optimistic coordination with deterministic conflict resolution**:
 
 ## Context and Problem Statement
 
-During E8 experimental validation, we have developed a comprehensive test laboratory infrastructure using ContainerLab to validate PEAT protocol performance at scale. Initial testing (2-node POC, 12-node squad) showed promising results, and we expanded to 24-node platoon hierarchies (Phase 3A) as documented in EXPERIMENT-PORTFOLIO.md.
+During E8 experimental validation, we have developed a comprehensive test laboratory infrastructure using ContainerLab to validate Peat protocol performance at scale. Initial testing (2-node POC, 12-node squad) showed promising results, and we expanded to 24-node platoon hierarchies (Phase 3A) as documented in EXPERIMENT-PORTFOLIO.md.
 
 However, **Phase 3A validation (2025-11-08) revealed a critical architectural concern:**
 
@@ -14174,7 +14160,7 @@ Before resuming Phase 3A/3B/3C testing, we must verify:
 
 ## Related Decisions
 
-- **ADR-001:** PEAT Protocol POC - Established capability-based filtering as core design
+- **ADR-001:** Peat Protocol POC - Established capability-based filtering as core design
 - **ADR-008:** Network Simulation Layer - Defined experimental validation approach
 - **ADR-009:** Bidirectional Hierarchical Flows - Documented hierarchical data patterns
 - **EXPERIMENT-PORTFOLIO.md:** Phase 3A-3D scaling roadmap
@@ -14250,19 +14236,18 @@ Before resuming Phase 3A/3B/3C testing, we must verify:
 **Authors:** CAP Research Team
 **Reviewers:** TBD (pending investigation findings)
 
----
 
 # ADR-016: TTL and Data Lifecycle Management Abstraction
 
 **Status**: Accepted
 **Date**: 2025-01-10
-**Authors**: Kit (with Codex)
+**Authors**: Kit (with Claude Code)
 **Supersedes**: None
 **Related ADRs**: [ADR-001](001-peat-protocol-poc.md) (CRDT-based state), [ADR-002](002-beacon-storage-architecture.md) (Ditto storage), [ADR-011](011-ditto-vs-automerge-iroh.md) (Backend abstraction)
 
 ## Context
 
-PEAT Protocol operates in disconnected tactical edge environments where nodes may be offline for hours or days. Managing document lifecycle in these environments presents fundamental challenges rooted in the CAP theorem:
+Peat Protocol operates in disconnected tactical edge environments where nodes may be offline for hours or days. Managing document lifecycle in these environments presents fundamental challenges rooted in the CAP theorem:
 
 ### The Distributed Deletion Problem
 
@@ -14510,7 +14495,7 @@ Applications using this abstraction MUST monitor:
 ## References
 
 - [TTL and Data Lifecycle Design](../TTL_AND_DATA_LIFECYCLE_DESIGN.md) - Ditto-specific implementation details
-- [ADR-001: PEAT Protocol POC](001-peat-protocol-poc.md) - CRDT-based state management decision
+- [ADR-001: Peat Protocol POC](001-peat-protocol-poc.md) - CRDT-based state management decision
 - [ADR-002: Beacon Storage Architecture](002-beacon-storage-architecture.md) - Ditto storage patterns
 - [ADR-011: Ditto vs Automerge/Iroh](011-ditto-vs-automerge-iroh.md) - Backend abstraction requirements
 - [Ditto DELETE vs EVICT](https://docs.ditto.live/sdk/latest/crud/delete) - Ditto deletion semantics
@@ -14519,15 +14504,14 @@ Applications using this abstraction MUST monitor:
 
 **2025-01-10**: Initial decision - Three-tier lifecycle abstraction (soft-delete, hard delete with tombstones, local eviction) with backend-agnostic interfaces. Default tactical preset: 168-hour tombstone TTL, 5-minute beacon soft-delete TTL, oldest-first eviction strategy.
 
----
 
 # ADR-017: P2P Mesh Management and Discovery Architecture
 
 **Status**: Proposed  
 **Date**: 2025-11-14  
-**Authors**: Kit Plummer, Codex  
+**Authors**: Kit Plummer, Claude  
 **Supersedes**: None  
-**Relates To**: ADR-001 (PEAT Protocol POC), ADR-002 (Beacon Storage), ADR-011 (Automerge + Iroh), ADR-013 (Distributed Software & AI Ops)
+**Relates To**: ADR-001 (Peat Protocol POC), ADR-002 (Beacon Storage), ADR-011 (Automerge + Iroh), ADR-013 (Distributed Software & AI Ops)
 
 ---
 
@@ -16093,7 +16077,7 @@ async fn test_network_partition() {
 3. [Containerlab Documentation](https://containerlab.dev)
 4. [mdns-sd Crate](https://crates.io/crates/mdns-sd)
 5. [Geohash Algorithm](https://en.wikipedia.org/wiki/Geohash)
-6. ADR-001: PEAT Protocol POC Architecture
+6. ADR-001: Peat Protocol POC Architecture
 7. ADR-002: Beacon Storage Architecture
 8. ADR-011: CRDT + Networking Stack Selection
 9. ADR-013: Distributed Software & AI Operations
@@ -16174,13 +16158,12 @@ pub struct MeshMetrics {
 **Next Review**: After Phase 1 completion (Week 2)  
 **Decision Status**: Proposed - Pending team review
 
----
 
 # ADR-018: AI Model Capability Advertisement and Metadata Standards
 
 **Status**: Proposed  
 **Date**: 2025-11-16  
-**Authors**: Codex, Kit Plummer  
+**Authors**: Claude, Kit Plummer  
 **Relates to**: ADR-009 (Bidirectional Flows), ADR-012 (Schema Definition), ADR-013 (Distributed Software/AI Operations), ADR-001 (CAP Protocol)
 
 ## Context
@@ -16278,7 +16261,7 @@ We conducted a comprehensive survey of existing AI/ML metadata standards and mil
 
 ### Key Findings
 
-**No existing standard addresses the PEAT use case:**
+**No existing standard addresses the Peat use case:**
 
 1. **Industry standards** (Model Cards, ONNX, MLflow) provide good **static documentation** but lack:
    - Operational status tracking (is the model actually running?)
@@ -16328,7 +16311,7 @@ We conducted a comprehensive survey of existing AI/ML metadata standards and mil
 
 ### Core Principle: Capability-Centric AI Model Advertisement
 
-We will create a **PEAT AI Model Capability Advertisement Schema** that shifts focus from "what models are installed" to "what AI capabilities are operationally available" across the distributed system.
+We will create a **Peat AI Model Capability Advertisement Schema** that shifts focus from "what models are installed" to "what AI capabilities are operationally available" across the distributed system.
 
 **Design Philosophy:**
 1. **Operational First**: Track runtime status, not just deployment state
@@ -16343,7 +16326,7 @@ We will create a **PEAT AI Model Capability Advertisement Schema** that shifts f
 
 #### Level 1: Platform AI Capability Advertisement
 
-Each platform advertises its AI capabilities using a standardized schema integrated into the PEAT capability advertisement protocol:
+Each platform advertises its AI capabilities using a standardized schema integrated into the Peat capability advertisement protocol:
 
 ```protobuf
 syntax = "proto3";
@@ -16925,7 +16908,7 @@ Following ADR-007 Automerge principles, AI capability advertisements are synchro
 The `ModelMetadata` message is designed for **bidirectional mapping** with Model Card schemas:
 
 ```python
-# Export PEAT AI capability to Model Card format
+# Export Peat AI capability to Model Card format
 def export_model_card(ai_model_instance):
     return {
         "model_details": {
@@ -16954,7 +16937,7 @@ def export_model_card(ai_model_instance):
         }
     }
 
-# Import Model Card to PEAT format
+# Import Model Card to Peat format
 def import_model_card(model_card_json):
     metadata = ModelMetadata()
     metadata.model_name = model_card_json["model_details"]["name"]
@@ -16966,13 +16949,13 @@ def import_model_card(model_card_json):
 #### ONNX Metadata Integration
 
 ```python
-# Augment ONNX model with PEAT metadata
+# Augment ONNX model with Peat metadata
 import onnx
 import json
 
 model = onnx.load('target_recognition_v4.2.1.onnx')
 
-# Add PEAT metadata to ONNX metadata_props
+# Add Peat metadata to ONNX metadata_props
 peat_meta = model.metadata_props.add()
 peat_meta.key = 'peat_model_metadata'
 peat_meta.value = json.dumps({
@@ -16993,11 +16976,11 @@ onnx.save(model, f'target_recognition_v4.2.1.onnx')
 #### MLflow Registry Synchronization
 
 ```python
-# Register PEAT-tracked model in MLflow
+# Register Peat-tracked model in MLflow
 import mlflow
 
 def register_peat_model_to_mlflow(ai_model_instance, model_artifact_path):
-    # Create MLflow signature from PEAT ModelSignature
+    # Create MLflow signature from Peat ModelSignature
     from mlflow.models import infer_signature
     signature = convert_peat_signature_to_mlflow(ai_model_instance.signature)
     
@@ -17031,7 +17014,7 @@ def register_peat_model_to_mlflow(ai_model_instance, model_artifact_path):
 
 **STANAG 4778 Metadata Binding:**
 ```python
-# Cryptographically bind PEAT metadata to model artifact
+# Cryptographically bind Peat metadata to model artifact
 def bind_metadata_stanag_4778(model_artifact_bytes, ai_model_instance):
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import ed25519
@@ -17058,7 +17041,7 @@ def bind_metadata_stanag_4778(model_artifact_bytes, ai_model_instance):
 
 **STANAG 5636 NCMS Searchability:**
 ```xml
-<!-- Map PEAT AI capabilities to NATO Core Metadata Specification -->
+<!-- Map Peat AI capabilities to NATO Core Metadata Specification -->
 <NCMS:Resource xmlns:NCMS="urn:nato:stanag:5636">
     <NCMS:Identifier>urn:peat:model:target_recognition:4.2.1</NCMS:Identifier>
     <NCMS:Title>Target Recognition Model v4.2.1</NCMS:Title>
@@ -17321,7 +17304,7 @@ impl PerformanceDegradationDetector {
 **Standards Evolution Risk**
 - Model Card, ONNX, MLflow standards may evolve incompatibly
 - NATO STANAGs update on multi-year cycles
-- PEAT schema may need versioning strategy to handle changes
+- Peat schema may need versioning strategy to handle changes
 - Risk of becoming tied to deprecated standards
 
 **Performance Measurement Challenges**
@@ -17384,7 +17367,7 @@ impl PerformanceDegradationDetector {
 - ONNX metadata integration
 - MLflow registry synchronization
 - STANAG 4778/5636 compliance validation
-- **Deliverable**: PEAT AI capabilities compatible with industry/military standards
+- **Deliverable**: Peat AI capabilities compatible with industry/military standards
 
 ### Phase 5: Security and Governance (Months 8-10)
 - Implement cryptographic provenance verification
@@ -17454,20 +17437,19 @@ This ADR requires approval from:
 - [ ] Security/Compliance Review
 - [ ] NATO Interoperability Working Group (Advisory)
 
----
 
-# ADR-019: Quality of Service and Data Prioritization for PEAT Sync
+# ADR-019: Quality of Service and Data Prioritization for Peat Sync
 
 **Status**: Proposed  
 **Date**: 2025-11-16  
-**Authors**: Kit Plummer, Codex  
+**Authors**: Kit Plummer, Claude  
 **Relates To**: ADR-005 (Data Sync Abstraction), ADR-009 (Bidirectional Hierarchical Flows), ADR-010 (Transport Layer), ADR-011 (Ditto vs Automerge/Iroh), ADR-016 (TTL and Data Lifecycle)
 
 ## Context
 
 ### The Problem: Not All Data Is Created Equal
 
-Customer feedback has revealed a critical requirement: **PEAT must support delivering model products (contact reports, images, audio/video clips, etc.) through its hierarchical network with appropriate prioritization.**
+Customer feedback has revealed a critical requirement: **Peat must support delivering model products (contact reports, images, audio/video clips, etc.) through its hierarchical network with appropriate prioritization.**
 
 The operational reality:
 
@@ -17498,7 +17480,7 @@ WITH QoS:
 
 ### The Fundamental Issue
 
-Current PEAT architecture (as inherited from Ditto/Automerge) treats all CRDT updates with approximately equal priority. This creates several operational problems:
+Current Peat architecture (as inherited from Ditto/Automerge) treats all CRDT updates with approximately equal priority. This creates several operational problems:
 
 1. **Priority Inversion**: Critical contact reports wait behind routine telemetry
 2. **Bandwidth Starvation**: Large media files (images/video) block small critical updates
@@ -17524,7 +17506,7 @@ A comprehensive **Quality of Service (QoS) framework** that provides:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    PEAT QoS Framework                       │
+│                    Peat QoS Framework                       │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  ┌─────────────────────────────────────────────────────┐   │
@@ -18251,7 +18233,7 @@ pub struct QoSMetrics {
 **Dashboard Example:**
 
 ```
-=== PEAT QoS Dashboard ===
+=== Peat QoS Dashboard ===
 Bandwidth: 487 Kbps / 1000 Kbps (48.7% utilized)
 
 Priority Queues:
@@ -18376,16 +18358,16 @@ pub enum EnforcementMode {
 
 **STANAG 4586 (UAV C2)**: Defines message priorities for UAV control
 - Our P1-P5 aligns with 4586's "Immediate", "Priority", "Routine", "Deferred"
-- PEAT extends to multi-platform coordination beyond single UAV
+- Peat extends to multi-platform coordination beyond single UAV
 
 **Link 16 Message Standard**: Tactical data link with priority levels
 - J-Series messages have defined precedence
-- PEAT provides similar prioritization for autonomous platforms
+- Peat provides similar prioritization for autonomous platforms
 
 ### Commercial Standards
 
 **DiffServ (RFC 2474)**: IP packet QoS markings
-- We can map PEAT QoS classes to DSCP values for network-layer QoS
+- We can map Peat QoS classes to DSCP values for network-layer QoS
 
 **MQTT QoS Levels**: Quality of Service for pub-sub messaging
 - MQTT has 3 levels (0, 1, 2) - we extend to 5 for finer control
@@ -18505,7 +18487,7 @@ impl AutomergeSyncCoordinator {
 
 ### Subscription Granularity
 
-**Current PEAT subscription model:**
+**Current Peat subscription model:**
 ```rust
 // Subscribe to entire collection
 backend.subscribe("beacons", Query::All).await?;
@@ -18519,7 +18501,7 @@ ditto.store.collection("beacons")
     .subscribe();
 ```
 
-**Proposed PEAT extension:**
+**Proposed Peat extension:**
 ```rust
 /// Enhanced query with spatial and attribute predicates
 pub enum Query {
@@ -18703,10 +18685,9 @@ collections:
 4. Define success metrics and validation experiments
 5. Begin integration with Automerge + Iroh (leverages QUIC priorities)
 
-**Authors**: Kit Plummer, Codex  
+**Authors**: Kit Plummer, Claude  
 **Last Updated**: 2025-11-16
 
----
 
 # ADR-020: TAK (Team Awareness Kit) and Cursor-on-Target Integration
 
@@ -18764,25 +18745,25 @@ collections:
 - Standardized types enable automatic symbol rendering
 
 **CoT Message Characteristics:**
-- **Size**: XML format up to 40KB per message (larger than PEAT's differential sync)
+- **Size**: XML format up to 40KB per message (larger than Peat's differential sync)
 - **Transport**: UDP/TCP, optionally Protobuf-encoded for bandwidth efficiency
 - **Update Rate**: Typically 1-5 second position updates
 - **Network**: Designed for IP-based networks (not optimized for contested/DIL environments)
 
-### Strategic Importance for PEAT
+### Strategic Importance for Peat
 
 **AUKUS Integration Requirement:**
 - TAK is extensively used within AUKUS partners (US, UK, Australia)
 - AUKUS Pillar II emphasizes technology interoperability
-- **Requirement**: PEAT must integrate with existing TAK infrastructure to enable adoption
+- **Requirement**: Peat must integrate with existing TAK infrastructure to enable adoption
 
 **Ecosystem Benefits:**
-1. **Common Operating Picture**: PEAT-coordinated assets visible in TAK
-2. **Human-Machine Interface**: TAK serves as operator interface for PEAT teams
-3. **Interoperability**: PEAT coordinates autonomy; TAK provides situational awareness to C2
-4. **Gradual Adoption**: Organizations can integrate PEAT without replacing TAK infrastructure
+1. **Common Operating Picture**: Peat-coordinated assets visible in TAK
+2. **Human-Machine Interface**: TAK serves as operator interface for Peat teams
+3. **Interoperability**: Peat coordinates autonomy; TAK provides situational awareness to C2
+4. **Gradual Adoption**: Organizations can integrate Peat without replacing TAK infrastructure
 
-**Challenge**: TAK's all-to-all event streaming model conflicts with PEAT's hierarchical aggregation approach.
+**Challenge**: TAK's all-to-all event streaming model conflicts with Peat's hierarchical aggregation approach.
 
 ### The Integration Problem
 
@@ -18798,7 +18779,7 @@ collections:
  [ATAK]   [WinTAK]  [ATAK]   [ATAK]   [ATAK]
 ```
 
-**PEAT's Architecture (Hierarchical Aggregation)**:
+**Peat's Architecture (Hierarchical Aggregation)**:
 ```
 ┌─────────────────────────────────────────────────────────┐
 │              Company HQ (Aggregated View)               │
@@ -18815,13 +18796,13 @@ collections:
 
 **Architectural Tension:**
 - TAK expects all position updates from all platforms
-- PEAT provides aggregated capabilities and filtered/summarized position data
-- **Risk**: Naively bridging PEAT → TAK could saturate network with O(n²) messages
-- **Opportunity**: TAK can display PEAT's hierarchical abstractions as cells/formations
+- Peat provides aggregated capabilities and filtered/summarized position data
+- **Risk**: Naively bridging Peat → TAK could saturate network with O(n²) messages
+- **Opportunity**: TAK can display Peat's hierarchical abstractions as cells/formations
 
 ## Decision
 
-We will implement **bidirectional integration between PEAT Protocol and TAK ecosystem** through a **three-tier integration architecture**:
+We will implement **bidirectional integration between Peat Protocol and TAK ecosystem** through a **three-tier integration architecture**:
 
 ### Tier 1: CoT Message Schema Integration (cap-schema layer)
 
@@ -18834,43 +18815,43 @@ cap-schema/
 │   └── ...
 ├── src/
 │   ├── cot/
-│   │   ├── encoder.rs         # PEAT → CoT XML/Protobuf
-│   │   ├── decoder.rs         # CoT → PEAT messages
+│   │   ├── encoder.rs         # Peat → CoT XML/Protobuf
+│   │   ├── decoder.rs         # CoT → Peat messages
 │   │   ├── types.rs           # CoT type hierarchy mapping
 │   │   └── validation.rs      # CoT schema validation
 ```
 
 **Bidirectional Message Mapping:**
 
-| PEAT Concept | CoT Representation | Direction | Notes |
+| Peat Concept | CoT Representation | Direction | Notes |
 |--------------|-------------------|-----------|-------|
-| Platform Position | CoT Event (type: a-f-G-U-C) | PEAT → TAK | Individual platform tracks |
-| Squad Formation | CoT Event + detail/link | PEAT → TAK | Cell as tactical graphic |
-| Capability Aggregate | CoT Event (custom detail) | PEAT → TAK | Squad-level capability summary |
-| Command Intent | CoT Event (type: t-x-m) | TAK → PEAT | Mission tasking from C2 |
-| Geofence/ROZ | CoT Event (type: u-d-r) | TAK → PEAT | Operational boundaries |
+| Platform Position | CoT Event (type: a-f-G-U-C) | Peat → TAK | Individual platform tracks |
+| Squad Formation | CoT Event + detail/link | Peat → TAK | Cell as tactical graphic |
+| Capability Aggregate | CoT Event (custom detail) | Peat → TAK | Squad-level capability summary |
+| Command Intent | CoT Event (type: t-x-m) | TAK → Peat | Mission tasking from C2 |
+| Geofence/ROZ | CoT Event (type: u-d-r) | TAK → Peat | Operational boundaries |
 | Chat/Text | CoT Event (type: b-t-f) | Bidirectional | Text messaging |
 
 **MIL-STD-2525 Entity Type Mappings** (from M1 POC):
 
-| PEAT Entity | CoT Type | MIL-STD-2525 Description |
+| Peat Entity | CoT Type | MIL-STD-2525 Description |
 |-------------|----------|--------------------------|
 | Tracked Person (POI) | `a-f-G-E-S` | Friendly Ground Equipment - Sensor |
 | Tracked Vehicle | `a-f-G-E-V` | Friendly Ground Equipment - Vehicle |
 | Unknown Track | `a-u-G` | Unknown Ground |
 | Hostile Track | `a-h-G` | Hostile Ground |
-| PEAT Platform (UGV) | `a-f-G-U-C` | Friendly Ground Unit - Combat |
-| PEAT Platform (UAV) | `a-f-A-M-F-Q` | Friendly Air - Military Fixed Wing - UAV |
-| PEAT Operator | `a-f-G-U-C-I` | Friendly Ground Unit - Infantry |
-| PEAT Cell/Team | `a-f-G-U-C` + links | Friendly Ground Unit with subordinates |
+| Peat Platform (UGV) | `a-f-G-U-C` | Friendly Ground Unit - Combat |
+| Peat Platform (UAV) | `a-f-A-M-F-Q` | Friendly Air - Military Fixed Wing - UAV |
+| Peat Operator | `a-f-G-U-C-I` | Friendly Ground Unit - Infantry |
+| Peat Cell/Team | `a-f-G-U-C` + links | Friendly Ground Unit with subordinates |
 | Formation | `a-f-G-U-C` + links | Higher echelon unit |
 | Geofence/ROZ | `u-d-r` | Drawing - Route/Area |
 | Mission Tasking | `t-x-m-c` | Tasking - Mission - Track |
-| Handoff Event | `a-x-h-h` | Custom - PEAT Handoff |
+| Handoff Event | `a-x-h-h` | Custom - Peat Handoff |
 
 **Hierarchy Encoding via CoT Links:**
 
-PEAT's hierarchical relationships map to CoT `<link>` elements with relation types:
+Peat's hierarchical relationships map to CoT `<link>` elements with relation types:
 
 ```xml
 <!-- Platform belongs to cell -->
@@ -18891,7 +18872,7 @@ PEAT's hierarchical relationships map to CoT `<link>` elements with relation typ
 | `o-o` | Observing | Sensor→track relationship |
 
 **Key Design Principles:**
-1. **Semantic Preservation**: PEAT capabilities map to appropriate CoT detail sub-schemas
+1. **Semantic Preservation**: Peat capabilities map to appropriate CoT detail sub-schemas
 2. **Minimal Overhead**: Only send necessary data; leverage CoT's extensible detail fields
 3. **Standard Compliance**: Use existing CoT sub-schemas where possible (flow-tags, sensor, etc.)
 4. **Hierarchy Encoding**: Use CoT link elements to represent squad→platform relationships
@@ -18930,7 +18911,7 @@ pub struct TakConfig {
 #[async_trait]
 impl MessageTransport for TakTransport {
     async fn send(&self, message: &dyn CapMessage, ...) -> Result<...> {
-        // 1. Convert PEAT message to CoT event
+        // 1. Convert Peat message to CoT event
         let cot_event = self.cot_encoder.encode(message)?;
         
         // 2. Serialize to XML or Protobuf
@@ -18951,7 +18932,7 @@ impl MessageTransport for TakTransport {
         // 1. Subscribe to CoT messages from TAK
         let cot_stream = self.client.subscribe().await?;
         
-        // 2. Filter and decode into PEAT messages
+        // 2. Filter and decode into Peat messages
         let peat_stream = cot_stream
             .filter_map(|cot_event| self.cot_decoder.decode::<M>(cot_event))
             .filter(|msg| filter.matches(msg));
@@ -18980,7 +18961,7 @@ impl MessageTransport for TakTransport {
 
 ### Tier 3: Hierarchical Filtering & Aggregation Bridge
 
-**Implement PEAT-specific logic to bridge hierarchical model with TAK's flat model:**
+**Implement Peat-specific logic to bridge hierarchical model with TAK's flat model:**
 
 ```rust
 // cap-protocol/src/tak_bridge.rs
@@ -19002,13 +18983,13 @@ pub enum AggregationPolicy {
     /// Recipients see detail appropriate to their echelon
     HierarchicalFiltering,
 
-    /// Custom filtering based on CoT type, recipient, and PEAT cell membership
+    /// Custom filtering based on CoT type, recipient, and Peat cell membership
     CustomFilters(Vec<FilterRule>),
 
     // === Additional policies from M1 POC feedback ===
 
     /// Track-focused: Only active tracks visible, not platform positions
-    /// Useful when operators care about targets, not PEAT assets
+    /// Useful when operators care about targets, not Peat assets
     TracksOnly,
 
     /// Capability-focused: Formation capabilities only, not positions
@@ -19026,10 +19007,10 @@ pub enum AggregationPolicy {
 
 /// QoS Priority to CoT Flow-Tags Mapping (ADR-019 integration)
 ///
-/// Maps PEAT QoS priorities to CoT `_flow-tags_` for TAK-side prioritization.
+/// Maps Peat QoS priorities to CoT `_flow-tags_` for TAK-side prioritization.
 /// TAK servers that honor flow-tags will process messages accordingly.
 ///
-/// | PEAT Priority | CoT Flow-Tag | TAK Behavior |
+/// | Peat Priority | CoT Flow-Tag | TAK Behavior |
 /// |---------------|--------------|--------------|
 /// | P1 (Critical) | `priority=flash` | Immediate delivery |
 /// | P2 (High) | `priority=immediate` | High priority queue |
@@ -19047,7 +19028,7 @@ pub fn priority_to_flow_tag(priority: Priority) -> &'static str {
 }
 
 impl PeatTakBridge {
-    /// Publish PEAT state to TAK
+    /// Publish Peat state to TAK
     pub async fn publish_to_tak(&self) -> Result<()> {
         match self.aggregation_policy {
             AggregationPolicy::HierarchicalFiltering => {
@@ -19065,7 +19046,7 @@ impl PeatTakBridge {
         Ok(())
     }
     
-    /// Ingest TAK events into PEAT
+    /// Ingest TAK events into Peat
     pub async fn ingest_from_tak(&self) -> Result<()> {
         let mut tak_stream = self.tak_transport.subscribe::<CotEvent>(
             MessageFilter::default()
@@ -19074,17 +19055,17 @@ impl PeatTakBridge {
         while let Some(cot_event) = tak_stream.next().await {
             match cot_event.event_type {
                 CotType::MissionTasking => {
-                    // Convert TAK mission tasking to PEAT command
+                    // Convert TAK mission tasking to Peat command
                     let command = self.convert_to_peat_command(cot_event)?;
                     self.peat_node.execute_command(command).await?;
                 },
                 CotType::Geofence => {
-                    // Import geofence as PEAT operational constraint
+                    // Import geofence as Peat operational constraint
                     let constraint = self.convert_to_constraint(cot_event)?;
                     self.peat_node.add_constraint(constraint).await?;
                 },
                 CotType::FriendlyPosition => {
-                    // Track external friendly units in PEAT
+                    // Track external friendly units in Peat
                     self.peat_node.update_external_track(cot_event).await?;
                 },
                 _ => {
@@ -19106,21 +19087,21 @@ impl PeatTakBridge {
               │ (Filtered CoT messages)
               │
     ┌─────────▼─────────┐
-    │  PEAT TAK Bridge  │
+    │  Peat TAK Bridge  │
     │  (Aggregation +   │
     │   Filtering)      │
     └─────────┬─────────┘
               │
-              │ (PEAT internal protocol - differential sync)
+              │ (Peat internal protocol - differential sync)
               │
     ┌─────────▼─────────┐
-    │    PEAT Network   │
+    │    Peat Network   │
     │  (Hierarchical)   │
     └───────────────────┘
 ```
 
 **Filtering Rules:**
-- **Geographic**: Only forward CoT events within PEAT cell's area of operations
+- **Geographic**: Only forward CoT events within Peat cell's area of operations
 - **Temporal**: Stale events (beyond stale time) filtered out
 - **Type-Based**: Only relevant CoT types forwarded (filter out irrelevant chat, admin messages)
 - **Authority-Based**: Mission commands only accepted from authorized TAK users
@@ -19128,22 +19109,22 @@ impl PeatTakBridge {
 
 ### Integration Deployment Models
 
-**Model 1: PEAT as TAK Plugin (Tight Integration)**
-- Develop ATAK plugin that exposes PEAT capabilities
-- Plugin displays PEAT cell formations, hierarchical summaries
-- Operators send commands to PEAT via TAK UI
+**Model 1: Peat as TAK Plugin (Tight Integration)**
+- Develop ATAK plugin that exposes Peat capabilities
+- Plugin displays Peat cell formations, hierarchical summaries
+- Operators send commands to Peat via TAK UI
 - **Pros**: Seamless UX, no separate infrastructure
 - **Cons**: Limited to Android devices, plugin development complexity
 
-**Model 2: PEAT TAK Bridge Node (Federated)**
-- Standalone PEAT node acts as TAK federation member
+**Model 2: Peat TAK Bridge Node (Federated)**
+- Standalone Peat node acts as TAK federation member
 - Appears as TAK server to TAK clients
-- Translates between PEAT and TAK protocols
+- Translates between Peat and TAK protocols
 - **Pros**: Works with all TAK clients (ATAK, WinTAK, iTAK)
 - **Cons**: Additional infrastructure, configuration complexity
 
-**Model 3: Hybrid - PEAT Core + TAK Interface Layer**
-- PEAT operates independently with native protocol
+**Model 3: Hybrid - Peat Core + TAK Interface Layer**
+- Peat operates independently with native protocol
 - TAK transport adapter provides bidirectional bridge
 - Multiple TAK bridges for scalability
 - **Pros**: Best performance, flexibility, supports multiple deployment scenarios
@@ -19159,7 +19140,7 @@ impl PeatTakBridge {
 
 **Tasks**:
 1. Survey TAK deployment patterns within AUKUS partners
-2. Identify critical CoT message types for PEAT integration
+2. Identify critical CoT message types for Peat integration
 3. Define success criteria for integration (latency, bandwidth, usability)
 4. Document security requirements (PKI, certificate management)
 
@@ -19171,18 +19152,18 @@ impl PeatTakBridge {
 
 ### Phase 1: CoT Schema Adapter (Weeks 3-4)
 
-**Goal**: Implement bidirectional CoT ↔ PEAT message conversion in `cap-schema`
+**Goal**: Implement bidirectional CoT ↔ Peat message conversion in `cap-schema`
 
 **Tasks**:
 1. Implement CoT XML parser/generator
 2. Implement CoT Protobuf encoder/decoder
-3. Create PEAT → CoT message mappings (platform position, squad formation, etc.)
-4. Create CoT → PEAT message mappings (mission tasking, geofences, etc.)
+3. Create Peat → CoT message mappings (platform position, squad formation, etc.)
+4. Create CoT → Peat message mappings (mission tasking, geofences, etc.)
 5. Unit tests for all conversions
 
 **Success Criteria**:
-- [ ] PEAT platform position converts to valid CoT event (MIL-STD-2525 type)
-- [ ] CoT mission tasking converts to PEAT command
+- [ ] Peat platform position converts to valid CoT event (MIL-STD-2525 type)
+- [ ] CoT mission tasking converts to Peat command
 - [ ] Round-trip conversion preserves semantic meaning
 - [ ] Validation catches malformed CoT messages
 
@@ -19203,7 +19184,7 @@ impl PeatTakBridge {
 - [ ] Mesh SA mode works in local network
 - [ ] Handles connection failures gracefully
 
-### Phase 3: PEAT-TAK Bridge Logic (Weeks 8-10)
+### Phase 3: Peat-TAK Bridge Logic (Weeks 8-10)
 
 **Goal**: Implement hierarchical filtering and aggregation bridge
 
@@ -19212,29 +19193,29 @@ impl PeatTakBridge {
 2. Add hierarchical filtering logic (echelon-based visibility)
 3. Implement bandwidth-aware throttling
 4. Create configuration system for filtering rules
-5. End-to-end testing with PEAT + TAK ecosystem
+5. End-to-end testing with Peat + TAK ecosystem
 
 **Success Criteria**:
 - [ ] Company HQ in TAK sees platoon summaries, not individual platforms
 - [ ] Squad leaders in TAK see full platform details
-- [ ] Mission commands from TAK correctly execute in PEAT
+- [ ] Mission commands from TAK correctly execute in Peat
 - [ ] Bandwidth usage < 10% of full event streaming
 
 ### Phase 4: ATAK Plugin Development (Weeks 11-14) [Optional]
 
-**Goal**: Create native ATAK plugin for PEAT integration
+**Goal**: Create native ATAK plugin for Peat integration
 
 **Tasks**:
 1. ATAK plugin skeleton (Java/Kotlin)
-2. Display PEAT cell formations on map
+2. Display Peat cell formations on map
 3. Display aggregated capabilities in UI
-4. Send commands to PEAT via plugin
+4. Send commands to Peat via plugin
 5. User acceptance testing with operators
 
 **Success Criteria**:
 - [ ] Plugin installs on ATAK devices
-- [ ] PEAT squad formations visible on map
-- [ ] Operators can task PEAT cells via natural interface
+- [ ] Peat squad formations visible on map
+- [ ] Operators can task Peat cells via natural interface
 - [ ] Performance acceptable on tactical devices
 
 ### Phase 5: Field Validation (Weeks 15-16)
@@ -19249,8 +19230,8 @@ impl PeatTakBridge {
 5. Documentation and training materials
 
 **Success Criteria**:
-- [ ] PEAT-coordinated assets visible in TAK common operating picture
-- [ ] Operators successfully task PEAT via TAK
+- [ ] Peat-coordinated assets visible in TAK common operating picture
+- [ ] Operators successfully task Peat via TAK
 - [ ] Performance meets operational requirements
 - [ ] Security audit passes with no critical findings
 
@@ -19258,20 +19239,20 @@ impl PeatTakBridge {
 
 ### Positive
 
-1. **AUKUS Interoperability**: Enables PEAT adoption within existing TAK infrastructure
+1. **AUKUS Interoperability**: Enables Peat adoption within existing TAK infrastructure
 2. **Operator Familiarity**: Leverages existing TAK training and muscle memory
-3. **Ecosystem Access**: Connects PEAT to broader TAK plugin ecosystem
-4. **Gradual Adoption**: Organizations can integrate PEAT incrementally
-5. **Common Operating Picture**: PEAT assets visible alongside traditional C2
+3. **Ecosystem Access**: Connects Peat to broader TAK plugin ecosystem
+4. **Gradual Adoption**: Organizations can integrate Peat incrementally
+5. **Common Operating Picture**: Peat assets visible alongside traditional C2
 6. **Standards Alignment**: Uses widely-adopted CoT message format
 7. **Multi-National Collaboration**: TAK used across NATO and AUKUS partners
-8. **Bidirectional Data Flow**: Both PEAT → TAK (awareness) and TAK → PEAT (tasking)
+8. **Bidirectional Data Flow**: Both Peat → TAK (awareness) and TAK → Peat (tasking)
 
 ### Negative
 
 1. **Complexity**: Additional abstraction layer increases system complexity
-2. **Bandwidth Overhead**: CoT messages larger than PEAT's differential sync
-3. **Impedance Mismatch**: TAK's flat model vs PEAT's hierarchical model requires careful bridging
+2. **Bandwidth Overhead**: CoT messages larger than Peat's differential sync
+3. **Impedance Mismatch**: TAK's flat model vs Peat's hierarchical model requires careful bridging
 4. **Security Surface**: Additional attack vectors through TAK integration points
 5. **Dependency**: Adds TAK ecosystem as external dependency
 6. **Testing Burden**: Must test against multiple TAK server implementations
@@ -19280,7 +19261,7 @@ impl PeatTakBridge {
 
 ### Risks and Mitigations
 
-**Risk 1**: TAK event flooding overwhelms PEAT network
+**Risk 1**: TAK event flooding overwhelms Peat network
 - **Mitigation**: Hierarchical filtering prevents O(n²) message forwarding
 - **Mitigation**: Bandwidth monitoring with dynamic throttling
 - **Mitigation**: Configurable aggregation policies
@@ -19294,7 +19275,7 @@ impl PeatTakBridge {
 - **Mitigation**: PKI-based authentication for TAK connections
 - **Mitigation**: Message signing for commands (ADR-006 integration)
 - **Mitigation**: Security audit before operational deployment
-- **Mitigation**: Network segmentation between TAK and PEAT domains
+- **Mitigation**: Network segmentation between TAK and Peat domains
 
 **Risk 4**: TAK server federation complexity
 - **Mitigation**: Start with single TAK server deployments
@@ -19310,7 +19291,7 @@ impl PeatTakBridge {
 
 ### Alternative 1: Ignore TAK Ecosystem
 
-**Approach**: PEAT operates entirely independently, no TAK integration
+**Approach**: Peat operates entirely independently, no TAK integration
 
 **Rejected Because**:
 - Blocks AUKUS adoption (TAK is deeply entrenched)
@@ -19318,9 +19299,9 @@ impl PeatTakBridge {
 - Loses access to TAK's extensive plugin ecosystem
 - Misses opportunity for common operating picture
 
-### Alternative 2: Replace TAK with PEAT-Native UI
+### Alternative 2: Replace TAK with Peat-Native UI
 
-**Approach**: Build PEAT's own mobile/desktop UI instead of TAK integration
+**Approach**: Build Peat's own mobile/desktop UI instead of TAK integration
 
 **Rejected Because**:
 - Massive development effort (ATAK took years to mature)
@@ -19330,13 +19311,13 @@ impl PeatTakBridge {
 
 ### Alternative 3: TAK-Only Mode (No Hierarchical Optimization)
 
-**Approach**: Naive bridge that forwards all PEAT events to TAK without filtering
+**Approach**: Naive bridge that forwards all Peat events to TAK without filtering
 
 **Rejected Because**:
-- Defeats PEAT's core value proposition (hierarchical scaling)
-- Would recreate O(n²) problem PEAT solves
+- Defeats Peat's core value proposition (hierarchical scaling)
+- Would recreate O(n²) problem Peat solves
 - Unacceptable bandwidth usage at scale
-- Doesn't leverage PEAT's aggregation capabilities
+- Doesn't leverage Peat's aggregation capabilities
 
 ### Alternative 4: Custom Protocol Instead of CoT
 
@@ -19351,20 +19332,20 @@ impl PeatTakBridge {
 ## Success Metrics
 
 1. **Integration Completeness**:
-   - [ ] Bidirectional message flow works (PEAT ↔ TAK)
+   - [ ] Bidirectional message flow works (Peat ↔ TAK)
    - [ ] 5+ CoT message types supported in each direction
    - [ ] Works with TAK Server, FreeTakServer, and Mesh SA
 
 2. **Performance**:
    - [ ] Message translation latency < 10ms
    - [ ] Bandwidth usage < 10% of naive event streaming
-   - [ ] Supports 100+ PEAT platforms visible in TAK
-   - [ ] TAK UI remains responsive with PEAT integration
+   - [ ] Supports 100+ Peat platforms visible in TAK
+   - [ ] TAK UI remains responsive with Peat integration
 
 3. **Operational Validation**:
    - [ ] Successfully demonstrated in AUKUS context
-   - [ ] Operators can task PEAT teams via TAK
-   - [ ] PEAT status updates visible in TAK within 2 seconds
+   - [ ] Operators can task Peat teams via TAK
+   - [ ] Peat status updates visible in TAK within 2 seconds
    - [ ] Works in contested network conditions (30% packet loss)
 
 4. **Developer Experience**:
@@ -19401,7 +19382,7 @@ impl PeatTakBridge {
 
 5. **Related ADRs**:
    - **ADR-012**: Defines cap-schema and cap-transport abstractions that enable TAK integration
-   - **ADR-009**: Bidirectional flows architecture aligns with TAK ↔ PEAT communication
+   - **ADR-009**: Bidirectional flows architecture aligns with TAK ↔ Peat communication
    - **ADR-006**: Security architecture extends to TAK authentication
 
 ## References
@@ -19420,10 +19401,10 @@ impl PeatTakBridge {
 | 2025-11-17 | Proposed TAK/CoT integration | AUKUS interoperability requirement |
 | 2025-11-17 | Selected Hybrid deployment model (Model 3) | Maximum flexibility, aligns with cap-transport |
 | 2025-11-17 | Hierarchical filtering mandatory | Prevents O(n²) message explosion |
-| 2025-11-26 | Added `_peat_` CoT extension schema (ADR-028) | M1 POC integrator feedback - preserve PEAT semantics |
+| 2025-11-26 | Added `_peat_` CoT extension schema (ADR-028) | M1 POC integrator feedback - preserve Peat semantics |
 | 2025-11-26 | Added MIL-STD-2525 entity type mappings | M1 POC integrator feedback - concrete type codes |
 | 2025-11-26 | Added QoS→flow-tags mapping | ADR-019 integration for TAK-side prioritization |
-| 2025-11-26 | Resolved Q5: No model distribution via TAK | Keep on PEAT blob transport (size limits, hash verification) |
+| 2025-11-26 | Resolved Q5: No model distribution via TAK | Keep on Peat blob transport (size limits, hash verification) |
 | 2025-11-26 | Resolved Q7: Yes, cells as TAK groups | Natural fit for operator workflow |
 | 2025-11-26 | Formation-level track correlation | Hierarchical aggregation before TAK bridge |
 | 2025-11-26 | Created ADR-029 for TAK Transport Adapter | DIL message queuing, separate architectural component |
@@ -19433,16 +19414,16 @@ impl PeatTakBridge {
 
 ### Resolved (M1 POC Feedback - 2025-11-26)
 
-**Q5: Should PEAT AI models distribute via TAK data packages?**
-- **Answer**: **No** - Keep model distribution on PEAT's content-addressed blob transport.
+**Q5: Should Peat AI models distribute via TAK data packages?**
+- **Answer**: **No** - Keep model distribution on Peat's content-addressed blob transport.
 - **Rationale**:
   - TAK data packages have size limits (~50MB typical)
-  - PEAT's Iroh-based blob transport provides hash verification, resumable transfers
+  - Peat's Iroh-based blob transport provides hash verification, resumable transfers
   - Model updates are P5 (bulk) priority - shouldn't compete with tactical data on TAK
-  - Separation of concerns: TAK for SA, PEAT for autonomy coordination
+  - Separation of concerns: TAK for SA, Peat for autonomy coordination
 
-**Q7: Should PEAT cells appear as TAK "groups"?**
-- **Answer**: **Yes** - Map PEAT cells to TAK contact groups.
+**Q7: Should Peat cells appear as TAK "groups"?**
+- **Answer**: **Yes** - Map Peat cells to TAK contact groups.
 - **Rationale**:
   - Natural fit for operators managing multiple teams
   - Enables group messaging to cells
@@ -19458,15 +19439,15 @@ impl PeatTakBridge {
 **Q (New): How to handle track correlation across teams?**
 - **Answer**: **Formation correlates** (Option 3)
 - **Context**: In M1 vignette, Alpha and Bravo teams may independently detect the same POI.
-- **Rationale**: Aligns with PEAT's hierarchical aggregation philosophy - coordinator correlates before bridge, single track to TAK.
+- **Rationale**: Aligns with Peat's hierarchical aggregation philosophy - coordinator correlates before bridge, single track to TAK.
 
 ### Still Open
 
-1. **Should PEAT support TAK federation directly?** Or only single TAK server connections?
+1. **Should Peat support TAK federation directly?** Or only single TAK server connections?
 2. ~~How do we handle TAK server outages?~~ → Resolved: DIL Message Queuing (see ADR-029)
 3. **What is the priority for ATAK plugin vs standalone bridge?** Resource allocation?
-4. **Should we support TAK's video streaming features?** Integration with PEAT sensor data?
-6. **Do we need CoT→PEAT conversion for all CoT types?** Or subset initially?
+4. **Should we support TAK's video streaming features?** Integration with Peat sensor data?
+6. **Do we need CoT→Peat conversion for all CoT types?** Or subset initially?
 
 ## Next Steps
 
@@ -19500,7 +19481,7 @@ impl PeatTakBridge {
 
 **Navy NIWC PAC Proposal**:
 - TAK integration addresses Maritime Big Play requirements
-- Enables PEAT adoption within existing USN TAK infrastructure
+- Enables Peat adoption within existing USN TAK infrastructure
 - Demonstrates interoperability with allied systems
 
 **BlackFlag.vc Seed Round**:
@@ -19510,11 +19491,10 @@ impl PeatTakBridge {
 
 ---
 
-**Critical Success Factor**: TAK integration must be **demonstrably operational** before major NATO STANAG proposals. Working TAK bridge provides credibility and shows PEAT complements (rather than replaces) existing C2 infrastructure.
+**Critical Success Factor**: TAK integration must be **demonstrably operational** before major NATO STANAG proposals. Working TAK bridge provides credibility and shows Peat complements (rather than replaces) existing C2 infrastructure.
 
-**Author's Note**: This ADR represents a strategic integration that enables PEAT adoption within the existing TAK ecosystem prevalent in AUKUS and broader DoD/NATO operations. The hierarchical filtering bridge is essential—naive event forwarding would recreate the O(n²) problem PEAT solves. By treating TAK as a first-class integration target, we position PEAT as complementary infrastructure that enhances existing situational awareness tools rather than competing with them.
+**Author's Note**: This ADR represents a strategic integration that enables Peat adoption within the existing TAK ecosystem prevalent in AUKUS and broader DoD/NATO operations. The hierarchical filtering bridge is essential—naive event forwarding would recreate the O(n²) problem Peat solves. By treating TAK as a first-class integration target, we position Peat as complementary infrastructure that enhances existing situational awareness tools rather than competing with them.
 
----
 
 # ADR-021: Document-Oriented Architecture and Update Semantics
 
@@ -19542,7 +19522,7 @@ This represents a **20× bandwidth amplification** where we're recreating docume
 
 ### The Core Architectural Principle
 
-PEAT Protocol is designed around a **document-oriented architecture** where:
+Peat Protocol is designed around a **document-oriented architecture** where:
 
 1. **Each entity is represented by exactly ONE living document**
    - Soldier/Platform/UAV → `sim_doc_{node_id}` (1 document)
@@ -20068,7 +20048,7 @@ async fn test_document_lifecycle_invariant() {
 
 ## Related Decisions
 
-- **ADR-001 (PEAT Protocol POC):** Defined CRDT-based architecture, implied but didn't mandate update semantics
+- **ADR-001 (Peat Protocol POC):** Defined CRDT-based architecture, implied but didn't mandate update semantics
 - **ADR-009 (Bidirectional Hierarchical Flows):** Covered flow direction, not document lifecycle
 - **ADR-011 (Ditto vs Automerge/Iroh):** Chose Ditto for CRDT support - must use properly
 - **ADR-015 (Hierarchical Aggregation):** Identified full replication vs aggregation concern, didn't specify document semantics
@@ -20129,7 +20109,6 @@ Before accepting this ADR as "Implemented":
 **Authors:** CAP Research Team
 **Reviewers:** TBD
 
----
 
 # ADR-022: Edge MLOps Architecture
 
@@ -20232,7 +20211,7 @@ Traditional Machine Learning Operations (MLOps) architectures assume:
 - Continuous monitoring telemetry → Central dashboards
 - Model registry as source of truth
 
-**PEAT Enables:**
+**Peat Enables:**
 - Edge-first inference with local model execution
 - Hierarchical model distribution via differential sync
 - Aggregated performance monitoring through hierarchy
@@ -20241,14 +20220,14 @@ Traditional Machine Learning Operations (MLOps) architectures assume:
 
 **Design Philosophy:**
 - **Models run at the edge** where decisions are made
-- **Model updates propagate hierarchically** using PEAT's differential sync
+- **Model updates propagate hierarchically** using Peat's differential sync
 - **Performance metrics aggregate upward** through command hierarchy
 - **Training happens offline** or via federated learning
 - **Capability, not inventory** is the operational metric
 
 ### Model Format Standards: ONNX as Foundation
 
-**PEAT uses ONNX (Open Neural Network Exchange) as the standard model interchange format** for edge AI operations. This decision provides critical benefits for military edge deployments:
+**Peat uses ONNX (Open Neural Network Exchange) as the standard model interchange format** for edge AI operations. This decision provides critical benefits for military edge deployments:
 
 #### Why ONNX for Tactical Edge
 
@@ -20295,10 +20274,10 @@ Traditional Machine Learning Operations (MLOps) architectures assume:
 - Integration with MLOps tools (MLflow, Azure ML)
 - Active development and governance (LF AI & Data)
 
-#### ONNX Integration in PEAT
+#### ONNX Integration in Peat
 
 ```python
-# Example: ONNX model in PEAT registry
+# Example: ONNX model in Peat registry
 {
   "model_id": "target_recognition_yolov8",
   "version": "4.2.1",
@@ -20377,7 +20356,7 @@ Traditional Machine Learning Operations (MLOps) architectures assume:
 }
 ```
 
-**PEAT's ONNX Runtime Integration:**
+**Peat's ONNX Runtime Integration:**
 
 ```python
 class PeatMLRuntime:
@@ -20408,7 +20387,7 @@ class PeatMLRuntime:
         
     def load_model(self, model_spec: ModelSpec):
         """Load ONNX model with automatic variant selection"""
-        # Fetch model metadata from PEAT
+        # Fetch model metadata from Peat
         model_metadata = self.peat_sync.get_artifact_metadata(
             collection="models.registry",
             artifact_id=f"{model_spec.model_id}:{model_spec.version}"
@@ -20421,7 +20400,7 @@ class PeatMLRuntime:
             self.get_hardware_capabilities()
         )
         
-        # Fetch ONNX model file via PEAT differential sync
+        # Fetch ONNX model file via Peat differential sync
         onnx_model_path = self.peat_sync.fetch_artifact(
             artifact_id=variant.file,
             priority="normal"
@@ -20451,7 +20430,7 @@ class PeatMLRuntime:
             "loaded_at": datetime.now()
         }
         
-        # Update capability state in PEAT
+        # Update capability state in Peat
         self.peat_sync.update_capability_state(
             platform_id=self.platform_id,
             capability=model_spec.model_id,
@@ -20535,7 +20514,7 @@ ONNX's structured format enables intelligent differential sync:
 }
 ```
 
-**Benefits for PEAT:**
+**Benefits for Peat:**
 - ONNX graph structure enables semantic chunking (by layer/operator)
 - Changed weights identified at granular level
 - Architecture changes (nodes/edges) detected separately
@@ -20593,18 +20572,18 @@ class PeatMLRuntime:
         self.performance_metrics = {}
         
     def load_model(self, model_spec: ModelSpec):
-        """Load model from PEAT-synced model registry"""
+        """Load model from Peat-synced model registry"""
         model_id = model_spec.model_id
         version = model_spec.version
         
-        # Check if model available in local PEAT state
+        # Check if model available in local Peat state
         model_artifact = self.peat_sync.get_artifact(
             collection="models.registry",
             artifact_id=f"{model_id}:{version}"
         )
         
         if model_artifact is None:
-            # Request from parent via PEAT sync
+            # Request from parent via Peat sync
             self.peat_sync.request_artifact(
                 artifact_id=f"{model_id}:{version}",
                 priority="normal"
@@ -20625,7 +20604,7 @@ class PeatMLRuntime:
             "inference_count": 0
         }
         
-        # Update capability state in PEAT
+        # Update capability state in Peat
         self.peat_sync.update_capability_state(
             platform_id=self.platform_id,
             capability=model_id,
@@ -20684,12 +20663,12 @@ class PeatMLRuntime:
         metrics["inference_count"] += 1
         metrics["last_updated"] = datetime.now()
         
-        # Periodically sync performance metrics up through PEAT
+        # Periodically sync performance metrics up through Peat
         if metrics["inference_count"] % 100 == 0:
             self.sync_performance_metrics(model_id)
             
     def sync_performance_metrics(self, model_id: str):
-        """Aggregate performance metrics into PEAT state"""
+        """Aggregate performance metrics into Peat state"""
         metrics = self.performance_metrics[model_id]
         
         self.peat_sync.update_capability_state(
@@ -20824,7 +20803,7 @@ impl ModelDistribution {
         
         // Companies automatically propagate to Platoons
         // Platoons to Squads, Squads to Platforms
-        // All via PEAT sync protocol
+        // All via Peat sync protocol
         
         // Step 5: Monitor convergence
         let convergence = self.monitor_convergence(
@@ -20866,7 +20845,7 @@ impl ModelDistribution {
 
 #### 3. Hierarchical Performance Monitoring
 
-Performance metrics aggregate up through PEAT hierarchy:
+Performance metrics aggregate up through Peat hierarchy:
 
 ```javascript
 // Platform-level performance (raw)
@@ -21041,7 +21020,7 @@ class TrainingDataCollector:
         # Store locally
         self.local_storage.store(metadata)
         
-        # Metadata propagates up via PEAT (small)
+        # Metadata propagates up via Peat (small)
         # Raw data stays local until platform returns to base
         self.peat_sync.log_training_metadata(metadata)
 ```
@@ -21100,7 +21079,7 @@ class FederatedLearningClient:
         compressed_delta = compress(weight_delta)
         signed_delta = self.sign_update(compressed_delta)
         
-        # Send delta up via PEAT (much smaller than raw data)
+        # Send delta up via Peat (much smaller than raw data)
         self.peat_sync.send_federated_update(
             model_id=model_id,
             delta=signed_delta,
@@ -21138,7 +21117,7 @@ class FederatedLearningAggregator:
         validation_results = self.validate_model(updated_model)
         
         if validation_results.meets_criteria():
-            # Publish new version via PEAT
+            # Publish new version via Peat
             new_version = self.model_registry.publish(
                 model=updated_model,
                 validation=validation_results,
@@ -21198,21 +21177,21 @@ class SyntheticDataGenerator:
 
 #### 5. Agent Context Integration (MCP Bridge)
 
-PEAT-synced state becomes context for AI agents:
+Peat-synced state becomes context for AI agents:
 
 ```python
 class PeatMCPBridge:
-    """Bridge between PEAT distributed state and MCP agent context"""
+    """Bridge between Peat distributed state and MCP agent context"""
     
     def __init__(self, peat_sync: PeatSyncEngine):
         self.peat_sync = peat_sync
         self.mcp_server = MCPServer()
         
-        # Register PEAT collections as MCP resources
+        # Register Peat collections as MCP resources
         self.register_peat_resources()
         
     def register_peat_resources(self):
-        """Expose PEAT state as MCP resources for agents"""
+        """Expose Peat state as MCP resources for agents"""
         
         # Resource: Current model registry
         @self.mcp_server.resource("models://registry")
@@ -21245,7 +21224,7 @@ class PeatMCPBridge:
         # Tool: Request model update
         @self.mcp_server.tool("request_model_update")
         def request_model_update(model_id: str, target_version: str, justification: str):
-            """Agent can request model updates through PEAT"""
+            """Agent can request model updates through Peat"""
             return self.peat_sync.request_model_update(
                 model_id=model_id,
                 target_version=target_version,
@@ -21256,7 +21235,7 @@ class PeatMCPBridge:
         # Tool: Report model performance issue
         @self.mcp_server.tool("report_performance_issue")
         def report_performance_issue(model_id: str, issue_type: str, details: dict):
-            """Agent can report degradation through PEAT"""
+            """Agent can report degradation through Peat"""
             return self.peat_sync.log_performance_issue(
                 model_id=model_id,
                 issue_type=issue_type,
@@ -21265,16 +21244,16 @@ class PeatMCPBridge:
             )
 
 class EdgeAgent:
-    """AI agent using PEAT-synced context via MCP"""
+    """AI agent using Peat-synced context via MCP"""
     
     def __init__(self, agent_id: str, mcp_client: MCPClient):
         self.agent_id = agent_id
         self.mcp = mcp_client
         
     async def make_decision(self, situation: Situation):
-        """Agent decision-making with PEAT context"""
+        """Agent decision-making with Peat context"""
         
-        # Get current context from PEAT via MCP
+        # Get current context from Peat via MCP
         model_registry = await self.mcp.get_resource("models://registry")
         capabilities = await self.mcp.get_resource("capabilities://platforms")
         mission_context = await self.mcp.get_resource("mission://context")
@@ -21305,8 +21284,8 @@ class EdgeAgent:
 │  AI Agent (ReAct, function calling) │
 │         ↕ [MCP Protocol]            │
 │  MCP Server (Context Provider)      │
-│         ↕ [PEAT Bridge]             │
-│  PEAT Sync Engine                   │
+│         ↕ [Peat Bridge]             │
+│  Peat Sync Engine                   │
 │    • Model Registry                 │
 │    • Capability State               │
 │    • Performance Metrics            │
@@ -21318,8 +21297,8 @@ class EdgeAgent:
 
 **Value Proposition:**
 - **MCP standardizes** agent-to-context interface
-- **PEAT ensures** context is available, current, consistent in DIL environments
-- **Separation of concerns**: MCP = local API, PEAT = distributed state
+- **Peat ensures** context is available, current, consistent in DIL environments
+- **Separation of concerns**: MCP = local API, Peat = distributed state
 - **Agents reason over hierarchically-appropriate context** (platform sees squad, squad sees platoon, etc.)
 
 ### Implementation Phases
@@ -21327,7 +21306,7 @@ class EdgeAgent:
 #### Phase 1: Foundation (Months 1-3)
 - **Model distribution infrastructure** using ADR-013 differential propagation
 - **Edge runtime instrumentation** for performance tracking
-- **Basic performance aggregation** through PEAT hierarchy
+- **Basic performance aggregation** through Peat hierarchy
 - **Content-addressed model storage** with signature verification
 
 **Success Criteria:**
@@ -21358,15 +21337,15 @@ class EdgeAgent:
 - Model performance improves from operational feedback
 
 #### Phase 4: Agent Integration (Months 9-12)
-- **MCP bridge** exposing PEAT state to agents
+- **MCP bridge** exposing Peat state to agents
 - **Hierarchical agent architecture** (agents at each echelon)
-- **Agent-driven model requests** through PEAT
+- **Agent-driven model requests** through Peat
 - **Multi-echelon agentic coordination**
 
 **Success Criteria:**
-- Agents can query PEAT-synced context via MCP
+- Agents can query Peat-synced context via MCP
 - Agents at different echelons see appropriate abstraction levels
-- Agent decisions propagate through PEAT hierarchy
+- Agent decisions propagate through Peat hierarchy
 
 ## Consequences
 
@@ -21398,9 +21377,9 @@ class EdgeAgent:
 
 **Agent Enablement:**
 - MCP provides standard interface for agent context
-- PEAT ensures context availability in disconnected environments
+- Peat ensures context availability in disconnected environments
 - Hierarchical abstraction matches agent decision scope
-- Agents can request updates through PEAT infrastructure
+- Agents can request updates through Peat infrastructure
 
 ### Negative
 
@@ -21465,7 +21444,7 @@ class EdgeAgent:
 ### With ADR-006 (Security, Authentication, Authorization)
 - **Model provenance:** Signature chains for model verification
 - **Federated learning:** Cryptographic verification of gradient updates
-- **Agent authorization:** MCP tools respect PEAT authorization model
+- **Agent authorization:** MCP tools respect Peat authorization model
 - **Training data:** Encryption of sensitive training metadata
 
 ### With ADR-007 (Automerge-Based Sync Engine)
@@ -21534,12 +21513,12 @@ class EdgeAgent:
 - Not designed for contested environments
 - Heavy resource requirements for edge
 
-**Why PEAT Edge MLOps:**
+**Why Peat Edge MLOps:**
 - **Hierarchical by design:** Matches military organization
 - **Offline-first:** Works in DIL environments
 - **Differential propagation:** Optimal for bandwidth constraints
 - **Capability focus:** Operational assessment, not just inventory
-- **Integrated:** Leverages existing PEAT infrastructure for distribution, monitoring, and coordination
+- **Integrated:** Leverages existing Peat infrastructure for distribution, monitoring, and coordination
 
 ## References
 
@@ -21591,7 +21570,7 @@ class EdgeAgent:
 
 ## Appendix A: Model Format Comparison for Tactical Edge
 
-This appendix compares the three primary model formats considered for PEAT edge deployments: **ONNX**, **TensorFlow Lite (TFLite)**, and **Native Framework Formats** (PyTorch .pt/.pth, TensorFlow SavedModel).
+This appendix compares the three primary model formats considered for Peat edge deployments: **ONNX**, **TensorFlow Lite (TFLite)**, and **Native Framework Formats** (PyTorch .pt/.pth, TensorFlow SavedModel).
 
 ### Evaluation Criteria for Military Edge
 
@@ -21627,7 +21606,7 @@ This appendix compares the three primary model formats considered for PEAT edge 
 
 **Tactical Edge Suitability:** ⭐⭐⭐⭐⭐ (5/5)
 
-**PEAT Integration:**
+**Peat Integration:**
 ```python
 # ONNX as standard format
 model_variants = {
@@ -21637,7 +21616,7 @@ model_variants = {
 }
 
 # Differential sync: 16MB delta between versions vs 487MB full model
-# PEAT distributes only changed weights using ONNX graph structure
+# Peat distributes only changed weights using ONNX graph structure
 ```
 
 **Size Analysis:**
@@ -21677,9 +21656,9 @@ model_variants = {
 
 **Tactical Edge Suitability:** ⭐⭐⭐ (3/5)
 
-**PEAT Integration Challenges:**
+**Peat Integration Challenges:**
 ```python
-# TFLite more difficult to integrate into PEAT
+# TFLite more difficult to integrate into Peat
 # - Conversion from PyTorch requires TF intermediate step
 # - Less semantic structure for differential sync
 # - Fewer hardware backend options
@@ -21714,9 +21693,9 @@ model_variants = {
 
 **Tactical Edge Suitability:** ⭐⭐ (2/5)
 
-**PEAT Integration Challenges:**
+**Peat Integration Challenges:**
 ```python
-# Native formats problematic for PEAT
+# Native formats problematic for Peat
 # - Large runtime dependencies (PyTorch 700MB + model 500MB = 1.2GB)
 # - Vendor lock-in unacceptable for government procurement
 # - Security: PyTorch uses pickle (arbitrary code execution risk)
@@ -21749,9 +21728,9 @@ model_variants = {
 | **Extremely constrained** | TFLite | When <10MB total footprint required |
 | **Research/experimentation** | Native | Rapid iteration, full operator support |
 
-### PEAT Architecture Decision
+### Peat Architecture Decision
 
-**PEAT adopts ONNX as the standard model format** for the following reasons:
+**Peat adopts ONNX as the standard model format** for the following reasons:
 
 1. **Vendor Neutrality:** Critical for government procurement and multi-vendor ecosystem
 2. **Security:** Auditable graph structure enables malware detection and operator whitelisting
@@ -21770,7 +21749,7 @@ Traditional PyTorch Deployment:
 - 200 platforms = 140GB runtime + 100GB models = 240GB total
 - Update: 100GB for new model version
 
-PEAT with ONNX:
+Peat with ONNX:
 - Runtime: 15MB per platform (ONNX Runtime)
 - Model: 125MB INT8 per model
 - 200 platforms = 3GB runtime + 25GB models = 28GB total (88% reduction)
@@ -21804,12 +21783,12 @@ def verify_onnx_security(model_path: str) -> bool:
 ```
 
 **NATO Standardization Argument:**
-> "PEAT uses ONNX as the standard model interchange format, enabling allied forces to share AI capabilities without vendor lock-in. A US-trained ONNX model can deploy to UK, Australian, or Canadian platforms via PEAT's hierarchical distribution, supporting coalition operations and AUKUS Pillar II technology sharing objectives."
+> "Peat uses ONNX as the standard model interchange format, enabling allied forces to share AI capabilities without vendor lock-in. A US-trained ONNX model can deploy to UK, Australian, or Canadian platforms via Peat's hierarchical distribution, supporting coalition operations and AUKUS Pillar II technology sharing objectives."
 
 ### Future Considerations
 
 **Multi-Format Support:**
-While ONNX is the standard, PEAT architecture allows for alternative formats when operationally necessary:
+While ONNX is the standard, Peat architecture allows for alternative formats when operationally necessary:
 - TFLite for extremely constrained platforms (<100MB storage)
 - Native formats for experimental/research deployments
 - Emerging formats (e.g., MLIR, StableHLO) as they mature
@@ -21826,16 +21805,15 @@ Quantization (FP16/INT8)
     ↓
 AFRL AI Passport Validation
     ↓
-PEAT Model Registry
+Peat Model Registry
     ↓
 Hierarchical Distribution to Tactical Edge
 ```
 
 ---
 
-**This ADR establishes PEAT as the enabling infrastructure for edge-first ML operations in contested tactical environments, supporting the full model lifecycle from distribution through training while maintaining operational capability focus throughout the hierarchy.**
+**This ADR establishes Peat as the enabling infrastructure for edge-first ML operations in contested tactical environments, supporting the full model lifecycle from distribution through training while maintaining operational capability focus throughout the hierarchy.**
 
----
 
 # ADR-023: End-to-End Propagation Latency Measurement for Baseline Comparison
 
@@ -21884,7 +21862,7 @@ Traditional baseline with UPDATE_FREQUENCY=0.5s (500ms broadcast interval):
 - Server → Client: ~1ms (measured)
 - **Total P50: ~252ms** (250× higher than measured!)
 
-### Why This Matters for PEAT Comparison
+### Why This Matters for Peat Comparison
 
 We're building hierarchical CRDT to improve on traditional client-server. But our comparison is unfair:
 
@@ -22086,7 +22064,7 @@ Could add additional metrics:
 - **ServerQueuingDelay**: Time between receive and broadcast
 - **MultiHopPropagation**: Track propagation through multiple tiers
 
-This creates a comprehensive latency measurement framework for all PEAT architectures.
+This creates a comprehensive latency measurement framework for all Peat architectures.
 
 ## References
 
@@ -22095,18 +22073,17 @@ This creates a comprehensive latency measurement framework for all PEAT architec
 - ADR-015: Hierarchical aggregation validation requirements
 - ADR-011: Ditto vs Automerge backend comparison
 
----
 
 # ADR-023: Peer Discovery Architecture - Beacon-Based vs DHT
 
 **Status**: Accepted
 **Date**: 2025-11-22
-**Deciders**: Kit Plummer, Codex
+**Deciders**: Kit Plummer, Claude Code
 **Related**: ADR-017 (P2P Mesh Management)
 
 ## Context
 
-PEAT requires peer discovery mechanisms to enable nodes to find and connect to each other in the P2P mesh network. Discovery needs vary by operational scale:
+Peat requires peer discovery mechanisms to enable nodes to find and connect to each other in the P2P mesh network. Discovery needs vary by operational scale:
 
 ### Tactical/Local Scale (meters to kilometers)
 - Squad members discovering squad leader
@@ -22302,7 +22279,7 @@ peat-mesh/src/discovery/
 - **Ethereum**: Kademlia DHT for global node discovery
 - **Polkadot**: libp2p-kad + mDNS
 
-PEAT follows similar pattern: **Local discovery (beacons) + optional global discovery (DHT)**.
+Peat follows similar pattern: **Local discovery (beacons) + optional global discovery (DHT)**.
 
 ## References
 
@@ -22317,13 +22294,12 @@ PEAT follows similar pattern: **Local discovery (beacons) + optional global disc
 - **2025-11-22**: Reserved DHT as future enhancement for wide-area scenarios
 - **2025-11-22**: Established multi-tier discovery architecture
 
----
 
 # ADR-024: Flexible Hierarchy Strategies for Adaptive Mesh Organization
 
 **Status**: Accepted (Implementation Complete)
 **Date**: 2025-11-22
-**Authors**: Codex, Kit Plummer
+**Authors**: Claude, Kit Plummer
 **Supersedes**: None
 **Relates To**: ADR-017 (P2P Mesh Management), ADR-002 (Beacon Storage), ADR-009 (Bidirectional Flows), ADR-014 (Distributed Coordination)
 
@@ -23858,20 +23834,19 @@ let config = TopologyConfig {
 **Implementation Status**: Complete (PR #140 merged)
 **Next Steps**: Operational validation and weight tuning based on field data
 
----
 
 # ADR-025: Blob Transfer Abstraction Layer
 
 **Status**: Proposed
 **Date**: 2025-11-25
-**Authors**: Codex, Kit Plummer
+**Authors**: Claude, Kit Plummer
 **Relates to**: ADR-005 (DataSync Abstraction), ADR-013 (Distributed Software/AI Operations), ADR-022 (Edge MLOps), ADR-018 (AI Model Capability Advertisement)
 
 ## Context
 
 ### The File Transfer Gap
 
-PEAT Protocol has comprehensive architecture for distributed AI model operations (ADR-013, ADR-022) and capability advertisement (ADR-018), but lacks the foundational primitive: **backend-agnostic binary file transfer through the mesh**.
+Peat Protocol has comprehensive architecture for distributed AI model operations (ADR-013, ADR-022) and capability advertisement (ADR-018), but lacks the foundational primitive: **backend-agnostic binary file transfer through the mesh**.
 
 **Current State:**
 - `StorageBackend` and `Collection` traits handle document CRUD (`storage/traits.rs`)
@@ -23975,7 +23950,7 @@ while let Some(chunk) = reader.next().await {
 
 ### Gap Analysis
 
-| Feature | Ditto | iroh-blobs | PEAT (Current) |
+| Feature | Ditto | iroh-blobs | Peat (Current) |
 |---------|-------|------------|----------------|
 | Content-addressed storage | Yes | Yes | No |
 | Progress tracking | Yes | Yes | No |
@@ -23993,7 +23968,7 @@ Introduce a `BlobStore` trait parallel to `StorageBackend`, acknowledging that b
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    PEAT Protocol Layer                       │
+│                    Peat Protocol Layer                       │
 │                                                              │
 │  ┌─────────────────┐           ┌─────────────────────────┐  │
 │  │ ModelDistribution│           │  SoftwareDistribution   │  │
@@ -24876,22 +24851,21 @@ These questions must be answered before implementing Phase 4:
 
 ---
 
-**This ADR establishes the foundational file transfer abstraction enabling AI model distribution and software operations across the PEAT mesh network.**
+**This ADR establishes the foundational file transfer abstraction enabling AI model distribution and software operations across the Peat mesh network.**
 
----
 
 # ADR-025: Blob Transfer Protocol
 
 **Status**: Proposed (Revision 2)  
 **Date**: 2025-11-25  
-**Authors**: Codex, Kit Plummer  
+**Authors**: Claude, Kit Plummer  
 **Relates to**: ADR-005 (DataSync Abstraction), ADR-012 (Schema Definition), ADR-007 (Automerge Sync)
 
 ## Context
 
 ### The File Transfer Gap
 
-PEAT Protocol provides CRDT-based document synchronization for coordination state (capabilities, commands, events). However, many coordination scenarios require transferring large binary artifacts:
+Peat Protocol provides CRDT-based document synchronization for coordination state (capabilities, commands, events). However, many coordination scenarios require transferring large binary artifacts:
 
 | Use Case | Examples | Size Range |
 |----------|----------|------------|
@@ -24925,14 +24899,14 @@ Both Ditto and Iroh recognize this distinction with separate APIs:
 
 ### Scope Clarification
 
-**This ADR defines PEAT Protocol primitives for blob transfer.**
+**This ADR defines Peat Protocol primitives for blob transfer.**
 
 It does NOT define:
 - How applications use blobs (model loading, container execution)
 - Distribution orchestration (which nodes get which blobs)
 - Application-specific metadata schemas
 
-Those concerns belong to applications built on PEAT (see ADR-026 Reference Implementation).
+Those concerns belong to applications built on Peat (see ADR-026 Reference Implementation).
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -24942,7 +24916,7 @@ Those concerns belong to applications built on PEAT (see ADR-026 Reference Imple
 └──────────────────────────┬──────────────────────────────────────┘
                            │ uses
 ═══════════════════════════╪═══════════════════════════════════════
-         PEAT PROTOCOL (this ADR)
+         Peat PROTOCOL (this ADR)
 ═══════════════════════════╪═══════════════════════════════════════
                            │
 ┌──────────────────────────┴──────────────────────────────────────┐
@@ -24965,7 +24939,7 @@ Blobs are identified by content hash, enabling:
 
 ### Schema: BlobReference
 
-The fundamental unit of blob identification in PEAT:
+The fundamental unit of blob identification in Peat:
 
 ```protobuf
 syntax = "proto3";
@@ -24975,7 +24949,7 @@ package peat.blob.v1;
 import "google/protobuf/timestamp.proto";
 
 // Content-addressed blob reference
-// This is the PEAT protocol's way of identifying binary artifacts
+// This is the Peat protocol's way of identifying binary artifacts
 message BlobReference {
   // Content hash (hex-encoded)
   string hash = 1;
@@ -24987,7 +24961,7 @@ message BlobReference {
   uint64 size_bytes = 3;
   
   // Optional: application-defined metadata
-  // PEAT treats this as opaque - applications define semantics
+  // Peat treats this as opaque - applications define semantics
   map<string, string> metadata = 10;
 }
 
@@ -25061,7 +25035,7 @@ Backend-agnostic interface for blob operations:
 //!
 //! This trait abstracts over backend-specific blob storage implementations
 //! (Ditto Attachments, iroh-blobs, etc.) providing a unified interface
-//! for the PEAT protocol layer.
+//! for the Peat protocol layer.
 //!
 //! # Design Principles
 //!
@@ -25714,25 +25688,24 @@ The following are explicitly out of scope for this ADR:
 
 ---
 
-**This ADR establishes the PEAT Protocol primitive for content-addressed blob transfer, enabling applications to distribute large binary artifacts through the mesh network.**
+**This ADR establishes the Peat Protocol primitive for content-addressed blob transfer, enabling applications to distribute large binary artifacts through the mesh network.**
 
----
 
 # ADR-026: Reference Implementation - Software Orchestration
 
 **Status**: Proposed  
 **Date**: 2025-11-25  
-**Authors**: Codex, Kit Plummer  
+**Authors**: Claude, Kit Plummer  
 **Type**: Reference Implementation (not protocol specification)  
 **Relates to**: ADR-012 (Schema), ADR-025 (Blob Transfer), ADR-018 (Capability Advertisement)
 
 ## Document Classification
 
-> **⚠️ This is a REFERENCE IMPLEMENTATION guide, not a PEAT Protocol specification.**
+> **⚠️ This is a REFERENCE IMPLEMENTATION guide, not a Peat Protocol specification.**
 >
-> This ADR demonstrates how to build a software orchestration system on top of PEAT Protocol primitives. The patterns, traits, and implementations shown here are examples that users MAY adopt, adapt, or replace entirely.
+> This ADR demonstrates how to build a software orchestration system on top of Peat Protocol primitives. The patterns, traits, and implementations shown here are examples that users MAY adopt, adapt, or replace entirely.
 >
-> **PEAT Protocol primitives used:**
+> **Peat Protocol primitives used:**
 > - `BlobStore` / `BlobRef` (ADR-025)
 > - `CapabilityAdvertisement` (ADR-012)
 > - `PeatEvent` with `AggregationPolicy` (ADR-012)
@@ -25746,11 +25719,11 @@ The following are explicitly out of scope for this ADR:
 
 ## Context
 
-### Building on PEAT Primitives
+### Building on Peat Primitives
 
-PEAT Protocol provides foundational primitives for distributed coordination:
+Peat Protocol provides foundational primitives for distributed coordination:
 
-| PEAT Primitive | What It Does | ADR |
+| Peat Primitive | What It Does | ADR |
 |----------------|--------------|-----|
 | BlobRef / BlobStore | Content-addressed binary transfer | ADR-025 |
 | CapabilityAdvertisement | Nodes advertise what they can do | ADR-012 |
@@ -25758,13 +25731,13 @@ PEAT Protocol provides foundational primitives for distributed coordination:
 | DeploymentDirective | Commands flow through hierarchy | ADR-012 |
 | AggregationPolicy | Control event propagation | ADR-012 |
 
-**These primitives are runtime-agnostic** - PEAT doesn't know or care if you're deploying ONNX models, Docker containers, or configuration files.
+**These primitives are runtime-agnostic** - Peat doesn't know or care if you're deploying ONNX models, Docker containers, or configuration files.
 
 This reference implementation shows **one way** to build a software orchestration system that:
 - Deploys multiple artifact types (models, containers, binaries)
-- Reports health and status through PEAT events
-- Produces outputs that flow through PEAT's event routing
-- Uses PEAT's blob transfer for artifact distribution
+- Reports health and status through Peat events
+- Produces outputs that flow through Peat's event routing
+- Uses Peat's blob transfer for artifact distribution
 
 ### Why a Reference Implementation?
 
@@ -25774,7 +25747,7 @@ Different organizations will have different needs:
 - Military users may have specific runtime requirements (MOSA, certifications)
 
 By providing a reference implementation rather than mandating an approach, we:
-1. **Demonstrate** how to use PEAT primitives effectively
+1. **Demonstrate** how to use Peat primitives effectively
 2. **Provide** working code that can be adopted or adapted
 3. **Avoid** constraining users to our specific choices
 4. **Enable** innovation in the application layer
@@ -25807,11 +25780,11 @@ By providing a reference implementation rather than mandating an approach, we:
 └──────────────────────────┬──────────────────────────────────────┘
                            │ uses
 ═══════════════════════════╪═══════════════════════════════════════
-         PEAT PROTOCOL BOUNDARY
+         Peat PROTOCOL BOUNDARY
 ═══════════════════════════╪═══════════════════════════════════════
                            │
 ┌──────────────────────────┴──────────────────────────────────────┐
-│  PEAT PROTOCOL LAYER                                             │
+│  Peat PROTOCOL LAYER                                             │
 │  BlobStore, CapabilityAdvertisement, PeatEvent, DeploymentDir.  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -25821,7 +25794,7 @@ By providing a reference implementation rather than mandating an approach, we:
 **Artifact**: A deployable unit (blob) with type information
 ```rust
 struct Artifact {
-    blob_ref: BlobRef,           // PEAT primitive (ADR-025)
+    blob_ref: BlobRef,           // Peat primitive (ADR-025)
     artifact_type: ArtifactType, // Application-defined
     config: serde_json::Value,   // Runtime-specific config
 }
@@ -25840,8 +25813,8 @@ trait RuntimeAdapter {
 **OrchestrationService**: Coordinates deployment lifecycle
 ```rust
 struct OrchestrationService {
-    blob_store: Arc<dyn BlobStore>,        // PEAT primitive
-    peat_events: Arc<dyn PeatEventPublisher>, // PEAT primitive  
+    blob_store: Arc<dyn BlobStore>,        // Peat primitive
+    peat_events: Arc<dyn PeatEventPublisher>, // Peat primitive  
     adapters: Vec<Arc<dyn RuntimeAdapter>>, // Application-defined
 }
 ```
@@ -25963,7 +25936,7 @@ pub struct ProductOutput {
     pub routing: RoutingHint,
 }
 
-/// Hint for how this product should be routed through PEAT
+/// Hint for how this product should be routed through Peat
 #[derive(Clone, Debug, Default)]
 pub struct RoutingHint {
     /// Map to PeatEvent.AggregationPolicy
@@ -26046,7 +26019,7 @@ pub trait RuntimeAdapter: Send + Sync {
     /// Subscribe to product outputs from this instance
     ///
     /// Products are runtime-specific outputs (detections, classifications, etc.)
-    /// The orchestration service will route these through PEAT events.
+    /// The orchestration service will route these through Peat events.
     async fn subscribe_products(
         &self,
         instance_id: &InstanceId,
@@ -26455,7 +26428,7 @@ impl RuntimeAdapter for ContainerAdapter {
 
 ### OrchestrationService
 
-Coordinates deployment using PEAT primitives:
+Coordinates deployment using Peat primitives:
 
 ```rust
 use crate::storage::{BlobStore, BlobRef};
@@ -26464,16 +26437,16 @@ use crate::protocol::{PeatEventPublisher, CapabilityPublisher};
 /// Orchestration service coordinating software lifecycle
 ///
 /// This is the main entry point for deploying and managing software.
-/// It uses PEAT primitives (BlobStore, Events) and delegates runtime
+/// It uses Peat primitives (BlobStore, Events) and delegates runtime
 /// specifics to RuntimeAdapter implementations.
 pub struct OrchestrationService {
-    /// PEAT blob store for artifact retrieval
+    /// Peat blob store for artifact retrieval
     blob_store: Arc<dyn BlobStore>,
     
-    /// PEAT event publisher for products/anomalies
+    /// Peat event publisher for products/anomalies
     event_publisher: Arc<dyn PeatEventPublisher>,
     
-    /// PEAT capability publisher for status
+    /// Peat capability publisher for status
     capability_publisher: Arc<dyn CapabilityPublisher>,
     
     /// Available runtime adapters
@@ -26514,11 +26487,11 @@ impl OrchestrationService {
     
     /// Deploy an artifact locally
     ///
-    /// 1. Fetches blob via BlobStore (PEAT primitive)
+    /// 1. Fetches blob via BlobStore (Peat primitive)
     /// 2. Selects appropriate RuntimeAdapter
     /// 3. Activates via adapter
     /// 4. Subscribes to products/anomalies
-    /// 5. Publishes capability advertisement (PEAT primitive)
+    /// 5. Publishes capability advertisement (Peat primitive)
     pub async fn deploy(
         &self,
         blob_ref: BlobRef,
@@ -26526,7 +26499,7 @@ impl OrchestrationService {
         config: serde_json::Value,
         capabilities: Vec<String>,
     ) -> Result<InstanceId> {
-        // Step 1: Fetch blob (PEAT primitive)
+        // Step 1: Fetch blob (Peat primitive)
         let local_blob = self.blob_store.fetch(&blob_ref, |progress| {
             // Could emit progress events here
             tracing::debug!(?progress, "Blob fetch progress");
@@ -26550,7 +26523,7 @@ impl OrchestrationService {
         // Step 4: Subscribe to outputs
         self.start_monitoring(&instance_id, &adapter).await?;
         
-        // Step 5: Publish capability (PEAT primitive)
+        // Step 5: Publish capability (Peat primitive)
         self.publish_capability(&instance_id, &capabilities, InstanceState::Running).await?;
         
         // Record instance
@@ -26603,7 +26576,7 @@ impl OrchestrationService {
         instance_id: &InstanceId,
         adapter: &Arc<dyn RuntimeAdapter>,
     ) -> Result<()> {
-        // Subscribe to products and route through PEAT events
+        // Subscribe to products and route through Peat events
         let mut products = adapter.subscribe_products(instance_id).await?;
         let event_pub = self.event_publisher.clone();
         let iid = instance_id.clone();
@@ -26678,7 +26651,7 @@ impl OrchestrationService {
         capabilities: &[String],
         state: InstanceState,
     ) -> Result<()> {
-        // Build PEAT CapabilityAdvertisement
+        // Build Peat CapabilityAdvertisement
         let advertisement = CapabilityAdvertisement {
             capabilities: capabilities.iter().map(|c| Capability {
                 capability_type: "software".into(),
@@ -26758,17 +26731,17 @@ pub struct Waypoint {
 }
 ```
 
-## Integration with PEAT Protocol
+## Integration with Peat Protocol
 
-### Using PEAT Primitives
+### Using Peat Primitives
 
 ```rust
-// Example: Full deployment flow using PEAT primitives
+// Example: Full deployment flow using Peat primitives
 
 async fn deploy_model(
     orchestration: &OrchestrationService,
-    peat_storage: &dyn StorageBackend,  // PEAT document storage
-    blob_store: &dyn BlobStore,          // PEAT blob storage (ADR-025)
+    peat_storage: &dyn StorageBackend,  // Peat document storage
+    blob_store: &dyn BlobStore,          // Peat blob storage (ADR-025)
 ) -> Result<()> {
     // 1. Model blob already stored (maybe by C2 node)
     let model_ref = BlobRef {
@@ -26788,7 +26761,7 @@ async fn deploy_model(
         vec!["target_recognition".into()],
     ).await?;
     
-    // 3. Capability is automatically advertised via PEAT
+    // 3. Capability is automatically advertised via Peat
     // 4. Products/anomalies automatically flow via PeatEvent
     
     Ok(())
@@ -26798,10 +26771,10 @@ async fn deploy_model(
 ### Receiving Deployment Commands
 
 ```rust
-// Example: Handling DeploymentDirective from PEAT
+// Example: Handling DeploymentDirective from Peat
 
 async fn handle_deployment_directive(
-    directive: DeploymentDirective,  // PEAT protocol message
+    directive: DeploymentDirective,  // Peat protocol message
     orchestration: &OrchestrationService,
 ) -> Result<()> {
     // Extract application-specific config from directive
@@ -26815,7 +26788,7 @@ async fn handle_deployment_directive(
     
     // Deploy using orchestration service
     orchestration.deploy(
-        directive.artifact,  // BlobRef from PEAT
+        directive.artifact,  // BlobRef from Peat
         artifact_type,
         directive.config,
         capabilities,
@@ -26859,7 +26832,7 @@ These are valid extensions you may need - this reference focuses on the core lif
 
 ## References
 
-### PEAT Protocol ADRs
+### Peat Protocol ADRs
 - ADR-012: Schema Definition (CapabilityAdvertisement, PeatEvent)
 - ADR-025: Blob Transfer Protocol (BlobStore, BlobRef)
 
@@ -26874,22 +26847,21 @@ These are valid extensions you may need - this reference focuses on the core lif
 
 ---
 
-**This reference implementation demonstrates how to build software orchestration on PEAT Protocol primitives. Adopt, adapt, or replace as needed for your use case.**
+**This reference implementation demonstrates how to build software orchestration on Peat Protocol primitives. Adopt, adapt, or replace as needed for your use case.**
 
----
 
 # ADR-027: Event Routing and Aggregation Protocol
 
 **Status**: Proposed  
 **Date**: 2025-11-25  
-**Authors**: Codex, Kit Plummer  
+**Authors**: Claude, Kit Plummer  
 **Relates to**: ADR-012 (Schema Definition), ADR-009 (Bidirectional Flows), ADR-019 (QoS and Data Prioritization)
 
 ## Context
 
 ### The Event Flow Problem
 
-PEAT Protocol enables distributed autonomous systems to coordinate through hierarchical state synchronization. ADR-012 defines the **schemas** for events, capabilities, and commands. This ADR defines the **protocol behavior** - how events flow through the hierarchy and how aggregation policies are enforced.
+Peat Protocol enables distributed autonomous systems to coordinate through hierarchical state synchronization. ADR-012 defines the **schemas** for events, capabilities, and commands. This ADR defines the **protocol behavior** - how events flow through the hierarchy and how aggregation policies are enforced.
 
 **Core Challenge:**
 
@@ -26904,9 +26876,9 @@ In a 1000-node company formation with 4 echelons (platform → squad → platoon
 - Operators overwhelmed with undifferentiated data
 - Higher echelons have no situational awareness
 
-**PEAT's Solution:**
+**Peat's Solution:**
 
-Events carry `AggregationPolicy` metadata that tells PEAT *how* to route them:
+Events carry `AggregationPolicy` metadata that tells Peat *how* to route them:
 - **Critical anomalies**: Immediate propagation, preempt other traffic
 - **Routine detections**: Aggregate into summaries at squad level
 - **Telemetry**: Store locally, respond to queries
@@ -26925,7 +26897,7 @@ This ADR specifies the protocol behavior that enforces these policies.
 
 ### Design Principles
 
-1. **Policy-Driven**: Event producers declare routing intent; PEAT enforces
+1. **Policy-Driven**: Event producers declare routing intent; Peat enforces
 2. **Hierarchical**: Events flow through formation structure, not arbitrary mesh
 3. **Bandwidth-Aware**: Aggregation reduces traffic at each echelon
 4. **Priority-Respecting**: Critical events preempt routine traffic
@@ -27440,7 +27412,7 @@ impl EventTTLEnforcer {
 
 ### Wire Protocol
 
-Events are transmitted using the standard PEAT transport (ADR-010):
+Events are transmitted using the standard Peat transport (ADR-010):
 
 ```protobuf
 syntax = "proto3";
@@ -27633,7 +27605,7 @@ Capability summaries are generated at each echelon using `FormationCapabilitySum
 - ADR-012: Schema Definition (PeatEvent, AggregationPolicy schemas)
 - ADR-009: Bidirectional Hierarchical Flows
 - ADR-019: QoS and Data Prioritization
-- ADR-001: PEAT Protocol PoC
+- ADR-001: Peat Protocol PoC
 
 ### Algorithms
 - Weighted Fair Queuing (WFQ)
@@ -27647,11 +27619,10 @@ Capability summaries are generated at each echelon using `FormationCapabilitySum
 
 ---
 
-**This ADR specifies how PEAT Protocol routes events through the hierarchy, enforces aggregation policies, and enables bandwidth-efficient distributed coordination.**
+**This ADR specifies how Peat Protocol routes events through the hierarchy, enforces aggregation policies, and enables bandwidth-efficient distributed coordination.**
 
----
 
-# ADR-028: PEAT CoT Custom Detail Extension Schema
+# ADR-028: Peat CoT Custom Detail Extension Schema
 
 **Status**: Proposed
 **Date**: 2025-11-26
@@ -27667,24 +27638,24 @@ Capability summaries are generated at each echelon using `FormationCapabilitySum
 
 ### Problem Statement
 
-When translating PEAT messages to Cursor-on-Target (CoT) XML format for TAK integration, significant semantic information is lost. CoT's core schema supports:
+When translating Peat messages to Cursor-on-Target (CoT) XML format for TAK integration, significant semantic information is lost. CoT's core schema supports:
 - Position (lat/lon/hae)
 - Identity (uid, type)
 - Time bounds (time, start, stale)
 - Basic details (remarks, links, contacts)
 
-However, PEAT messages contain rich context that TAK operators need:
+However, Peat messages contain rich context that TAK operators need:
 - **Source attribution**: Which platform and AI model produced this data?
 - **Confidence scores**: How reliable is this track detection?
 - **Hierarchy membership**: Which cell/formation does this belong to?
 - **Capability status**: What can this platform do? Is it degraded?
 - **Custom attributes**: Domain-specific metadata (clothing color, vehicle type, etc.)
 
-Without preserving this information, TAK operators cannot make informed decisions about PEAT-coordinated assets.
+Without preserving this information, TAK operators cannot make informed decisions about Peat-coordinated assets.
 
 ### CoT Extensibility
 
-CoT supports custom detail elements via XML namespaces. Elements starting with `_` are treated as extensions and passed through by TAK servers/clients that don't recognize them. This allows PEAT to embed rich metadata while maintaining compatibility.
+CoT supports custom detail elements via XML namespaces. Elements starting with `_` are treated as extensions and passed through by TAK servers/clients that don't recognize them. This allows Peat to embed rich metadata while maintaining compatibility.
 
 **TAK Extension Convention**:
 - Element names starting with `_` are extensions
@@ -27694,7 +27665,7 @@ CoT supports custom detail elements via XML namespaces. Elements starting with `
 
 ## Decision
 
-We will define a standardized `<_peat_>` CoT detail extension schema for embedding PEAT-specific semantics in CoT messages.
+We will define a standardized `<_peat_>` CoT detail extension schema for embedding Peat-specific semantics in CoT messages.
 
 ### Schema Definition
 
@@ -27721,7 +27692,7 @@ We will define a standardized `<_peat_>` CoT detail extension schema for embeddi
     <zone id="{zone_id}"/>
   </hierarchy>
 
-  <!-- Custom Attributes (pass-through from PEAT messages) -->
+  <!-- Custom Attributes (pass-through from Peat messages) -->
   <attributes>
     <attr key="{key}" type="{string|number|boolean}">{value}</attr>
     <!-- ... additional attributes ... -->
@@ -27814,7 +27785,7 @@ We will define a standardized `<_peat_>` CoT detail extension schema for embeddi
 
 #### `<hierarchy>` - Hierarchy Membership
 
-Contains child elements describing the entity's position in PEAT hierarchy:
+Contains child elements describing the entity's position in Peat hierarchy:
 
 | Element | Attributes | Description |
 |---------|------------|-------------|
@@ -27833,7 +27804,7 @@ Contains child elements describing the entity's position in PEAT hierarchy:
 
 #### `<attributes>` - Custom Attributes
 
-Pass-through container for domain-specific metadata from PEAT messages.
+Pass-through container for domain-specific metadata from Peat messages.
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -28169,12 +28140,12 @@ impl PeatDetailDecoder {
 
 ### Positive
 
-1. **Semantic Preservation**: Rich PEAT context survives translation to CoT
+1. **Semantic Preservation**: Rich Peat context survives translation to CoT
 2. **TAK Compatibility**: Uses standard CoT extension mechanism
 3. **Operator Awareness**: TAK users can see confidence, source, hierarchy
-4. **Plugin Support**: ATAK plugins can render PEAT-specific UI
+4. **Plugin Support**: ATAK plugins can render Peat-specific UI
 5. **Versioned Schema**: Enables forward-compatible evolution
-6. **Standardized Format**: Consistent across all PEAT message types
+6. **Standardized Format**: Consistent across all Peat message types
 
 ### Negative
 
@@ -28199,8 +28170,8 @@ impl PeatDetailDecoder {
 
 ## Success Metrics
 
-1. **Completeness**: All PEAT message types have defined mappings
-2. **Round-trip**: PEAT → CoT → PEAT preserves semantic meaning
+1. **Completeness**: All Peat message types have defined mappings
+2. **Round-trip**: Peat → CoT → Peat preserves semantic meaning
 3. **Compatibility**: Works with TAK Server, FreeTakServer, ATAK
 4. **Performance**: Extension parsing < 1ms
 5. **Documentation**: XSD schema published and validated
@@ -28217,11 +28188,10 @@ impl PeatDetailDecoder {
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2025-11-26 | Created ADR-028 | M1 POC feedback - need standardized PEAT extension |
+| 2025-11-26 | Created ADR-028 | M1 POC feedback - need standardized Peat extension |
 | 2025-11-26 | Selected `_peat_` element name | TAK `_` prefix convention for extensions |
-| 2025-11-26 | Included all PEAT message types | Comprehensive coverage from COT_SCHEMA_MAPPING.md |
+| 2025-11-26 | Included all Peat message types | Comprehensive coverage from COT_SCHEMA_MAPPING.md |
 
----
 
 # ADR-029: TAK Transport Adapter
 
@@ -28256,7 +28226,7 @@ ADR-020 defines the high-level TAK/CoT integration strategy, but the transport l
 
 ### Transport Adapter Pattern
 
-PEAT already uses transport adapters for backend abstraction (Ditto, Iroh). TAK integration follows this pattern as an external bridge transport, not a CRDT sync backend.
+Peat already uses transport adapters for backend abstraction (Ditto, Iroh). TAK integration follows this pattern as an external bridge transport, not a CRDT sync backend.
 
 ## Decision
 
@@ -28267,7 +28237,7 @@ We will implement `TakTransport` as a first-class transport adapter with DIL-res
 ```rust
 /// TAK Transport Adapter
 ///
-/// Provides bidirectional CoT message transport between PEAT and TAK ecosystem.
+/// Provides bidirectional CoT message transport between Peat and TAK ecosystem.
 /// Supports TAK Server (TCP/SSL) and Mesh SA (UDP multicast) modes.
 #[async_trait]
 pub trait TakTransport: Send + Sync {
@@ -28460,7 +28430,7 @@ pub struct XmlEncodingOptions {
     /// Pretty print (development only)
     pub pretty_print: bool,
 
-    /// Include PEAT extension by default
+    /// Include Peat extension by default
     pub include_peat_extension: bool,
 }
 ```
@@ -28810,7 +28780,7 @@ impl TakServerTransport {
     async fn send_presence(&mut self) -> Result<(), TakError> {
         let callsign = self.config.identity.as_ref()
             .map(|i| i.callsign.as_str())
-            .unwrap_or("PEAT-BRIDGE");
+            .unwrap_or("Peat-BRIDGE");
 
         let presence = CotEvent::presence(callsign);
         self.send_raw(&presence).await
@@ -29128,7 +29098,7 @@ pub struct QueueDepthMetrics {
 ### Integration Tests
 
 1. FreeTakServer connection lifecycle
-2. Message round-trip (PEAT → TAK → ATAK)
+2. Message round-trip (Peat → TAK → ATAK)
 3. Disconnection/reconnection handling
 4. Certificate authentication
 
@@ -29143,7 +29113,7 @@ pub struct QueueDepthMetrics {
 
 ### Why Protobuf is Preferred
 
-TAK Server and modern TAK clients (ATAK, WinTAK, iTAK) support **TAK Protocol Version 1** which uses Google Protocol Buffers instead of XML. This is critical for PEAT's tactical/DIL environments:
+TAK Server and modern TAK clients (ATAK, WinTAK, iTAK) support **TAK Protocol Version 1** which uses Google Protocol Buffers instead of XML. This is critical for Peat's tactical/DIL environments:
 
 | Metric | XML | Protobuf | Benefit |
 |--------|-----|----------|---------|
@@ -29172,7 +29142,7 @@ The official TAK Protocol Buffers definitions are available at:
 
 Key message type: `atakmap.commoncommo.v1.TakMessage`
 
-### PEAT Extension in Protobuf
+### Peat Extension in Protobuf
 
 The `_peat_` XML extension (ADR-028) can be embedded in Protobuf via:
 1. **`xmlDetail` field** - Embed XML string in Protobuf detail (initial approach, maximum compatibility)
@@ -29216,13 +29186,12 @@ Initial implementation will use `xmlDetail` for compatibility with all TAK produ
 | 2025-11-26 | Support both TAK Server and Mesh SA | Different deployment scenarios |
 | 2025-11-26 | Trait-based design | Enables mock implementations for testing |
 
----
 
 # ADR-030: Multi-Interface Transport for Network Bridging
 
 **Status**: Accepted
 **Date**: 2025-12-02
-**Authors**: Kit Plummer, Codex
+**Authors**: Kit Plummer, Claude
 **Relates To**: ADR-011 (Automerge + Iroh), ADR-017 (P2P Mesh Management)
 
 ---
@@ -29599,26 +29568,27 @@ Update documentation to clarify multi-interface support:
 3. 🔲 Update documentation
 4. 🔲 (Future) Implement BridgeTransport only if air-gapped network support is required
 
----
 
-# ADR-031: PEAT Commander - Tactical Capability RPG
+# ADR-031: Peat Commander - Tactical Capability RPG
 
 ## Status
-Proposed (TUI prototype complete)
+**Superseded** — peat-commander has been removed from the workspace and will be redeveloped as an external repository. This ADR is retained for historical context.
+
+*Previously: Proposed (TUI prototype complete)*
 
 ## Context
 
-Industry feedback identified two critical gaps in PEAT's current demonstration capability:
+Industry feedback identified two critical gaps in Peat's current demonstration capability:
 
 1. **Visualization Gap**: "You need to be able to visualize the hierarchy in some simple C2 map, video game kind of way - showing individual capabilities being aggregated into emergent capabilities, and tasking being redistributed back out by the player"
 
 2. **Cross-Boundary Coordination Gap**: "Can you take one asset from one squad and another asset from a different squad and task them as a new group? This would be super valuable, especially if they are crossing ownership boundaries (operated by two different countries)"
 
-Additionally, the concept of **coagency performance** - measuring how well human-machine-AI teams perform together - was identified as a research differentiator that PEAT could demonstrate through interactive gameplay.
+Additionally, the concept of **coagency performance** - measuring how well human-machine-AI teams perform together - was identified as a research differentiator that Peat could demonstrate through interactive gameplay.
 
 ### Why Not RTS?
 
-Real-time strategy games are chaotic, hard to follow in demos, and don't naturally emphasize **composition** - the core value of PEAT. Players focus on micro-management and APM rather than thoughtful capability aggregation.
+Real-time strategy games are chaotic, hard to follow in demos, and don't naturally emphasize **composition** - the core value of Peat. Players focus on micro-management and APM rather than thoughtful capability aggregation.
 
 ### Why D&D-Style Tactical RPG?
 
@@ -29627,18 +29597,18 @@ Dungeons & Dragons is fundamentally about **party composition**:
 - "Who has the skill we need? Can we combine abilities?"
 - "The rogue can't pick the lock alone, but with the wizard's guidance spell..."
 
-This is *exactly* what PEAT does - matching task requirements to composed capabilities. The D&D framing makes this intuitive and memorable.
+This is *exactly* what Peat does - matching task requirements to composed capabilities. The D&D framing makes this intuitive and memorable.
 
 ## Decision
 
-Build **PEAT Commander**, a turn-based tactical RPG that uses the actual Rust PEAT reference implementation to coordinate heterogeneous assets on a 3D terrain map. The game emphasizes **capability composition** through D&D-style skill checks and party mechanics.
+Build **Peat Commander**, a turn-based tactical RPG that uses the actual Rust Peat reference implementation to coordinate heterogeneous assets on a 3D terrain map. The game emphasizes **capability composition** through D&D-style skill checks and party mechanics.
 
 ### Core Design Principles
 
 1. **Composition is the game** - Victory comes from clever capability combinations, not twitch reflexes
 2. **Turn-based for clarity** - Audience can follow the action in demos
 3. **DM = Presenter** - The presenter controls scenarios, introduces challenges
-4. **Skill checks = Capability matching** - D&D's core mechanic maps perfectly to PEAT
+4. **Skill checks = Capability matching** - D&D's core mechanic maps perfectly to Peat
 5. **3D terrain map** - Spatial context with elevation, cover, and line-of-sight
 6. **Hierarchy through zoom** - Zoomed out shows composed capabilities, drill down for details
 
@@ -29646,9 +29616,9 @@ Build **PEAT Commander**, a turn-based tactical RPG that uses the actual Rust PE
 
 ## Game Design
 
-### The PEAT Party System
+### The Peat Party System
 
-Instead of D&D's Fighter/Wizard/Rogue classes, PEAT Commander has **Capability Classes**:
+Instead of D&D's Fighter/Wizard/Rogue classes, Peat Commander has **Capability Classes**:
 
 | Class | Role | Base Capabilities | D&D Analog |
 |-------|------|-------------------|------------|
@@ -29687,7 +29657,7 @@ Every piece has a capability profile:
 
 ### The Skill Check System
 
-When a task requires capabilities, PEAT Commander uses D&D-style skill checks:
+When a task requires capabilities, Peat Commander uses D&D-style skill checks:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -29722,7 +29692,7 @@ When a task requires capabilities, PEAT Commander uses D&D-style skill checks:
 
 ### Turn Structure
 
-Each round has phases that mirror PEAT's coordination flow:
+Each round has phases that mirror Peat's coordination flow:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -29736,7 +29706,7 @@ Each round has phases that mirror PEAT's coordination flow:
 │                                                                 │
 │  PHASE 2: PLANNING (Commander)                                  │
 │  ├── View capability requirements for each objective           │
-│  ├── See PEAT's recommended compositions                       │
+│  ├── See Peat's recommended compositions                       │
 │  └── Decide which objectives to pursue                         │
 │                                                                 │
 │  PHASE 3: MOVEMENT (All Players)                                │
@@ -29925,7 +29895,7 @@ In demo mode, the presenter acts as Dungeon Master:
 │                                                                 │
 │  TEACHING MOMENTS                                               │
 │  ├── [Highlight Composition] - show why this combo worked      │
-│  ├── [Show PEAT Recommendation] - "PEAT suggests..."           │
+│  ├── [Show Peat Recommendation] - "Peat suggests..."           │
 │  └── [Pause for Q&A] - freeze game state                       │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
@@ -30000,7 +29970,7 @@ In demo mode, the presenter acts as Dungeon Master:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        PEAT Commander                           │
+│                        Peat Commander                           │
 ├─────────────────────────────────────────────────────────────────┤
 │  Frontend (TypeScript/React)                                    │
 │  ├── 3D Map Renderer (Three.js or React Three Fiber)           │
@@ -30013,7 +29983,7 @@ In demo mode, the presenter acts as Dungeon Master:
 │  WebSocket Connection                                           │
 ├─────────────────────────────────────────────────────────────────┤
 │  Backend (Rust/Axum)                                            │
-│  ├── PEAT Reference Implementation                              │
+│  ├── Peat Reference Implementation                              │
 │  │   ├── Capability Documents (Automerge CRDTs)                │
 │  │   ├── Composition Engine (calculate synergies)              │
 │  │   ├── Task-Capability Matching (DC calculation)             │
@@ -30066,10 +30036,10 @@ cap/
 
 ### 1. Capability Composition (Core Mechanic)
 
-The skill check system directly validates PEAT's composition engine:
+The skill check system directly validates Peat's composition engine:
 
 ```rust
-// Does PEAT's composition bonus calculation match player intuition?
+// Does Peat's composition bonus calculation match player intuition?
 fn calculate_party_modifier(party: &[Piece], check_type: Capability) -> i32 {
     let base = party.iter()
         .map(|p| p.get_modifier(check_type))
@@ -30099,7 +30069,7 @@ Encounters validate that DC calculation makes sense:
 
 - Are "impossible" encounters actually impossible without the right composition?
 - Do "easy" encounters feel appropriately simple?
-- Does PEAT's recommendation system suggest good parties?
+- Does Peat's recommendation system suggest good parties?
 
 ### 4. Cross-Boundary Coordination
 
@@ -30200,7 +30170,7 @@ The D&D-style mechanics support multiple themes:
 |-----------|---------|--------|
 | Time to "get it" | New user understands composition | < 2 minutes |
 | Engagement | "I was the drone" recall | > 90% |
-| Teaching value | Audience asks about PEAT | > 50% |
+| Teaching value | Audience asks about Peat | > 50% |
 
 ### Technical Validation
 
@@ -30216,7 +30186,7 @@ The D&D-style mechanics support multiple themes:
 |-----------|---------|--------|
 | Composition data | Which synergies players discover | Logged |
 | Strategy patterns | Winning compositions | Analyzed |
-| Human-AI teaming | PEAT recommendation acceptance | Tracked |
+| Human-AI teaming | Peat recommendation acceptance | Tracked |
 
 ---
 
@@ -30225,7 +30195,7 @@ The D&D-style mechanics support multiple themes:
 ### RTS (Real-Time Strategy) - Rejected
 - Pro: Exciting, immediate
 - Con: Chaotic, hard to follow in demos
-- Con: Doesn't emphasize composition (the core PEAT value)
+- Con: Doesn't emphasize composition (the core Peat value)
 - Con: Favors micro-management over thoughtful coordination
 
 ### Pure Chess - Rejected
@@ -30240,7 +30210,7 @@ The D&D-style mechanics support multiple themes:
 - Con: Abstract, not tangible for C2 demos
 
 ### D&D-Style Tactical RPG - Chosen
-- Pro: Party composition is the core mechanic (exactly PEAT)
+- Pro: Party composition is the core mechanic (exactly Peat)
 - Pro: Skill checks map directly to capability matching
 - Pro: Turn-based means audience can follow
 - Pro: DM role fits presenter perfectly
@@ -30293,21 +30263,20 @@ cargo run -p peat-commander
 - ADR-001: CAP Protocol POC
 - ADR-004: Human-Machine Squad Composition
 - ADR-014: Distributed Coordination Primitives
-- Industry Feedback: PEAT Hierarchy Visualization (2024-12-06)
+- Industry Feedback: Peat Hierarchy Visualization (2024-12-06)
 
 ---
 
-*Organization: (r)evolve - Revolve Team LLC*
-*URL: https://revolveteam.com*
+*Organization: Defense Unicorns*
+*URL: https://defenseunicorns.com*
 
----
 
 # ADR-032: Pluggable Transport Abstraction for Multi-Network Operations
 
 **Status**: Proposed
 **Date**: 2025-12-07
 **Updated**: 2025-01-09
-**Authors**: Kit Plummer, Codex
+**Authors**: Kit Plummer, Claude
 **Relates to**: ADR-011 (Automerge + Iroh), ADR-017 (P2P Mesh Management), ADR-030 (Multi-Interface Transport), ADR-019 (QoS), ADR-046 (Targeted Delivery)
 **Implements**: Issue #548
 
@@ -30373,7 +30342,7 @@ How multiple transports are used together:
 **ADR-030** answered: "Does Iroh support multiple NICs?"
 - Yes, Iroh automatically binds to all interfaces
 
-**ADR-032** answers: "How does PEAT manage multiple transports holistically?"
+**ADR-032** answers: "How does Peat manage multiple transports holistically?"
 - Transport registration with unique IDs
 - PACE-style failover policies
 - Simultaneous use modes
@@ -30998,7 +30967,7 @@ impl BluetoothLETransport {
             },
             adapter,
             connections: RwLock::new(HashMap::new()),
-            service_uuid: Uuid::parse_str("PEAT-SERVICE-UUID").unwrap(),
+            service_uuid: Uuid::parse_str("Peat-SERVICE-UUID").unwrap(),
         }
     }
 }
@@ -31662,13 +31631,12 @@ Where does PACE transport policy live, and how do the layers interact?
 **Last Updated**: 2025-12-07
 **Status**: PROPOSED - Awaiting discussion
 
----
 
 # ADR-033: Positioning and Timing System Abstraction
 
 **Status**: Proposed
 **Date**: 2025-12-07
-**Authors**: Kit Plummer, Codex
+**Authors**: Kit Plummer, Claude
 **Relates to**: ADR-024 (Flexible Hierarchy Strategies), ADR-032 (Pluggable Transport Abstraction)
 
 ---
@@ -31677,7 +31645,7 @@ Where does PACE transport policy live, and how do the layers interact?
 
 ### The GPS Dependency Problem
 
-PEAT Protocol currently assumes GPS availability for:
+Peat Protocol currently assumes GPS availability for:
 - **Geographic beacons** (ADR-024) - nodes advertise lat/long/altitude
 - **Distance-based hierarchy** - parent selection based on proximity
 - **Range mode selection** (ADR-032) - transport config based on peer distance
@@ -31696,7 +31664,7 @@ PEAT Protocol currently assumes GPS availability for:
 
 ### The Timing Problem
 
-Beyond positioning, GPS provides precise timing (PPS - Pulse Per Second). PEAT needs time sync for:
+Beyond positioning, GPS provides precise timing (PPS - Pulse Per Second). Peat needs time sync for:
 - **CRDT ordering** - Automerge uses timestamps for conflict resolution
 - **Event sequencing** - Telemetry and command ordering
 - **TTL enforcement** - Document expiration
@@ -32236,7 +32204,7 @@ impl MeshTimeSync {
 }
 ```
 
-### 5. Integration with PEAT Components
+### 5. Integration with Peat Components
 
 ```rust
 /// Central positioning and timing service
@@ -32475,13 +32443,12 @@ Combine global and local positioning:
 **Last Updated**: 2025-12-07
 **Status**: PROPOSED - Awaiting discussion
 
----
 
 # ADR-034: Record Deletion and Tombstone Management
 
 **Status**: Proposed
 **Date**: 2025-12-09
-**Authors**: Kit Plummer, Codex
+**Authors**: Kit Plummer, Claude
 **Relates to**: ADR-019 (Sync Modes), ADR-011 (Automerge Backend), ADR-024 (Flexible Hierarchy)
 
 ---
@@ -32524,12 +32491,12 @@ struct Tombstone {
 2. Without the tombstone, sync would resurrect the document
 3. No safe point to garbage collect without coordination
 
-**In PEAT's tactical context:**
+**In Peat's tactical context:**
 - A 10-node squad generating 1 beacon/second for 8 hours = 288,000 records
 - If 10% are "deleted" (superseded), that's 28,800 tombstones
 - Tombstones sync forever, consuming bandwidth on reconnection
 
-### PEAT-Specific Considerations
+### Peat-Specific Considerations
 
 | Data Type | Deletion Semantics | Retention Need |
 |-----------|-------------------|----------------|
@@ -32542,7 +32509,7 @@ struct Tombstone {
 
 ### Current State
 
-PEAT currently has **no explicit deletion mechanism**:
+Peat currently has **no explicit deletion mechanism**:
 - `DocumentStore::delete()` is not implemented
 - Old documents accumulate indefinitely
 - `SyncMode::LatestOnly` discards history but not documents
@@ -33053,9 +33020,8 @@ Documents are immutable, use versioning instead.
 
 Legend: ✅ = Full support, ⚠️ = Partial/conditional, ❌ = Not supported
 
----
 
-# ADR-035: PEAT-Lite Embedded Sensor Nodes
+# ADR-035: Peat-Lite Embedded Sensor Nodes
 
 ## Status
 
@@ -33073,13 +33039,13 @@ The current approach for integrating such sensors is MQTT or similar broker-base
 4. **No hierarchical filtering** - Can't aggregate/filter at intermediate tiers
 5. **Single point of compromise** - Broker is an attractive attack target
 
-PEAT's mesh architecture offers a fundamentally different model where sensors can be first-class participants in a distributed data fabric, but our current implementation requires:
+Peat's mesh architecture offers a fundamentally different model where sensors can be first-class participants in a distributed data fabric, but our current implementation requires:
 - Full Rust `std` library support
 - Automerge CRDT engine (memory-intensive)
 - Persistent storage backends
 - Significant RAM (tens of MB minimum)
 
-This ADR proposes PEAT-Lite: a minimal, resource-constrained implementation enabling embedded devices to participate as full mesh members while respecting their hardware limitations.
+This ADR proposes Peat-Lite: a minimal, resource-constrained implementation enabling embedded devices to participate as full mesh members while respecting their hardware limitations.
 
 ## Target Hardware Profile
 
@@ -33091,7 +33057,7 @@ This ADR proposes PEAT-Lite: a minimal, resource-constrained implementation enab
 - Power: Battery + USB-C
 
 **Minimum Target Specs:**
-- 256KB RAM available for PEAT-Lite
+- 256KB RAM available for Peat-Lite
 - WiFi or BLE connectivity
 - No persistent storage required (ephemeral operation)
 
@@ -33102,17 +33068,17 @@ This ADR proposes PEAT-Lite: a minimal, resource-constrained implementation enab
 
 ## Decision
 
-We will create PEAT-Lite as a distinct but protocol-compatible implementation targeting embedded devices. Key design decisions:
+We will create Peat-Lite as a distinct but protocol-compatible implementation targeting embedded devices. Key design decisions:
 
 ### 1. Tiered Node Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        PEAT Node Tiers                          │
+│                        Peat Node Tiers                          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐         │
-│  │  PEAT-Full  │    │ PEAT-Edge   │    │ PEAT-Lite   │         │
+│  │  Peat-Full  │    │ Peat-Edge   │    │ Peat-Lite   │         │
 │  │             │    │             │    │             │         │
 │  │ • Full CRDT │    │ • Selective │    │ • Minimal   │         │
 │  │ • Persistent│    │   CRDTs     │    │   CRDTs     │         │
@@ -33130,13 +33096,13 @@ We will create PEAT-Lite as a distinct but protocol-compatible implementation ta
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**PEAT-Full**: Current implementation - servers, powerful edge devices
-**PEAT-Edge**: Intermediate tier - Raspberry Pi, phones, tablets (future)
-**PEAT-Lite**: This ADR - microcontrollers, embedded sensors
+**Peat-Full**: Current implementation - servers, powerful edge devices
+**Peat-Edge**: Intermediate tier - Raspberry Pi, phones, tablets (future)
+**Peat-Lite**: This ADR - microcontrollers, embedded sensors
 
 ### 2. Ephemeral-First Design
 
-PEAT-Lite nodes operate without persistent storage:
+Peat-Lite nodes operate without persistent storage:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -33164,7 +33130,7 @@ PEAT-Lite nodes operate without persistent storage:
 
 ### 3. Minimal CRDT Subset
 
-Instead of full Automerge, PEAT-Lite implements only essential CRDTs:
+Instead of full Automerge, Peat-Lite implements only essential CRDTs:
 
 | CRDT Type | Use Case | Memory | Complexity |
 |-----------|----------|--------|------------|
@@ -33177,7 +33143,7 @@ Instead of full Automerge, PEAT-Lite implements only essential CRDTs:
 **Not included**: Full document CRDTs, text CRDTs, complex nested structures
 
 ```rust
-// PEAT-Lite CRDT trait (no_std compatible)
+// Peat-Lite CRDT trait (no_std compatible)
 #![no_std]
 
 pub trait LiteCrdt: Sized {
@@ -33201,11 +33167,11 @@ pub struct LwwRegister<T, const MAX_SIZE: usize> {
 
 ### 4. Lightweight Gossip Protocol
 
-PEAT-Lite uses a simplified gossip protocol optimized for constrained networks:
+Peat-Lite uses a simplified gossip protocol optimized for constrained networks:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                  PEAT-Lite Gossip Protocol                      │
+│                  Peat-Lite Gossip Protocol                      │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  Message Types (4-bit type field):                              │
@@ -33235,14 +33201,14 @@ PEAT-Lite uses a simplified gossip protocol optimized for constrained networks:
 
 ### 5. Hierarchical Data Flow
 
-This is where PEAT-Lite differs fundamentally from MQTT:
+This is where Peat-Lite differs fundamentally from MQTT:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │              Hierarchical vs Broker Architecture                │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  MQTT (Centralized):              PEAT (Mesh + Hierarchy):      │
+│  MQTT (Centralized):              Peat (Mesh + Hierarchy):      │
 │                                                                 │
 │       ┌─────────┐                      ┌─────────┐              │
 │       │ Broker  │                      │ Squad   │              │
@@ -33270,7 +33236,7 @@ This is where PEAT-Lite differs fundamentally from MQTT:
 
 ### 6. First-Class Mesh Participation
 
-PEAT-Lite nodes are **not** second-class citizens requiring a bridge. They participate directly in the mesh using the same protocol as Full nodes, with capability negotiation to handle feature differences.
+Peat-Lite nodes are **not** second-class citizens requiring a bridge. They participate directly in the mesh using the same protocol as Full nodes, with capability negotiation to handle feature differences.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -33280,7 +33246,7 @@ PEAT-Lite nodes are **not** second-class citizens requiring a bridge. They parti
 │  Bridge Model (REJECTED):         First-Class Model (CHOSEN):   │
 │                                                                 │
 │  ┌──────────┐                     ┌──────────┐                  │
-│  │PEAT-Full │                     │PEAT-Full │                  │
+│  │Peat-Full │                     │Peat-Full │                  │
 │  │          │                     │          │                  │
 │  │ ┌──────┐ │                     └────┬─────┘                  │
 │  │ │Bridge│ │                          │                        │
@@ -33304,7 +33270,7 @@ PEAT-Lite nodes are **not** second-class citizens requiring a bridge. They parti
 2. **Capability advertisement** - Nodes announce what they support (storage, relay, CRDTs)
 3. **Graceful degradation** - Full nodes understand Lite limitations, don't request unsupported features
 4. **Direct peering** - Lite nodes connect directly to any reachable node (Full, Edge, or Lite)
-5. **No translation layer** - Data from Lite nodes is native PEAT data, not converted
+5. **No translation layer** - Data from Lite nodes is native Peat data, not converted
 
 **Capability Flags (announced during handshake):**
 
@@ -33321,10 +33287,10 @@ bitflags! {
     }
 }
 
-// PEAT-Lite typical capabilities:
+// Peat-Lite typical capabilities:
 const LITE_CAPS: NodeCapabilities = NodeCapabilities::PRIMITIVE_CRDT;
 
-// PEAT-Full typical capabilities:
+// Peat-Full typical capabilities:
 const FULL_CAPS: NodeCapabilities = NodeCapabilities::all();
 ```
 
@@ -33344,7 +33310,7 @@ const FULL_CAPS: NodeCapabilities = NodeCapabilities::all();
 ### 7. Implementation Strategy
 
 **Phase 1: Unified Protocol Specification**
-- Extend current PEAT wire protocol with capability negotiation
+- Extend current Peat wire protocol with capability negotiation
 - Define compact binary encoding for primitive CRDTs
 - Ensure protocol works identically for all node types
 - Add feature flags for graceful capability discovery
@@ -33355,8 +33321,8 @@ const FULL_CAPS: NodeCapabilities = NodeCapabilities::all();
 - ESP32 HAL integration (using `esp-hal` or `esp-idf-hal`)
 - UDP transport with multicast discovery
 
-**Phase 3: PEAT-Full Compatibility**
-- Update PEAT-Full to handle capability negotiation
+**Phase 3: Peat-Full Compatibility**
+- Update Peat-Full to handle capability negotiation
 - Ensure Full nodes work seamlessly with Lite peers
 - Add primitive CRDT support to Full nodes (for interop)
 
@@ -33367,7 +33333,7 @@ const FULL_CAPS: NodeCapabilities = NodeCapabilities::all();
 
 ### 8. Memory Budget
 
-Target: 256KB RAM allocation for PEAT-Lite runtime
+Target: 256KB RAM allocation for Peat-Lite runtime
 
 | Component | Budget | Notes |
 |-----------|--------|-------|
@@ -33396,7 +33362,7 @@ Target: 256KB RAM allocation for PEAT-Lite runtime
 │                 └──────────────┼───────────┘                    │
 │                                │                                │
 │  Floor 1:  [Temp-101]◄──►[Gateway]◄──►[Temp-102]               │
-│                         (PEAT-Full)                             │
+│                         (Peat-Full)                             │
 │                              │                                  │
 │                              ▼                                  │
 │                    [Cloud/HQ Systems]                           │
@@ -33423,7 +33389,7 @@ A key capability is how primitive CRDTs from Lite nodes feed into Automerge docu
 │           Primitive CRDT → Automerge Document Flow              │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  PEAT-Lite Node                    PEAT-Full/Edge Node          │
+│  Peat-Lite Node                    Peat-Full/Edge Node          │
 │  ┌─────────────────┐               ┌─────────────────────────┐  │
 │  │ LWW-Register:   │   gossip      │ Automerge Document:     │  │
 │  │ temp = 23.5°C   │ ──────────►   │ {                       │  │
@@ -33478,7 +33444,7 @@ The M5Stack Core2 provides an excellent reference platform with meaningful onboa
 An M5Stack Core2 worn by a team member could provide:
 
 ```rust
-// Data published by a single PEAT-Lite node (M5Stack Core2)
+// Data published by a single Peat-Lite node (M5Stack Core2)
 struct PersonnelSensorData {
     // Motion/Posture (from IMU)
     orientation: LwwRegister<Orientation>,  // Standing, prone, moving
@@ -33560,8 +33526,8 @@ A Full node correlates: "Possible casualty event - Operator-2 down, Operator-3 r
 2. **Local Intelligence** - Sensors benefit from peer data, enabling edge decisions
 3. **Bandwidth Efficiency** - Hierarchical aggregation reduces upstream traffic
 4. **Resilience** - Local mesh operates independently of upstream connectivity
-5. **Low Cost** - $15-30 sensor nodes can participate in PEAT mesh
-6. **Incremental Adoption** - Can add Lite nodes to existing PEAT deployments
+5. **Low Cost** - $15-30 sensor nodes can participate in Peat mesh
+6. **Incremental Adoption** - Can add Lite nodes to existing Peat deployments
 
 ### Negative
 
@@ -33572,7 +33538,7 @@ A Full node correlates: "Possible casualty event - Operator-2 down, Operator-3 r
 
 ### Neutral
 
-1. **Separate Codebase** - PEAT-Lite likely needs its own repo/crate (shared protocol definitions)
+1. **Separate Codebase** - Peat-Lite likely needs its own repo/crate (shared protocol definitions)
 2. **Different Skillset** - Embedded development differs from server development
 3. **Hardware Dependency** - Testing requires physical devices or emulators
 4. **Capability Negotiation** - All nodes must implement capability discovery
@@ -33590,7 +33556,7 @@ Attempt to run full Automerge on ESP32 with PSRAM.
 
 ### Alternative 2: MQTT Bridge Only
 
-Keep sensors on MQTT, bridge at PEAT-Full nodes.
+Keep sensors on MQTT, bridge at Peat-Full nodes.
 
 **Rejected because:**
 - Loses peer-to-peer benefits
@@ -33604,7 +33570,7 @@ Simple pub/sub without CRDT guarantees.
 **Rejected because:**
 - Loses consistency guarantees
 - Can't meaningfully merge conflicting data
-- Defeats purpose of PEAT integration
+- Defeats purpose of Peat integration
 
 ## Appendix C: AXP192 Power Management (CRITICAL)
 
@@ -33696,7 +33662,7 @@ The AXP192 is not a peripheral to experiment with. Its registers directly contro
 ## Appendix A: Sensor Data Schema
 
 ```rust
-/// Standard sensor reading format for PEAT-Lite
+/// Standard sensor reading format for Peat-Lite
 #[derive(Clone)]
 pub struct SensorReading {
     /// Sensor type identifier
@@ -33723,7 +33689,7 @@ pub struct SensorAlert {
 
 All node types use the **same wire protocol**. Differences are in capabilities, not protocol dialect.
 
-| Feature | PEAT-Full | PEAT-Edge | PEAT-Lite |
+| Feature | Peat-Full | Peat-Edge | Peat-Lite |
 |---------|-----------|-----------|-----------|
 | **Mesh Participation** | ✓ | ✓ | ✓ |
 | **Direct Peering** | ✓ | ✓ | ✓ |
@@ -33740,9 +33706,8 @@ All node types use the **same wire protocol**. Differences are in capabilities, 
 
 **Key point**: A Lite node can peer directly with a Full node, another Lite node, or an Edge node. No bridges, no translation, no second-class citizenship.
 
----
 
-# ADR-025: TADIL-J / Link 16 Integration
+# ADR-036: TADIL-J / Link 16 Integration
 
 **Status**: Proposed  
 **Date**: 2025-12-10  
@@ -33780,9 +33745,9 @@ All node types use the **same wire protocol**. Differences are in capabilities, 
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Critical J-Series Message Types for PEAT Integration:**
+**Critical J-Series Message Types for Peat Integration:**
 
-| J-Series | Name | Purpose | PEAT Relevance |
+| J-Series | Name | Purpose | Peat Relevance |
 |----------|------|---------|----------------|
 | J2.2 | Air Track | Air platform position/ID | Air asset SA |
 | J3.2 | Surface/Ground Track | Surface/ground position | Squad position aggregation |
@@ -33794,7 +33759,7 @@ All node types use the **same wire protocol**. Differences are in capabilities, 
 | J13.2 | Target Designation | Target assignment | Engagement coordination |
 | J14.0 | Info Management | Network coordination | Synchronization |
 
-### Strategic Importance for PEAT
+### Strategic Importance for Peat
 
 **Multi-Domain Integration Requirement:**
 
@@ -33813,33 +33778,33 @@ Link 16 is **severely bandwidth-constrained** compared to IP networks:
 |---------|--------------------|--------------------|
 | Link 16 | ~115 kbps (shared) | 3-12 second cycles |
 | TAK/CoT | 1-100 Mbps | 1-5 seconds |
-| PEAT internal | 10-1000 Mbps | Sub-second differential |
+| Peat internal | 10-1000 Mbps | Sub-second differential |
 
 **Naive bridging would fail catastrophically:**
 - 100 platforms × 70-bit position words × 1 Hz = exceeds entire Link 16 capacity
 - Each time slot is precious (~7.8125 ms, ~225 bits usable)
 - Flat event streaming is physically impossible
 
-**PEAT's hierarchical aggregation is the solution:**
+**Peat's hierarchical aggregation is the solution:**
 - Squad of 12 platforms → 1 aggregate track
 - 95%+ bandwidth reduction through hierarchy
 - Natural mapping to military C2 echelons
 
-### Why PEAT Enables This
+### Why Peat Enables This
 
-The question "how would PEAT bridge on-platform messaging to TADIL-J?" has a compelling answer:
+The question "how would Peat bridge on-platform messaging to TADIL-J?" has a compelling answer:
 
-> **PEAT's hierarchical tiers create natural aggregation points that map directly to Link 16 network participation models. The tier leader—which already maintains aggregated subordinate state via CRDT synchronization—serves as the bridge point, presenting consolidated SA to the tactical data link rather than raw platform telemetry.**
+> **Peat's hierarchical tiers create natural aggregation points that map directly to Link 16 network participation models. The tier leader—which already maintains aggregated subordinate state via CRDT synchronization—serves as the bridge point, presenting consolidated SA to the tactical data link rather than raw platform telemetry.**
 
 This is not a workaround; it's the architecture working as intended.
 
 ## Decision
 
-We will implement **TADIL-J/Link 16 integration as a transport adapter** within the PEAT architecture, following these principles:
+We will implement **TADIL-J/Link 16 integration as a transport adapter** within the Peat architecture, following these principles:
 
 ### Principle 1: Hierarchy as Bridge Architecture
 
-PEAT tier boundaries serve as natural Link 16 integration points:
+Peat tier boundaries serve as natural Link 16 integration points:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -33852,7 +33817,7 @@ PEAT tier boundaries serve as natural Link 16 integration points:
                           │ J12.x (Commands ↓)
                           │
               ┌───────────▼───────────┐
-              │   PEAT Tier Leader    │
+              │   Peat Tier Leader    │
               │   (Link 16 Bridge)    │
               │                       │
               │  • MIDS Terminal      │
@@ -33872,7 +33837,7 @@ PEAT tier boundaries serve as natural Link 16 integration points:
          │               │               │
          └───────────────┴───────────────┘
                          │
-              PEAT CRDT Sync (Rich State)
+              Peat CRDT Sync (Rich State)
               - Full telemetry
               - Detailed capabilities  
               - Sub-second updates
@@ -33887,14 +33852,14 @@ Following ADR-012's separation of concerns, J-series message encoding/decoding b
 ```
 peat-schema/
 ├── proto/
-│   ├── peat_core.proto           # Core PEAT messages
+│   ├── peat_core.proto           # Core Peat messages
 │   ├── cot_bridge.proto          # CoT mappings (ADR-020)
 │   └── tadil_j_bridge.proto      # J-series mappings (this ADR)
 ├── src/
 │   ├── tadil_j/
 │   │   ├── mod.rs
-│   │   ├── encoder.rs            # PEAT → J-series
-│   │   ├── decoder.rs            # J-series → PEAT
+│   │   ├── encoder.rs            # Peat → J-series
+│   │   ├── decoder.rs            # J-series → Peat
 │   │   ├── j_series_types.rs     # J2, J3, J7, J12, J13, J14
 │   │   ├── track_number.rs       # JU Track Number management
 │   │   └── validation.rs         # MIL-STD-6016 compliance
@@ -33902,17 +33867,17 @@ peat-schema/
 
 **Bidirectional Message Mapping:**
 
-| PEAT Concept | J-Series Message | Direction | Notes |
+| Peat Concept | J-Series Message | Direction | Notes |
 |--------------|------------------|-----------|-------|
-| Platform position (individual) | J3.2 (surface track) | PEAT → Link 16 | Only if full fidelity needed |
-| **Squad aggregate position** | **J3.2 (surface track)** | **PEAT → Link 16** | **Primary use case** |
-| Squad capability summary | J7.2 (platform status) | PEAT → Link 16 | Aggregated readiness |
-| Air contact detection | J2.2 (air track) | PEAT → Link 16 | Sensor fusion result |
-| Target designation | J13.2 (target) | PEAT → Link 16 | Engagement handoff |
+| Platform position (individual) | J3.2 (surface track) | Peat → Link 16 | Only if full fidelity needed |
+| **Squad aggregate position** | **J3.2 (surface track)** | **Peat → Link 16** | **Primary use case** |
+| Squad capability summary | J7.2 (platform status) | Peat → Link 16 | Aggregated readiness |
+| Air contact detection | J2.2 (air track) | Peat → Link 16 | Sensor fusion result |
+| Target designation | J13.2 (target) | Peat → Link 16 | Engagement handoff |
 | Control measure / ROZ | J3.5 (land point) | Bidirectional | Operational boundaries |
-| Mission tasking | J12.0 (mission assignment) | Link 16 → PEAT | Higher HQ commands |
-| Movement vector | J12.6 (control) | Link 16 → PEAT | Directional commands |
-| Network time sync | J14.0 (info management) | Link 16 → PEAT | Time reference |
+| Mission tasking | J12.0 (mission assignment) | Link 16 → Peat | Higher HQ commands |
+| Movement vector | J12.6 (control) | Link 16 → Peat | Directional commands |
+| Network time sync | J14.0 (info management) | Link 16 → Peat | Time reference |
 
 ### Principle 3: Transport Adapter in peat-transport
 
@@ -33952,7 +33917,7 @@ pub struct Link16Config {
 }
 
 pub enum Link16AggregationPolicy {
-    /// Send one track per PEAT tier (recommended)
+    /// Send one track per Peat tier (recommended)
     TierAggregation,
     
     /// Send tracks for designated platforms only
@@ -33964,7 +33929,7 @@ pub enum Link16AggregationPolicy {
 
 #[async_trait]
 impl TacticalDataLink for Link16Transport {
-    /// Publish aggregated PEAT state to Link 16 network
+    /// Publish aggregated Peat state to Link 16 network
     async fn publish(&self, state: &AggregatedState) -> Result<(), Link16Error> {
         // 1. Convert aggregated state to J-series messages
         let j_messages = self.encoder.encode_aggregated(state, &self.config)?;
@@ -33986,7 +33951,7 @@ impl TacticalDataLink for Link16Transport {
         
         match j_message.label() {
             JLabel::J12_0 | JLabel::J12_6 => {
-                // Command message - decode and return for PEAT processing
+                // Command message - decode and return for Peat processing
                 let command = self.decoder.decode_command(&j_message)?;
                 Ok(Link16Message::Command(command))
             }
@@ -34008,7 +33973,7 @@ impl TacticalDataLink for Link16Transport {
 
 ### Principle 4: Track Number Management
 
-Link 16 requires globally unique track numbers (JU numbers) within a network. PEAT bridge nodes must manage track number allocation:
+Link 16 requires globally unique track numbers (JU numbers) within a network. Peat bridge nodes must manage track number allocation:
 
 ```rust
 // peat-transport/src/link16/track_manager.rs
@@ -34036,7 +34001,7 @@ pub struct TrackNumberBlock {
 }
 
 impl TrackNumberManager {
-    /// Assign track number to PEAT entity (squad, platform, etc.)
+    /// Assign track number to Peat entity (squad, platform, etc.)
     pub fn assign(&mut self, entity_id: PeatEntityId) -> Result<JuTrackNumber, TrackError> {
         // Check if already assigned
         if let Some(existing) = self.assignments.get(&entity_id) {
@@ -34146,7 +34111,7 @@ impl Link16Aggregator {
 
 ### peat-schema Additions
 
-The PEAT open standard (`peat-schema`) gains J-series message definitions:
+The Peat open standard (`peat-schema`) gains J-series message definitions:
 
 ```protobuf
 // peat-schema/proto/tadil_j_bridge.proto
@@ -34210,7 +34175,7 @@ message J12_0_MissionAssignment {
     Timestamp not_after = 22;
 }
 
-// Mapping from PEAT entities to J-series representations
+// Mapping from Peat entities to J-series representations
 message PeatToLink16Mapping {
     string peat_entity_id = 1;
     JuTrackNumber link16_track = 2;
@@ -34410,11 +34375,11 @@ impl SimulatedLink16Network {
 }
 ```
 
-## Integration with PEAT Core
+## Integration with Peat Core
 
 ### Bridge Node Configuration
 
-A PEAT node configured as a Link 16 bridge:
+A Peat node configured as a Link 16 bridge:
 
 ```rust
 // Example: Squad leader with Link 16 bridge capability
@@ -34426,7 +34391,7 @@ let config = PeatNodeConfig {
     },
     
     transports: vec![
-        // Internal PEAT sync
+        // Internal Peat sync
         TransportConfig::Quic(QuicConfig::default()),
         
         // Link 16 bridge (if hardware available)
@@ -34459,7 +34424,7 @@ let config = PeatNodeConfig {
 let node = PeatNode::new(config).await?;
 
 // Bridge automatically publishes aggregated state to Link 16
-// and injects received commands into PEAT hierarchy
+// and injects received commands into Peat hierarchy
 node.run().await?;
 ```
 
@@ -34476,11 +34441,11 @@ For larger formations, bridges at multiple echelons:
         │                                 │
 ┌───────▼───────┐                 ┌───────▼───────┐
 │  Company HQ   │                 │  Platoon HQ   │
-│  PEAT Bridge  │                 │  PEAT Bridge  │
+│  Peat Bridge  │                 │  Peat Bridge  │
 │  (Optional)   │                 │  (Primary)    │
 └───────┬───────┘                 └───────┬───────┘
         │                                 │
-        │ PEAT Protocol                   │ PEAT Protocol
+        │ Peat Protocol                   │ Peat Protocol
         │ (Platoon aggregates)            │ (Squad details)
         │                                 │
 ┌───────▼───────┐                 ┌───────▼───────┐
@@ -34512,7 +34477,7 @@ For larger formations, bridges at multiple echelons:
 **Complementary Integration:**
 - TAK for rich, low-latency team awareness
 - Link 16 for joint force integration and higher echelon SA
-- Both can operate simultaneously from same PEAT network
+- Both can operate simultaneously from same Peat network
 
 ## Implementation Phases
 
@@ -34522,7 +34487,7 @@ For larger formations, bridges at multiple echelons:
 
 **Tasks**:
 1. Survey Link 16 usage patterns in target operational contexts
-2. Identify critical J-series message types for PEAT integration
+2. Identify critical J-series message types for Peat integration
 3. Define track number allocation strategy
 4. Document MIDS integration requirements (vendor coordination)
 
@@ -34538,8 +34503,8 @@ For larger formations, bridges at multiple echelons:
 
 **Tasks**:
 1. Define J-series protobuf messages
-2. Implement J-series encoder (PEAT → Link 16)
-3. Implement J-series decoder (Link 16 → PEAT)
+2. Implement J-series encoder (Peat → Link 16)
+3. Implement J-series decoder (Link 16 → Peat)
 4. Define aggregation profile schemas
 5. Unit tests for all conversions
 
@@ -34564,7 +34529,7 @@ For larger formations, bridges at multiple echelons:
 - [ ] SimulatedMids enables full testing without hardware
 - [ ] Track numbers assigned and managed correctly
 - [ ] Aggregation policies produce expected track representations
-- [ ] Bidirectional message flow works (PEAT ↔ Link 16)
+- [ ] Bidirectional message flow works (Peat ↔ Link 16)
 
 ### Phase 3: Aggregation Logic (Weeks 8-10)
 
@@ -34574,7 +34539,7 @@ For larger formations, bridges at multiple echelons:
 1. Implement position aggregation methods (centroid, leader, weighted)
 2. Implement capability aggregation (sum, min, custom)
 3. Create configurable aggregation profiles
-4. Integrate with PEAT tier leader logic
+4. Integrate with Peat tier leader logic
 5. End-to-end testing with multi-tier hierarchy
 
 **Success Criteria**:
@@ -34592,17 +34557,17 @@ For larger formations, bridges at multiple echelons:
 2. Add network condition simulation (latency, loss, jamming)
 3. Create external traffic injection (simulate other network participants)
 4. Build analysis tools for message flow visualization
-5. Integration with existing PEAT simulation framework (ADR-008)
+5. Integration with existing Peat simulation framework (ADR-008)
 
 **Success Criteria**:
-- [ ] Simulate 10+ PEAT nodes with Link 16 bridges
+- [ ] Simulate 10+ Peat nodes with Link 16 bridges
 - [ ] Inject realistic external Link 16 traffic
 - [ ] Measure and validate bandwidth utilization
 - [ ] Demonstrate graceful degradation under jamming
 
 ### Phase 5: PoC Integration (Weeks 14-16)
 
-**Goal**: Integrate Link 16 bridging into PEAT PoC demonstration
+**Goal**: Integrate Link 16 bridging into Peat PoC demonstration
 
 **Tasks**:
 1. Add Link 16 bridge to POI tracking vignette
@@ -34613,7 +34578,7 @@ For larger formations, bridges at multiple echelons:
 
 **Success Criteria**:
 - [ ] POI tracking vignette shows squad tracks on simulated Link 16
-- [ ] Commands injected via Link 16 execute correctly in PEAT
+- [ ] Commands injected via Link 16 execute correctly in Peat
 - [ ] Visualization clearly shows aggregation in action
 - [ ] Documentation enables third-party integration
 
@@ -34629,7 +34594,7 @@ For larger formations, bridges at multiple echelons:
 5. Security accreditation activities
 
 **Success Criteria**:
-- [ ] Real MIDS terminal successfully transmits PEAT-generated tracks
+- [ ] Real MIDS terminal successfully transmits Peat-generated tracks
 - [ ] Received commands correctly processed
 - [ ] Interoperability with other Link 16 participants validated
 - [ ] Security architecture passes review
@@ -34638,12 +34603,12 @@ For larger formations, bridges at multiple echelons:
 
 ### Positive
 
-1. **Joint Force Integration**: PEAT-coordinated platforms visible to entire coalition via Link 16
-2. **Higher Echelon SA**: Brigade/Division C2 systems see aggregated PEAT formations
-3. **Command Reception**: Higher HQ can task PEAT teams through existing C2 infrastructure
-4. **Coalition Interoperability**: Allied platforms share SA with PEAT formations
-5. **Airspace Integration**: PEAT air assets properly represented for deconfliction
-6. **Validates Core Architecture**: Link 16's constraints prove PEAT's aggregation value
+1. **Joint Force Integration**: Peat-coordinated platforms visible to entire coalition via Link 16
+2. **Higher Echelon SA**: Brigade/Division C2 systems see aggregated Peat formations
+3. **Command Reception**: Higher HQ can task Peat teams through existing C2 infrastructure
+4. **Coalition Interoperability**: Allied platforms share SA with Peat formations
+5. **Airspace Integration**: Peat air assets properly represented for deconfliction
+6. **Validates Core Architecture**: Link 16's constraints prove Peat's aggregation value
 7. **Standards Alignment**: Uses established NATO tactical data link standards
 8. **Bandwidth Efficiency**: Hierarchical aggregation enables feasible Link 16 participation
 
@@ -34666,7 +34631,7 @@ For larger formations, bridges at multiple echelons:
 
 **Risk 2**: Track number conflicts with other network participants
 - **Mitigation**: Track number block allocation coordinated with network authority
-- **Mitigation**: Source Track ID uniquely identifies PEAT formations
+- **Mitigation**: Source Track ID uniquely identifies Peat formations
 - **Mitigation**: Track recycling with appropriate stale timers
 
 **Risk 3**: Aggregation loses operationally critical information
@@ -34697,9 +34662,9 @@ For larger formations, bridges at multiple echelons:
    - [ ] Interoperability with JITC reference implementation
 
 3. **Operational Integration**:
-   - [ ] Commands from Link 16 correctly execute in PEAT (< 5s latency)
-   - [ ] PEAT state changes reflected in Link 16 tracks (< 15s latency)
-   - [ ] Simulated external participants see correct PEAT representation
+   - [ ] Commands from Link 16 correctly execute in Peat (< 5s latency)
+   - [ ] Peat state changes reflected in Link 16 tracks (< 15s latency)
+   - [ ] Simulated external participants see correct Peat representation
 
 4. **PoC Demonstration**:
    - [ ] POI tracking vignette includes Link 16 bridge
@@ -34725,22 +34690,21 @@ For larger formations, bridges at multiple echelons:
 
 ---
 
-**Author's Note**: This ADR represents a strategic integration that validates PEAT's core architectural thesis: hierarchical aggregation isn't just an optimization—it's the **only** way to participate in bandwidth-constrained tactical networks at scale. While TAK/CoT integration (ADR-020) proves PEAT works with modern IP-based systems, Link 16 integration proves PEAT can bridge to the legacy tactical data link infrastructure that remains the backbone of NATO joint operations. The same hierarchical design that enables 1000+ platform coordination also enables participation in networks designed for dozens of tracks. This is "stop moving data, start moving decisions" made tangible.
+**Author's Note**: This ADR represents a strategic integration that validates Peat's core architectural thesis: hierarchical aggregation isn't just an optimization—it's the **only** way to participate in bandwidth-constrained tactical networks at scale. While TAK/CoT integration (ADR-020) proves Peat works with modern IP-based systems, Link 16 integration proves Peat can bridge to the legacy tactical data link infrastructure that remains the backbone of NATO joint operations. The same hierarchical design that enables 1000+ platform coordination also enables participation in networks designed for dozens of tracks. This is "stop moving data, start moving decisions" made tangible.
 
----
 
-# ADR-025: Resource-Constrained Device Optimization (PEAT Lite)
+# ADR-037: Resource-Constrained Device Optimization (Peat Lite)
 
 **Status**: Proposed  
 **Date**: 2025-12-11  
-**Authors**: Kit Plummer, Codex  
+**Authors**: Kit Plummer, Claude  
 **Relates To**: ADR-010 (Transport Layer), ADR-016 (TTL and Data Lifecycle), ADR-019 (QoS and Data Prioritization), ADR-024 (Flexible Hierarchy Strategies), ADR-026 (Protocol-Level Format Transformation Primitives)
 
 ## Context
 
 ### The Problem: Battery-Constrained Tactical Wearables
 
-Customer feedback from Ascent (Alex Gorsuch) identified a critical pain point: **current sync solutions (specifically Ditto) drain battery rapidly on Samsung watches running WearTAK**. This represents a broader class of resource-constrained devices that need PEAT connectivity without the overhead of full mesh participation.
+Customer feedback from Ascent (Alex Gorsuch) identified a critical pain point: **current sync solutions (specifically Ditto) drain battery rapidly on Samsung watches running WearTAK**. This represents a broader class of resource-constrained devices that need Peat connectivity without the overhead of full mesh participation.
 
 The operational reality for wearables:
 
@@ -34753,13 +34717,13 @@ Samsung Galaxy Watch Running WearTAK:
 ├─ Target mission duration: 12-24 hours
 └─ Battery budget for sync: ~10% of total
 
-Full PEAT Node Power Profile:
+Full Peat Node Power Profile:
 ├─ Continuous sync heartbeats: Radio active 20% of time
 ├─ CRDT merge operations: CPU spikes every sync
 ├─ Full mesh state: Memory pressure → swap → battery
 ├─ Result: 3-4 hour battery life (unacceptable)
 
-PEAT Lite Target Profile:
+Peat Lite Target Profile:
 ├─ Burst sync on connection: Radio active 2% of time
 ├─ Minimal state: Only upstream parent + own data
 ├─ Aggregated heartbeats: 60-second batched updates
@@ -34776,7 +34740,7 @@ PEAT Lite Target Profile:
 | **Tactical EUD** | 4-8 cores, 2GHz | 4-8GB | 64-128GB | 4000-6000 mAh | Multi-band | ATAK phone |
 | **Edge Compute** | 8+ cores, 2GHz+ | 8-32GB | 256GB+ | AC/Vehicle | Full stack | Jetson, vehicle server |
 
-PEAT must support the full spectrum, with optimization profiles appropriate to each class.
+Peat must support the full spectrum, with optimization profiles appropriate to each class.
 
 ### Why Ditto Drains Batteries
 
@@ -34788,9 +34752,9 @@ Based on analysis and customer feedback, Ditto's battery consumption stems from:
 4. **Monolithic Design**: Can't disable features for constrained devices
 5. **Background Activity**: Sync continues even when app is idle
 
-### PEAT's Architectural Advantages
+### Peat's Architectural Advantages
 
-PEAT's hierarchical model enables natural optimization:
+Peat's hierarchical model enables natural optimization:
 
 1. **Leaf Node Simplification**: Wearables are leaves, not mesh participants
 2. **Differential Sync**: Only changed data transmits (95-99% reduction)
@@ -34800,9 +34764,9 @@ PEAT's hierarchical model enables natural optimization:
 
 ## Decision
 
-### PEAT Lite: Resource-Constrained Device Profile
+### Peat Lite: Resource-Constrained Device Profile
 
-We introduce **PEAT Lite** as a configuration profile (not a separate codebase) that optimizes PEAT for resource-constrained devices through:
+We introduce **Peat Lite** as a configuration profile (not a separate codebase) that optimizes Peat for resource-constrained devices through:
 
 1. **Leaf-Only Operation**: No mesh routing, single parent connection
 2. **Minimal CRDT State**: Only track own documents + immediate parent sync state
@@ -34814,11 +34778,11 @@ We introduce **PEAT Lite** as a configuration profile (not a separate codebase) 
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    PEAT Device Profiles                         │
+│                    Peat Device Profiles                         │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
-│  │  PEAT Full  │  │ PEAT Edge   │  │ PEAT Lite   │             │
+│  │  Peat Full  │  │ Peat Edge   │  │ Peat Lite   │             │
 │  │             │  │             │  │             │             │
 │  │ • Full mesh │  │ • Limited   │  │ • Leaf only │             │
 │  │ • All roles │  │   routing   │  │ • Single    │             │
@@ -34835,11 +34799,11 @@ We introduce **PEAT Lite** as a configuration profile (not a separate codebase) 
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### PEAT Lite Architecture
+### Peat Lite Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                    PEAT Lite Node                            │
+│                    Peat Lite Node                            │
 ├──────────────────────────────────────────────────────────────┤
 │                                                              │
 │  ┌────────────────────────────────────────────────────────┐  │
@@ -34880,7 +34844,7 @@ We introduce **PEAT Lite** as a configuration profile (not a separate codebase) 
 ### Sync Window Optimization
 
 ```rust
-/// PEAT Lite sync configuration
+/// Peat Lite sync configuration
 pub struct LiteSyncConfig {
     /// Minimum interval between sync attempts (power saving)
     pub min_sync_interval: Duration,
@@ -35093,11 +35057,11 @@ impl PowerAwareSyncScheduler {
 
 ### WearTAK Integration Architecture
 
-**Note**: WearTAK integration depends on ADR-026 (Protocol-Level Format Transformation Primitives) for CoT ↔ PEAT transformation. See ADR-026 for the FormatAdapter framework, CoT-native mode, and parent-side bridging patterns.
+**Note**: WearTAK integration depends on ADR-026 (Protocol-Level Format Transformation Primitives) for CoT ↔ Peat transformation. See ADR-026 for the FormatAdapter framework, CoT-native mode, and parent-side bridging patterns.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                 WearTAK + PEAT Lite Stack                       │
+│                 WearTAK + Peat Lite Stack                       │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  Samsung Galaxy Watch                    ATAK Phone (Parent)    │
@@ -35108,7 +35072,7 @@ impl PowerAwareSyncScheduler {
 │  │  └──────────────┘   │                │  └──────────────┘   │ │
 │  │         │           │                │         │           │ │
 │  │  ┌──────────────┐   │    BLE Link    │  ┌──────────────┐   │ │
-│  │  │ PEAT Lite    │───┼────────────────┼──│ PEAT Edge    │   │ │
+│  │  │ Peat Lite    │───┼────────────────┼──│ Peat Edge    │   │ │
 │  │  │ (Leaf Node)  │   │   Batched      │  │ (Aggregator) │   │ │
 │  │  │              │   │   Updates      │  │              │   │ │
 │  │  └──────────────┘   │                │  └──────────────┘   │ │
@@ -35128,16 +35092,16 @@ impl PowerAwareSyncScheduler {
 
 Data Flow:
 1. Watch generates position/health updates
-2. PEAT Lite batches updates (60-second window)
+2. Peat Lite batches updates (60-second window)
 3. BLE sync to phone on schedule
-4. Phone aggregates into PEAT mesh
+4. Phone aggregates into Peat mesh
 5. CoT events flow to TAK Server as normal
 ```
 
 ### Minimal State Schema for Wearables
 
 ```protobuf
-// Minimal schema for PEAT Lite wearable nodes
+// Minimal schema for Peat Lite wearable nodes
 message LiteNodeState {
   // Identity
   string node_id = 1;
@@ -35300,7 +35264,7 @@ pub struct PowerImprovement {
 
 ## Alternatives Considered
 
-### Alternative 1: Separate PEAT Lite Codebase
+### Alternative 1: Separate Peat Lite Codebase
 
 Create a distinct minimal implementation for constrained devices.
 
@@ -35316,7 +35280,7 @@ Wearables only relay data through BLE, no local CRDT state.
 **Pros**: Minimal device complexity, near-zero state overhead
 **Cons**: No offline operation, loses CRDT benefits, single point of failure
 
-**Decision**: Partially adopted. Available as `StatelessRelay` mode for extremely constrained devices, but PEAT Lite retains minimal CRDT state for offline resilience.
+**Decision**: Partially adopted. Available as `StatelessRelay` mode for extremely constrained devices, but Peat Lite retains minimal CRDT state for offline resilience.
 
 ### Alternative 3: Custom Lightweight CRDT
 
@@ -35329,7 +35293,7 @@ Design a custom minimal CRDT specifically for constrained devices.
 
 ## Implementation Plan
 
-### Phase 1: Core PEAT Lite Profile (Q1 2026)
+### Phase 1: Core Peat Lite Profile (Q1 2026)
 1. Define device profile configuration system
 2. Implement batch accumulator
 3. Add sync interval controls
@@ -35388,26 +35352,25 @@ Design a custom minimal CRDT specifically for constrained devices.
 | Display | 100 mW | 0.5 mW | 20% | 20% |
 | Sensors | 15 mW | 1 mW | 50% | 50% |
 
-**Full PEAT**: ~85 mW average → ~4 hours on 350 mAh
-**PEAT Lite**: ~35 mW average → ~10 hours on 350 mAh (with display active)
-**PEAT Lite (display off)**: ~15 mW average → ~23 hours on 350 mAh
+**Full Peat**: ~85 mW average → ~4 hours on 350 mAh
+**Peat Lite**: ~35 mW average → ~10 hours on 350 mAh (with display active)
+**Peat Lite (display off)**: ~15 mW average → ~23 hours on 350 mAh
 
 ### Sync Energy Comparison
 
 | Sync Type | Energy per Sync | Syncs per Hour | Energy per Hour |
 |-----------|----------------|----------------|-----------------|
 | Ditto Continuous | 0.5 mWh | 60+ | 30+ mWh |
-| PEAT Full | 0.3 mWh | 30 | 9 mWh |
-| PEAT Lite (scheduled) | 0.2 mWh | 6 | 1.2 mWh |
-| PEAT Lite (low battery) | 0.2 mWh | 2 | 0.4 mWh |
+| Peat Full | 0.3 mWh | 30 | 9 mWh |
+| Peat Lite (scheduled) | 0.2 mWh | 6 | 1.2 mWh |
+| Peat Lite (low battery) | 0.2 mWh | 2 | 0.4 mWh |
 
----
 
-# ADR-026: Protocol-Level Format Transformation Primitives
+# ADR-038: Protocol-Level Format Transformation Primitives
 
 **Status**: Proposed  
 **Date**: 2025-12-11  
-**Authors**: Kit Plummer, Codex  
+**Authors**: Kit Plummer, Claude  
 **Extends**: ADR-012 (Schema Definition & Protocol Extensibility), ADR-020 (TAK/CoT Integration)  
 **Relates To**: ADR-025 (Resource-Constrained Device Optimization)
 
@@ -35431,20 +35394,20 @@ Current Architecture Problem:
                           │ ??? Integration Point
                           ▼
                     ┌─────────────┐
-                    │ PEAT Node   │
+                    │ Peat Node   │
                     │ (CRDT docs) │
                     └─────────────┘
 
 Questions:
-1. Where does PEAT ↔ CoT transformation happen?
+1. Where does Peat ↔ CoT transformation happen?
 2. Who owns the transformation logic?
-3. How does a WearTAK device join a PEAT hierarchy?
-4. Can a node speak CoT natively without full PEAT stack?
+3. How does a WearTAK device join a Peat hierarchy?
+4. Can a node speak CoT natively without full Peat stack?
 ```
 
 ### The Deeper Issue: Format Interoperability at Scale
 
-PEAT will integrate with multiple format ecosystems:
+Peat will integrate with multiple format ecosystems:
 
 | Format | Use Case | Characteristics |
 |--------|----------|-----------------|
@@ -35458,21 +35421,21 @@ PEAT will integrate with multiple format ecosystems:
 
 Each requires bidirectional transformation. If transformation remains an ad-hoc concern, we get:
 - **N×M integration matrix** - every format pair needs custom code
-- **No composability** - can't chain PEAT → CoT → Link 16
+- **No composability** - can't chain Peat → CoT → Link 16
 - **No negotiation** - nodes can't discover compatible formats
 - **No optimization** - constrained devices can't skip unused transforms
 
 ### WearTAK Integration Requirements
 
-For Samsung watches running WearTAK to participate in PEAT hierarchies:
+For Samsung watches running WearTAK to participate in Peat hierarchies:
 
-1. **Minimal footprint** - Watch can't run full PEAT stack
+1. **Minimal footprint** - Watch can't run full Peat stack
 2. **CoT native** - WearTAK already speaks CoT to ATAK
-3. **Hierarchy participation** - Watch is a leaf node in PEAT hierarchy
+3. **Hierarchy participation** - Watch is a leaf node in Peat hierarchy
 4. **Bidirectional** - Receive commands, send position/health/alerts
 5. **Battery efficient** - Transform overhead must be minimal
 
-**Key Insight**: The watch shouldn't need to understand PEAT's CRDT internals. It should speak CoT, and PEAT should accept CoT as a valid input format at the protocol level.
+**Key Insight**: The watch shouldn't need to understand Peat's CRDT internals. It should speak CoT, and Peat should accept CoT as a valid input format at the protocol level.
 
 ## Decision
 
@@ -35482,7 +35445,7 @@ We introduce **Format Adapters** as first-class protocol elements:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    PEAT Protocol Stack                          │
+│                    Peat Protocol Stack                          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ┌───────────────────────────────────────────────────────────┐  │
@@ -35498,7 +35461,7 @@ We introduce **Format Adapters** as first-class protocol elements:
 │  ┌───────────────────────────────────────────────────────────┐  │
 │  │         ★ FORMAT ADAPTER LAYER ★ (NEW)                    │  │
 │  │  • Schema-declared transformations                        │  │
-│  │  • Bidirectional PEAT ↔ External format mapping          │  │
+│  │  • Bidirectional Peat ↔ External format mapping          │  │
 │  │  • Format capability advertisement                        │  │
 │  │  • Automatic format negotiation                           │  │
 │  └───────────────────────────────────────────────────────────┘  │
@@ -35531,7 +35494,7 @@ We introduce **Format Adapters** as first-class protocol elements:
 │                          │                                      │
 │                          ▼                                      │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │              Canonical PEAT Document Model                │  │
+│  │              Canonical Peat Document Model                │  │
 │  │  • Position, Health, Capability, Command, Alert           │  │
 │  │  • Hierarchical relationships (parent, children)          │  │
 │  │  • CRDT-native (Automerge compatible)                     │  │
@@ -35558,8 +35521,8 @@ message FormatAdapterCapability {
 
 enum TransformDirection {
   BIDIRECTIONAL = 0;
-  ENCODE_ONLY = 1;   // PEAT → External
-  DECODE_ONLY = 2;   // External → PEAT
+  ENCODE_ONLY = 1;   // Peat → External
+  DECODE_ONLY = 2;   // External → Peat
 }
 
 // Schema-level type mapping declaration
@@ -35593,7 +35556,7 @@ message FieldTransform {
 
 // Declare what information is lost in transformation
 message LossInfo {
-  repeated string peat_fields_not_mapped = 1;   // PEAT fields with no external equivalent
+  repeated string peat_fields_not_mapped = 1;   // Peat fields with no external equivalent
   repeated string external_fields_ignored = 2;  // External fields we don't import
   string semantic_notes = 3;                    // Human-readable loss description
 }
@@ -35607,7 +35570,7 @@ pub struct CotFormatAdapter {
     /// Supported CoT protocol versions
     supported_versions: Vec<CotVersion>,
     
-    /// Type mappings (PEAT type → CoT type code)
+    /// Type mappings (Peat type → CoT type code)
     type_mappings: HashMap<PeatType, CotTypeMapping>,
     
     /// Field-level transformations
@@ -35656,7 +35619,7 @@ impl FormatAdapter for CotFormatAdapter {
         }
     }
     
-    /// Encode PEAT document to CoT event
+    /// Encode Peat document to CoT event
     fn encode(&self, doc: &PeatDocument) -> Result<EncodedMessage, TransformError> {
         let cot_event = match doc.doc_type() {
             PeatDocType::Position => self.encode_position(doc)?,
@@ -35685,7 +35648,7 @@ impl FormatAdapter for CotFormatAdapter {
         })
     }
     
-    /// Decode CoT event to PEAT document
+    /// Decode CoT event to Peat document
     fn decode(&self, msg: &EncodedMessage) -> Result<PeatDocument, TransformError> {
         // Parse CoT event
         let cot_event = self.parse_cot(&msg.payload, &msg.encoding)?;
@@ -35693,7 +35656,7 @@ impl FormatAdapter for CotFormatAdapter {
         // Validate against CoT schema
         self.validator.validate(&cot_event)?;
         
-        // Map to PEAT document based on CoT type
+        // Map to Peat document based on CoT type
         let peat_doc = match self.classify_cot_type(&cot_event.event_type) {
             CotClassification::Position => self.decode_position(&cot_event)?,
             CotClassification::Track => self.decode_track(&cot_event)?,
@@ -35718,10 +35681,10 @@ impl FormatAdapter for CotFormatAdapter {
 }
 ```
 
-### Type Mapping: PEAT ↔ CoT
+### Type Mapping: Peat ↔ CoT
 
 ```rust
-/// PEAT to CoT type mapping definitions
+/// Peat to CoT type mapping definitions
 impl CotFormatAdapter {
     fn init_type_mappings() -> HashMap<PeatType, CotTypeMapping> {
         let mut mappings = HashMap::new();
@@ -35805,7 +35768,7 @@ impl CotFormatAdapter {
 
 ### Format Capability Advertisement
 
-Nodes advertise their format capabilities as part of PEAT discovery:
+Nodes advertise their format capabilities as part of Peat discovery:
 
 ```protobuf
 // Extend beacon to include format capabilities
@@ -35891,7 +35854,7 @@ impl FormatNegotiator {
             .ok_or(NegotiationError::NoCommonFormat)
     }
     
-    /// Handle PEAT-native peer (no format adapter needed)
+    /// Handle Peat-native peer (no format adapter needed)
     pub fn is_peat_native(peer_capabilities: &[FormatAdapterCapability]) -> bool {
         peer_capabilities.iter().any(|c| c.format_id == "peat-native")
     }
@@ -35907,7 +35870,7 @@ pub struct NegotiatedFormat {
 
 ### Transform Pipeline (Chained Transformations)
 
-For multi-hop scenarios (e.g., PEAT → CoT → Link 16 gateway):
+For multi-hop scenarios (e.g., Peat → CoT → Link 16 gateway):
 
 ```rust
 /// Transform pipeline for chained format conversion
@@ -35923,18 +35886,18 @@ impl TransformPipeline {
         registry: &FormatAdapterRegistry
     ) -> Result<Self, PipelineError> {
         // Find path through registered adapters
-        // All adapters convert to/from canonical PEAT format
+        // All adapters convert to/from canonical Peat format
         
         let mut stages: Vec<Box<dyn FormatAdapter>> = vec![];
         
-        // If source isn't PEAT-native, add decode stage
+        // If source isn't Peat-native, add decode stage
         if source_format != "peat-native" {
             let decoder = registry.get(source_format)
                 .ok_or(PipelineError::AdapterNotFound(source_format.into()))?;
             stages.push(decoder);
         }
         
-        // If dest isn't PEAT-native, add encode stage
+        // If dest isn't Peat-native, add encode stage
         if dest_format != "peat-native" {
             let encoder = registry.get(dest_format)
                 .ok_or(PipelineError::AdapterNotFound(dest_format.into()))?;
@@ -35949,14 +35912,14 @@ impl TransformPipeline {
         let mut current = input.clone();
         
         for stage in &self.stages {
-            // Decode to PEAT doc
+            // Decode to Peat doc
             let doc = stage.decode(&current)?;
             
             // If more stages, encode to next format
             if let Some(next_stage) = self.stages.get(1) {
                 current = next_stage.encode(&doc)?;
             } else {
-                // Final stage - return as PEAT doc or re-encode
+                // Final stage - return as Peat doc or re-encode
                 return stage.encode(&doc);
             }
         }
@@ -35965,19 +35928,19 @@ impl TransformPipeline {
     }
 }
 
-// Example: CoT → PEAT → Link 16 (via gateway)
+// Example: CoT → Peat → Link 16 (via gateway)
 // let pipeline = TransformPipeline::build("cot", "link16", &registry)?;
 // let link16_msg = pipeline.transform(&cot_message)?;
 ```
 
 ### WearTAK Integration Mode
 
-For WearTAK devices, PEAT Lite can operate in **CoT-Native Mode**:
+For WearTAK devices, Peat Lite can operate in **CoT-Native Mode**:
 
 ```rust
-/// PEAT Lite operating modes for format handling
+/// Peat Lite operating modes for format handling
 pub enum LiteFormatMode {
-    /// Full PEAT protocol with optional format adapters
+    /// Full Peat protocol with optional format adapters
     PeatNative {
         adapters: Vec<FormatAdapterCapability>,
     },
@@ -35985,7 +35948,7 @@ pub enum LiteFormatMode {
     /// Speak external format natively, parent handles conversion
     ExternalNative {
         format: String,          // "cot", "mqtt", etc.
-        parent_converts: bool,   // Parent handles PEAT ↔ format conversion
+        parent_converts: bool,   // Parent handles Peat ↔ format conversion
     },
     
     /// Minimal: Only send raw data, parent handles everything
@@ -36012,14 +35975,14 @@ pub fn weartk_config() -> LiteNodeConfig {
 }
 ```
 
-### Parent-Side CoT Bridge for PEAT Lite
+### Parent-Side CoT Bridge for Peat Lite
 
-The ATAK phone (PEAT Edge node) handles CoT ↔ PEAT transformation for its leaf children:
+The ATAK phone (Peat Edge node) handles CoT ↔ Peat transformation for its leaf children:
 
 ```rust
-/// ATAK/PEAT Edge node handling WearTAK children
+/// ATAK/Peat Edge node handling WearTAK children
 pub struct AtakPeatBridge {
-    /// Local PEAT node
+    /// Local Peat node
     peat_node: PeatEdgeNode,
     
     /// CoT format adapter
@@ -36038,7 +36001,7 @@ impl AtakPeatBridge {
         child_id: &NodeId, 
         cot_bytes: &[u8]
     ) -> Result<(), BridgeError> {
-        // Decode CoT to PEAT document
+        // Decode CoT to Peat document
         let encoded = EncodedMessage {
             format: "cot".into(),
             encoding: "protobuf".into(),
@@ -36048,7 +36011,7 @@ impl AtakPeatBridge {
         
         let peat_doc = self.cot_adapter.decode(&encoded)?;
         
-        // Inject into PEAT as child's document
+        // Inject into Peat as child's document
         let doc_with_hierarchy = peat_doc.with_parent(self.peat_node.node_id());
         self.peat_node.merge_child_document(child_id, doc_with_hierarchy).await?;
         
@@ -36065,7 +36028,7 @@ impl AtakPeatBridge {
         child_id: &NodeId,
         command: PeatCommand
     ) -> Result<(), BridgeError> {
-        // Encode PEAT command to CoT
+        // Encode Peat command to CoT
         let peat_doc = command.to_document();
         let cot_msg = self.cot_adapter.encode(&peat_doc)?;
         
@@ -36085,7 +36048,7 @@ impl AtakPeatBridge {
 Constrained devices only need a subset of CoT:
 
 ```protobuf
-// Minimal CoT for PEAT Lite wearables
+// Minimal CoT for Peat Lite wearables
 // Subset of full CoT schema
 
 message MinimalCotEvent {
@@ -36142,12 +36105,12 @@ message AckDetail {
 
 ### Positive
 
-1. **Native format support**: Devices can speak CoT (or other formats) without full PEAT stack
+1. **Native format support**: Devices can speak CoT (or other formats) without full Peat stack
 2. **Negotiated interoperability**: Peers automatically discover compatible formats
 3. **Composable transforms**: Multi-hop bridging becomes straightforward
 4. **Explicit semantics**: Schema-declared mappings document what's preserved/lost
 5. **Optimized for constraints**: Lite nodes can skip transformation overhead
-6. **Ecosystem integration**: TAK, ROS2, MQTT devices join PEAT naturally
+6. **Ecosystem integration**: TAK, ROS2, MQTT devices join Peat naturally
 
 ### Negative
 
@@ -36158,7 +36121,7 @@ message AckDetail {
 
 ### Risks
 
-1. **Semantic drift**: PEAT concepts may not map cleanly to all formats
+1. **Semantic drift**: Peat concepts may not map cleanly to all formats
 2. **Performance**: Transform overhead in hot paths (mitigated by caching)
 3. **Security**: Malformed external messages could exploit transform bugs
 
@@ -36171,13 +36134,13 @@ message AckDetail {
 4. Basic pipeline infrastructure
 
 ### Phase 2: CoT Reference Adapter (Q1 2026)
-1. Full PEAT ↔ CoT type mappings
+1. Full Peat ↔ CoT type mappings
 2. XML and Protobuf encoding
 3. Schema validation
 4. Integration tests with TAK
 
 ### Phase 3: WearTAK Integration (Q1 2026)
-1. CoT-native mode for PEAT Lite
+1. CoT-native mode for Peat Lite
 2. ATAK bridge implementation
 3. Minimal CoT schema for wearables
 4. Field testing with Ascent
@@ -36231,34 +36194,33 @@ Examples:
 
 ## Appendix B: Transform Loss Documentation
 
-| PEAT → CoT | Lost Information | Mitigation |
+| Peat → CoT | Lost Information | Mitigation |
 |------------|------------------|------------|
 | Capability | Rich capability taxonomy | Encode in detail/peat_capabilities extension |
 | Hierarchy | Multi-parent relationships | Use CoT link elements for primary parent |
 | CRDT metadata | Vector clocks, merge history | Not needed for TAK display |
-| TTL semantics | PEAT's flexible TTL tiers | Map to CoT stale time |
+| TTL semantics | Peat's flexible TTL tiers | Map to CoT stale time |
 
-| CoT → PEAT | Lost Information | Mitigation |
+| CoT → Peat | Lost Information | Mitigation |
 |------------|------------------|------------|
 | Symbology detail | MIL-STD-2525 specifics | Preserve in opaque detail field |
-| Contact chains | CoT contact references | Parse and map to PEAT relationships |
+| Contact chains | CoT contact references | Parse and map to Peat relationships |
 | Custom detail schemas | Domain-specific extensions | Preserve as opaque JSON |
 
----
 
-# ADR-039: PEAT-BTLE Mesh Transport Crate
+# ADR-039: Peat-BTLE Mesh Transport Crate
 
 **Status**: Proposed  
 **Date**: 2025-12-13  
-**Authors**: Kit Plummer, Codex  
-**Organization**: (r)evolve - Revolve Team LLC (https://revolveteam.com)  
-**Relates To**: ADR-032 (Pluggable Transport Abstraction), ADR-035 (PEAT-Lite Embedded Nodes), ADR-037 (Resource-Constrained Device Optimization), ADR-017 (P2P Mesh Management), ADR-006 (Security)
+**Authors**: Kit Plummer, Claude  
+**Organization**: Defense Unicorns (https://defenseunicorns.com)  
+**Relates To**: ADR-032 (Pluggable Transport Abstraction), ADR-035 (Peat-Lite Embedded Nodes), ADR-037 (Resource-Constrained Device Optimization), ADR-017 (P2P Mesh Management), ADR-006 (Security)
 
 ---
 
 ## Executive Summary
 
-This ADR defines the architecture for `peat-btle`, a Rust crate providing Bluetooth Low Energy mesh networking for PEAT Protocol. The crate enables peer-to-peer discovery, advertisement, and connectivity across resource-constrained devices while supporting PEAT-Lite synchronization. It implements configurable Coded PHYs for throughput/range tradeoffs and targets cross-platform deployment on Linux, Android, macOS, iOS, and Windows across x86 and ARM architectures.
+This ADR defines the architecture for `peat-btle`, a Rust crate providing Bluetooth Low Energy mesh networking for Peat Protocol. The crate enables peer-to-peer discovery, advertisement, and connectivity across resource-constrained devices while supporting Peat-Lite synchronization. It implements configurable Coded PHYs for throughput/range tradeoffs and targets cross-platform deployment on Linux, Android, macOS, iOS, and Windows across x86 and ARM architectures.
 
 ---
 
@@ -36266,9 +36228,9 @@ This ADR defines the architecture for `peat-btle`, a Rust crate providing Blueto
 
 ### The BLE Mesh Opportunity
 
-Bluetooth Low Energy represents a critical transport for PEAT's tactical edge scenarios:
+Bluetooth Low Energy represents a critical transport for Peat's tactical edge scenarios:
 
-| Scenario | BLE Advantage | PEAT Use Case |
+| Scenario | BLE Advantage | Peat Use Case |
 |----------|---------------|---------------|
 | Wearable sync | Ultra-low power (10mW) | WearTAK on Samsung watches |
 | Sensor mesh | No infrastructure required | Environmental sensors, asset trackers |
@@ -36287,10 +36249,10 @@ Ditto BLE Behavior:
 ├─ Full mesh participation: All devices relay everything
 └─ Result: 3-4 hour battery life (mission failure)
 
-PEAT-BTLE Target:
+Peat-BTLE Target:
 ├─ Batched sync windows: Radio active <5% of time
 ├─ Hierarchical discovery: Leaf nodes don't scan
-├─ PEAT Lite profile: Minimal state, single parent
+├─ Peat Lite profile: Minimal state, single parent
 └─ Result: 18-24 hour battery life (mission capable)
 ```
 
@@ -36313,7 +36275,7 @@ Per ADR-032 (Pluggable Transport Abstraction), each transport type requires fund
 
 1. **Cross-Platform**: Single codebase targeting Linux, Android, macOS, iOS, Windows
 2. **Cross-Architecture**: x86_64 and ARM (aarch64, armv7, armv7-a)
-3. **PEAT-Lite Support**: Synchronize minimal CRDT state per ADR-035/037
+3. **Peat-Lite Support**: Synchronize minimal CRDT state per ADR-035/037
 4. **Coded PHY Support**: Configure LE Coded (S=2, S=8) for range/throughput tradeoffs
 5. **Mesh Topology**: P2P discovery, advertisement, and multi-peer connectivity
 6. **Power Efficiency**: >50% battery improvement over Ditto baseline
@@ -36351,7 +36313,7 @@ peat-btle/
 │   │   ├── mod.rs
 │   │   ├── advertiser.rs   # Advertisement broadcasting
 │   │   ├── scanner.rs      # Passive/active scanning
-│   │   └── beacon.rs       # PEAT beacon encoding/decoding
+│   │   └── beacon.rs       # Peat beacon encoding/decoding
 │   │
 │   ├── mesh/               # Mesh topology management
 │   │   ├── mod.rs
@@ -36361,11 +36323,11 @@ peat-btle/
 │   │
 │   ├── gatt/               # GATT service definition
 │   │   ├── mod.rs
-│   │   ├── service.rs      # PEAT BLE service
+│   │   ├── service.rs      # Peat BLE service
 │   │   ├── characteristics.rs
 │   │   └── protocol.rs     # Characteristic read/write protocol
 │   │
-│   ├── sync/               # PEAT-Lite synchronization
+│   ├── sync/               # Peat-Lite synchronization
 │   │   ├── mod.rs
 │   │   ├── batch.rs        # Batched sync accumulator
 │   │   ├── delta.rs        # Differential sync encoding
@@ -36420,7 +36382,7 @@ use peat_protocol::transport::{
     MessageRequirements, MeshConnection
 };
 
-/// Bluetooth LE transport implementing PEAT Transport trait
+/// Bluetooth LE transport implementing Peat Transport trait
 pub struct BluetoothLETransport {
     config: BleConfig,
     adapter: BleAdapter,
@@ -36581,10 +36543,10 @@ pub enum PhyStrategy {
 
 use crate::phy::BlePhy;
 
-/// PEAT BLE beacon format (fits in BLE advertisement payload)
+/// Peat BLE beacon format (fits in BLE advertisement payload)
 #[derive(Debug, Clone)]
 pub struct PeatBeacon {
-    /// PEAT protocol version (4 bits)
+    /// Peat protocol version (4 bits)
     pub version: u8,
     /// Node capabilities flags (12 bits)
     pub capabilities: NodeCapabilities,
@@ -36604,7 +36566,7 @@ impl PeatBeacon {
     /// Encode to BLE advertisement data (max 31 bytes legacy, 254 bytes extended)
     pub fn encode(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(16);
-        // PEAT service UUID (16 bits)
+        // Peat service UUID (16 bits)
         buf.extend_from_slice(&PEAT_SERVICE_UUID_SHORT);
         // Packed beacon data (13 bytes)
         buf.push((self.version << 4) | ((self.capabilities.bits() >> 8) as u8 & 0x0F));
@@ -36676,9 +36638,9 @@ impl DiscoveryManager {
 ```rust
 // File: src/gatt/service.rs
 
-/// PEAT BLE GATT Service definition
+/// Peat BLE GATT Service definition
 /// 
-/// Service UUID: 0xPEAT (custom 128-bit UUID)
+/// Service UUID: 0xPeat (custom 128-bit UUID)
 /// 
 /// Characteristics:
 /// - Node Info (read): Node identity and capabilities
@@ -36731,7 +36693,7 @@ impl PeatGattService {
     }
 }
 
-/// PEAT Sync Protocol over GATT
+/// Peat Sync Protocol over GATT
 /// 
 /// Uses chunked transfer for payloads > MTU
 pub struct GattSyncProtocol {
@@ -36790,7 +36752,7 @@ impl GattSyncProtocol {
 }
 ```
 
-#### 5. PEAT-Lite Sync Support
+#### 5. Peat-Lite Sync Support
 
 ```rust
 // File: src/sync/mod.rs
@@ -36876,7 +36838,7 @@ impl DeltaEncoder {
     }
 }
 
-/// PEAT-Lite sync state for BLE transport
+/// Peat-Lite sync state for BLE transport
 pub struct BlePeatLiteSync {
     node_id: NodeId,
     parent_id: Option<NodeId>,
@@ -36944,7 +36906,7 @@ pub enum PowerProfile {
         adv_interval_ms: u32,    // 500ms
         conn_interval_ms: u32,   // 30ms
     },
-    /// Maximum battery life (PEAT Lite default)
+    /// Maximum battery life (Peat Lite default)
     /// Radio active ~2% of time
     LowPower {
         scan_interval_ms: u32,   // 5000ms
@@ -37090,7 +37052,7 @@ impl BleSecurityManager {
             }
         }
         
-        // Step 3: PEAT-level authentication
+        // Step 3: Peat-level authentication
         let identity = self.peat_security.authenticate_peer(peer_id).await?;
         
         Ok(identity)
@@ -37191,10 +37153,10 @@ mod embedded {
 name = "peat-btle"
 version = "0.1.0"
 edition = "2021"
-authors = ["(r)evolve - Revolve Team LLC"]
+authors = ["Defense Unicorns"]
 license = "Apache-2.0"
-description = "Bluetooth Low Energy mesh transport for PEAT Protocol"
-repository = "https://github.com/revolveteam/peat-protocol"
+description = "Bluetooth Low Energy mesh transport for Peat Protocol"
+repository = "https://github.com/defenseunicorns/peat-protocol"
 keywords = ["ble", "bluetooth", "mesh", "sync", "crdt"]
 categories = ["network-programming", "embedded", "hardware-support"]
 
@@ -37242,7 +37204,7 @@ esp-idf-hal = { version = "0.43", optional = true }  # ESP32
 # Embedded
 embedded-hal = { version = "1.0", optional = true }
 
-# PEAT Protocol integration
+# Peat Protocol integration
 peat-protocol = { path = "../peat-protocol" }
 peat-lite = { path = "../peat-lite", optional = true }
 
@@ -37273,14 +37235,14 @@ harness = false
 | Level 3 | Yes | Yes | MITM-protected pairing |
 | Level 4 | Yes | Yes (FIPS) | LE Secure Connections |
 
-**Recommendation**: PEAT-BTLE should require Level 3+ for sync operations.
+**Recommendation**: Peat-BTLE should require Level 3+ for sync operations.
 
 ### Application-Layer Security
 
 Per ADR-006, BLE transport security is layered:
 
 1. **BLE Pairing**: Establishes link encryption (AES-CCM)
-2. **PEAT PKI**: Verifies device identity via certificates
+2. **Peat PKI**: Verifies device identity via certificates
 3. **Application Encryption**: ChaCha20-Poly1305 for sync payloads (optional)
 
 ### Threat Model
@@ -37289,7 +37251,7 @@ Per ADR-006, BLE transport security is layered:
 |--------|------------|
 | Eavesdropping | BLE link encryption + optional app-layer encryption |
 | MITM | Numeric comparison or passkey pairing |
-| Replay | Sequence numbers in PEAT beacon/sync messages |
+| Replay | Sequence numbers in Peat beacon/sync messages |
 | Rogue device | PKI-based device authentication |
 | Battery drain attack | Rate limiting, connection limits |
 
@@ -37348,7 +37310,7 @@ Per ADR-006, BLE transport security is layered:
 - [ ] Parent failover works
 - [ ] Connection limits enforced
 
-### Phase 3: PEAT-Lite Sync (Weeks 6-7)
+### Phase 3: Peat-Lite Sync (Weeks 6-7)
 
 **Deliverables:**
 1. Batch accumulator
@@ -37404,6 +37366,243 @@ Per ADR-006, BLE transport security is layered:
 
 ---
 
+## peat-ffi Integration
+
+### Dual-Mode Operation
+
+peat-btle is designed to operate in two modes:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              Full Peat (ATAK, CLI, etc.)                │
+│                                                         │
+│  TransportManager (PACE policy)                         │
+│  ├── IrohTransport (QUIC/WiFi) - Primary                │
+│  ├── PeatBleTransport ────────┐  - Alternate            │
+│  └── ...                      │                         │
+└───────────────────────────────│─────────────────────────┘
+                                │ wraps
+                                ▼
+┌─────────────────────────────────────────────────────────┐
+│                      peat-btle                          │
+│         (Standalone OR as transport plugin)             │
+│         Same protocol - devices interoperate            │
+└─────────────────────────────────────────────────────────┘
+                                ▲
+                                │ uses directly
+┌───────────────────────────────┴─────────────────────────┐
+│              WearTAK (Samsung Watch)                    │
+│         Can't run full Peat - standalone peat-btle      │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Mode 1: Standalone** - For resource-constrained devices (WearTAK on Samsung watches, ESP32 sensors) that cannot run full Peat. The device uses peat-btle directly with its lightweight CRDT sync.
+
+**Mode 2: Transport Plugin** - For full Peat nodes (ATAK, CLI, servers), peat-btle is wrapped by `PeatBleTransport` and registered with `TransportManager` alongside other transports (Iroh/QUIC, future LoRa, etc.).
+
+**Interoperability**: Both modes use the same BLE protocol (GATT service, beacon format, sync protocol), so a Samsung Watch running standalone peat-btle can sync with ATAK running full Peat with BLE as a transport.
+
+### peat-ffi Transport Abstraction
+
+#### Feature Flags
+
+```toml
+# peat-ffi/Cargo.toml
+[features]
+default = ["sync"]
+sync = ["peat-protocol/automerge-backend"]
+bluetooth = ["peat-protocol/bluetooth"]
+```
+
+#### Extended NodeConfig
+
+```rust
+// peat-ffi/src/lib.rs
+
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct NodeConfig {
+    pub app_id: String,
+    pub shared_key: String,
+    pub bind_address: Option<String>,
+    pub storage_path: String,
+    pub transport_config: Option<TransportConfigFFI>,  // NEW
+}
+
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct TransportConfigFFI {
+    /// Enable BLE transport (requires bluetooth feature)
+    pub enable_ble: bool,
+    /// BLE mesh ID for WearTAK interoperability (e.g., "WEARTAK")
+    pub ble_mesh_id: Option<String>,
+    /// Power profile: "aggressive", "balanced", "low_power"
+    pub ble_power_profile: Option<String>,
+    /// PACE transport preference order (e.g., ["quic", "bluetooth_le"])
+    pub transport_preference: Option<Vec<String>>,
+}
+```
+
+#### PeatNode with TransportManager
+
+```rust
+// peat-ffi/src/lib.rs
+
+pub struct PeatNode {
+    sync_backend: Arc<AutomergeIrohBackend>,
+    storage_backend: Arc<AutomergeBackend>,
+    transport_manager: Arc<TransportManager>,  // Replaces: transport: Arc<IrohTransport>
+    iroh_transport: Arc<IrohTransport>,
+    #[cfg(feature = "bluetooth")]
+    ble_transport: Option<Arc<PeatBleTransport>>,
+    store: Arc<AutomergeStore>,
+    storage_path: PathBuf,
+    runtime: Arc<tokio::runtime::Runtime>,
+    cleanup_running: Arc<AtomicBool>,
+}
+```
+
+#### Platform Adapters
+
+peat-btle provides platform-specific adapters that peat-ffi uses via feature flags:
+
+| Platform | peat-btle Feature | Adapter |
+|----------|-------------------|---------|
+| Linux | `linux` | BlueZ via `bluer` crate |
+| Android | `android` | JNI to Android Bluetooth API |
+| macOS | `macos` | CoreBluetooth |
+| iOS | `ios` | CoreBluetooth |
+| Windows | `windows` | WinRT Bluetooth API |
+
+peat-ffi doesn't implement its own adapters - it uses peat-btle's existing adapters:
+
+```rust
+// peat-ffi/src/lib.rs
+
+#[cfg(all(feature = "bluetooth", target_os = "linux"))]
+use peat_btle::platform::linux::LinuxAdapter;
+
+#[cfg(all(feature = "bluetooth", target_os = "android"))]
+use peat_btle::platform::android::AndroidAdapter;
+
+#[cfg(all(feature = "bluetooth", any(target_os = "macos", target_os = "ios")))]
+use peat_btle::platform::apple::AppleAdapter;
+
+// Create transport with platform-appropriate adapter
+#[cfg(feature = "bluetooth")]
+fn create_ble_transport(config: &BleConfig) -> Result<PeatBleTransport<impl BleAdapter>> {
+    #[cfg(target_os = "linux")]
+    let adapter = LinuxAdapter::new()?;
+
+    #[cfg(target_os = "android")]
+    let adapter = AndroidAdapter::new()?;
+
+    // ... etc
+
+    Ok(PeatBleTransport::new(config, adapter))
+}
+```
+
+For Android, peat-ffi exposes JNI functions to control the transport:
+
+```kotlin
+// PeatJni.kt
+external fun enableBleTransport(nodeHandle: Long, meshId: String): Boolean
+external fun disableBleTransport(nodeHandle: Long): Boolean
+external fun getBleStatus(nodeHandle: Long): BleStatus
+```
+
+### Translation Layer (ADR-041 Integration)
+
+Full Peat nodes act as gateways between Automerge documents and peat-btle's lightweight CRDTs:
+
+```rust
+// peat-protocol/src/sync/ble_translation.rs
+
+pub struct BleTranslationLayer {
+    node_mapping: HashMap<u32, String>,
+}
+
+impl BleTranslationLayer {
+    /// Receive PeatDocument from BLE, update Automerge
+    pub fn on_ble_document(
+        &mut self,
+        doc: &PeatDocument,
+        am_doc: &mut Automerge
+    ) -> Result<()> {
+        let node_id = format!("{:08X}", doc.node_id());
+
+        // Map peat-btle fields to Automerge document structure
+        am_doc.put(&format!("/devices/{}/counter", node_id), doc.counter())?;
+
+        if let Some(peripheral) = doc.peripheral() {
+            if let Some(loc) = peripheral.location() {
+                am_doc.put(&format!("/devices/{}/lat", node_id), loc.lat)?;
+                am_doc.put(&format!("/devices/{}/lon", node_id), loc.lon)?;
+            }
+            if let Some(event) = peripheral.last_event() {
+                match event.event_type {
+                    EventType::Emergency => {
+                        am_doc.put(&format!("/alerts/{}/emergency", node_id), true)?;
+                    }
+                    EventType::Ack => {
+                        am_doc.put(&format!("/alerts/{}/ack", node_id), true)?;
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Build PeatDocument from Automerge for BLE broadcast
+    pub fn build_ble_document(&self, node_id: u32, am_doc: &Automerge) -> Vec<u8> {
+        let mut doc = PeatDocument::new(node_id);
+        // Extract relevant fields from Automerge, populate lightweight doc
+        doc.encode()
+    }
+}
+```
+
+### ATAK Plugin Migration
+
+The ATAK plugin currently runs two parallel systems:
+
+- `PeatNodeJni` → peat-ffi → IrohTransport (PLI broadcast)
+- `PeatBleManager` → peat-btle AAR → BLE mesh (WearTAK sync)
+
+**Problem**: Data doesn't flow between them. PLI broadcasts only go over Iroh; WearTAK devices on BLE never receive them.
+
+**Solution**: Unified transport via peat-ffi:
+
+```kotlin
+// PeatPluginLifecycle.kt - BEFORE (dual system)
+val peatNode = PeatJni.createNode(config)
+val bleManager = PeatBleManager(context, meshId)  // Separate!
+
+// PeatPluginLifecycle.kt - AFTER (unified)
+val config = NodeConfig(
+    appId = "...",
+    sharedKey = "...",
+    transportConfig = TransportConfigFFI(
+        enableBle = true,
+        bleMeshId = "WEARTAK",
+        blePowerProfile = "balanced"
+    )
+)
+val peatNode = PeatJni.createNode(config)
+// BLE is now managed by TransportManager inside peat-ffi
+```
+
+**Migration Steps**:
+
+1. Add `bluetooth` feature to peat-ffi, expose `TransportConfigFFI` via UniFFI
+2. Add JNI bindings for BLE control (`enableBleTransport`, `onBleDiscovered`, etc.)
+3. Update `PeatPluginLifecycle` to use `TransportConfigFFI` with `enable_ble=true`
+4. Deprecate `PeatBleManager` (keep working during transition)
+5. Validate WearTAK sync works via unified path
+6. Remove `PeatBleManager` once stable
+
+---
+
 ## Alternatives Considered
 
 ### 1. Use btleplug Directly
@@ -37422,7 +37621,7 @@ Bluetooth SIG defines a mesh networking standard.
 **Pros**: Standardized, multi-vendor support
 **Cons**: Complex provisioning, no CRDT support, designed for lighting/IoT not tactical
 
-**Decision**: Implement PEAT-native mesh over GATT, not SIG Mesh.
+**Decision**: Implement Peat-native mesh over GATT, not SIG Mesh.
 
 ### 3. ESP-NOW on ESP32
 
@@ -37442,7 +37641,7 @@ ESP-NOW is Espressif's proprietary peer-to-peer protocol.
 3. [bluer crate](https://docs.rs/bluer/) - Linux BlueZ bindings
 4. [btleplug crate](https://docs.rs/btleplug/) - Cross-platform BLE
 5. ADR-032: Pluggable Transport Abstraction
-6. ADR-035: PEAT-Lite Embedded Nodes
+6. ADR-035: Peat-Lite Embedded Nodes
 7. ADR-037: Resource-Constrained Device Optimization
 8. ADR-006: Security, Authentication, and Authorization
 
@@ -37453,33 +37652,82 @@ ESP-NOW is Espressif's proprietary peer-to-peer protocol.
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2025-12-13 | Create dedicated peat-btle crate | BLE requires fundamentally different abstractions than IP-based transports |
-| 2025-12-13 | GATT-based sync over SIG Mesh | PEAT needs CRDT sync semantics, not broadcast mesh |
+| 2025-12-13 | GATT-based sync over SIG Mesh | Peat needs CRDT sync semantics, not broadcast mesh |
 | 2025-12-13 | Platform abstraction with native implementations | Each platform has different BLE APIs and capabilities |
 | 2025-12-13 | Coded PHY support as feature | Enables range/throughput tradeoffs, requires BLE 5.0 |
+| 2025-01-12 | Dual-mode operation (standalone + transport plugin) | peat-btle must work standalone for constrained devices (WearTAK) AND as transport within full Peat |
+| 2025-01-12 | Integrate via TransportManager in peat-ffi | Unifies transport selection with PACE policy; avoids dual-system architecture in ATAK plugin |
+| 2025-01-12 | Translation layer for Automerge ↔ peat-btle | Per ADR-041, full Peat nodes act as gateways translating between document formats |
 
 ---
 
 **Next Steps:**
-1. Review with stakeholders
-2. Create GitHub issues for implementation phases
-3. Begin Phase 1 development on Linux reference platform
-4. Coordinate with Ascent for WearTAK integration testing
+1. ~~Review with stakeholders~~ (ongoing)
+2. GitHub issues created for peat-ffi integration (see below)
+3. Radicle issues for peat-btle API exposure
+4. Begin Phase 1: Add bluetooth feature flag to peat-ffi
+5. Coordinate with Ascent for WearTAK integration testing
+
+**GitHub Issues (peat repo):**
+- [#554](https://github.com/defenseunicorns/peat/issues/554) - Add `bluetooth` feature flag to peat-ffi
+- [#555](https://github.com/defenseunicorns/peat/issues/555) - Refactor PeatNode to use TransportManager
+- [#556](https://github.com/defenseunicorns/peat/issues/556) - Add BLE transport option to NodeConfig/create_node
+- [#557](https://github.com/defenseunicorns/peat/issues/557) - Implement Automerge ↔ peat-btle translation layer
+- [#558](https://github.com/defenseunicorns/peat/issues/558) - ATAK plugin: migrate to unified transport
+
+**Radicle Issues (peat-btle repo):** *(create manually in Radicle)*
+
+### Issue: Ensure platform adapters are usable from external crates (peat-ffi)
+
+**Summary**: peat-btle has platform adapters for Linux (BlueZ), macOS/iOS (CoreBluetooth), Android (JNI), and Windows (WinRT). Ensure these can be used by peat-ffi via feature flags without peat-ffi needing to implement its own adapters.
+
+**Implementation**:
+- Verify platform feature flags work correctly when peat-btle is a dependency
+- Ensure `BluetoothLETransport::new()` can be called with platform-appropriate adapter
+- Export configuration types (`BleConfig`, `PeatMeshConfig`, `PowerProfile`) for external use
+- Ensure observer/callback pattern works across crate boundary
+- Document feature flag combinations for each target platform
+
+**Acceptance Criteria**:
+- [ ] peat-ffi can use `linux` feature → gets BlueZ adapter
+- [ ] peat-ffi can use `android` feature → gets JNI adapter
+- [ ] peat-ffi can use `macos`/`ios` feature → gets CoreBluetooth adapter
+- [ ] Configuration types are public and documented
+- [ ] `PeatObserver` works across crate boundary
+- [ ] Example of external crate usage
 
 ---
 
-# ADR-040: Nostr Protocol Lessons for PEAT Architecture
+### Issue: Add transport-agnostic document encoding helpers
+
+**Summary**: Ensure `PeatDocument` encoding/decoding is public and transport-agnostic for use in the translation layer.
+
+**Implementation**:
+- Make `PeatDocument::from_bytes()` public
+- Make `PeatDocument::to_bytes()` / `encode()` public
+- Allow external construction with arbitrary node IDs
+- Document the binary format for interoperability
+
+**Acceptance Criteria**:
+- [ ] `PeatDocument::from_bytes()` is public
+- [ ] `PeatDocument::to_bytes()` is public
+- [ ] External node ID assignment works
+- [ ] Binary format documented
+
+
+# ADR-040: Nostr Protocol Lessons for Peat Architecture
 
 **Status**: Proposed  
 **Date**: 2025-12-15  
-**Authors**: Kit Plummer, Codex  
-**Organization**: (r)evolve - Revolve Team LLC (https://revolveteam.com)  
-**Relates To**: ADR-007 (Automerge Sync Engine), ADR-012 (Schema Definition), ADR-017 (P2P Mesh Management), ADR-021 (Document-Oriented Architecture), ADR-027 (Event Routing), ADR-035 (PEAT-Lite), ADR-039 (BTLE Mesh)
+**Authors**: Kit Plummer, Claude  
+**Organization**: Defense Unicorns (https://defenseunicorns.com)  
+**Relates To**: ADR-007 (Automerge Sync Engine), ADR-012 (Schema Definition), ADR-017 (P2P Mesh Management), ADR-021 (Document-Oriented Architecture), ADR-027 (Event Routing), ADR-035 (Peat-Lite), ADR-039 (BTLE Mesh)
 
 ---
 
 ## Executive Summary
 
-This ADR captures architectural lessons from the Nostr protocol and its NIPs (Nostr Implementation Possibilities) that inform PEAT Protocol design. Nostr represents a novel "Relay Architecture" that accepts network centralization as inevitable while preserving user key ownership. PEAT can adapt several Nostr patterns—particularly NIP-29 (Relay-Based Groups), NIP-77 (Negentropy Syncing), and the event-centric data model—while maintaining its distinct "Hierarchical Aggregation Architecture" optimized for contested tactical environments without cloud infrastructure.
+This ADR captures architectural lessons from the Nostr protocol and its NIPs (Nostr Implementation Possibilities) that inform Peat Protocol design. Nostr represents a novel "Relay Architecture" that accepts network centralization as inevitable while preserving user key ownership. Peat can adapt several Nostr patterns—particularly NIP-29 (Relay-Based Groups), NIP-77 (Negentropy Syncing), and the event-centric data model—while maintaining its distinct "Hierarchical Aggregation Architecture" optimized for contested tactical environments without cloud infrastructure.
 
 ---
 
@@ -37503,13 +37751,13 @@ Rather than fighting this physics, Nostr accepts it while preserving user sovere
 | **Centralized** | Bigger servers | Unlimited resources | Enterprise SaaS |
 | **Federated** | More servers talk | Servers cooperate | Social platforms (Mastodon) |
 | **Relay (Nostr)** | Dumb pipes + smart clients | Cloud available | Censorship resistance |
-| **Hierarchical (PEAT)** | Decompose by scope | No cloud, hierarchy exists | Tactical coordination |
+| **Hierarchical (Peat)** | Decompose by scope | No cloud, hierarchy exists | Tactical coordination |
 
-PEAT represents a fourth architecture: **Hierarchical Aggregation**—designed for environments where relays don't exist, peers are bandwidth-constrained, and command hierarchy naturally dictates information flow.
+Peat represents a fourth architecture: **Hierarchical Aggregation**—designed for environments where relays don't exist, peers are bandwidth-constrained, and command hierarchy naturally dictates information flow.
 
-### Why Nostr Matters for PEAT
+### Why Nostr Matters for Peat
 
-Despite different target environments, Nostr and PEAT share fundamental challenges:
+Despite different target environments, Nostr and Peat share fundamental challenges:
 
 1. **Eventual consistency** across disconnected nodes
 2. **Cryptographic identity** independent of any server
@@ -37546,7 +37794,7 @@ Nostr's entire protocol centers on a single object type—the **Event**:
 
 ### NIP-29: Relay-Based Groups
 
-NIP-29 defines closed groups managed by relay authority—directly analogous to PEAT's hierarchical echelons:
+NIP-29 defines closed groups managed by relay authority—directly analogous to Peat's hierarchical echelons:
 
 **Key Patterns**:
 
@@ -37580,7 +37828,7 @@ NIP-29 defines closed groups managed by relay authority—directly analogous to 
 
 5. **Anti-Replay Protection**: "Relays should prevent late publication (messages published now with a timestamp from days or even hours ago)."
 
-**PEAT Parallel**: The squad leader's node is the "relay" for that squad. The `h` tag maps to hierarchical scope (`squad/alpha-1`). Roles map to military positions (squad leader, team leader).
+**Peat Parallel**: The squad leader's node is the "relay" for that squad. The `h` tag maps to hierarchical scope (`squad/alpha-1`). Roles map to military positions (squad leader, team leader).
 
 ### NIP-77: Negentropy Syncing
 
@@ -37617,11 +37865,11 @@ NEG-ERR:  [subscription_id, reason]
 - Decoupled from storage structure (tree, array, etc.)
 - Supports frame size limits for constrained transports
 
-**PEAT Application**: Use Negentropy for **event discovery** (what capability reports exist?) before CRDT state sync (what's the current aggregated state?).
+**Peat Application**: Use Negentropy for **event discovery** (what capability reports exist?) before CRDT state sync (what's the current aggregated state?).
 
 ### Other Relevant NIPs
 
-| NIP | Purpose | PEAT Relevance |
+| NIP | Purpose | Peat Relevance |
 |-----|---------|----------------|
 | NIP-01 | Basic protocol flow | Event structure, filter syntax |
 | NIP-09 | Event deletion | Tombstone handling (ADR-034) |
@@ -37637,14 +37885,14 @@ NEG-ERR:  [subscription_id, reason]
 
 ## Decision
 
-### Adopt Nostr Patterns for PEAT
+### Adopt Nostr Patterns for Peat
 
 #### 1. Event Structure Alignment
 
-Adopt a Nostr-compatible event structure as PEAT's base message format:
+Adopt a Nostr-compatible event structure as Peat's base message format:
 
 ```rust
-/// PEAT Protocol Event (Nostr-compatible base)
+/// Peat Protocol Event (Nostr-compatible base)
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PeatEvent {
     /// SHA-256 hash of serialized event data
@@ -37690,22 +37938,22 @@ impl PeatEvent {
 }
 ```
 
-#### 2. PEAT Kind Registry
+#### 2. Peat Kind Registry
 
-Define PEAT-specific event kinds in reserved ranges:
+Define Peat-specific event kinds in reserved ranges:
 
 ```rust
-/// PEAT Protocol Kind Registry
+/// Peat Protocol Kind Registry
 /// 
 /// Ranges:
 /// - 0-9999: Nostr standard kinds (reserved)
-/// - 10000-19999: PEAT core protocol
-/// - 20000-29999: PEAT integrations (TAK, Link 16, etc.)
+/// - 10000-19999: Peat core protocol
+/// - 20000-29999: Peat integrations (TAK, Link 16, etc.)
 /// - 30000-39999: Replaceable events (Nostr standard)
 /// - 40000-49999: Application-specific (user-defined)
 
 pub mod kinds {
-    // PEAT Core Protocol (10000-10999)
+    // Peat Core Protocol (10000-10999)
     pub const CAPABILITY_REPORT: u16 = 10001;
     pub const CAPABILITY_AGGREGATE: u16 = 10002;
     pub const COMMAND_INTENT: u16 = 10003;
@@ -37715,18 +37963,18 @@ pub mod kinds {
     pub const SYNC_REQUEST: u16 = 10007;
     pub const SYNC_RESPONSE: u16 = 10008;
     
-    // PEAT Coordination (10100-10199)
+    // Peat Coordination (10100-10199)
     pub const TASK_ASSIGNMENT: u16 = 10100;
     pub const TASK_STATUS: u16 = 10101;
     pub const RESOURCE_REQUEST: u16 = 10102;
     pub const RESOURCE_OFFER: u16 = 10103;
     
-    // PEAT AI/ML (10200-10299)
+    // Peat AI/ML (10200-10299)
     pub const MODEL_CAPABILITY: u16 = 10200;
     pub const INFERENCE_REQUEST: u16 = 10201;
     pub const INFERENCE_RESULT: u16 = 10202;
     
-    // PEAT Security (10300-10399)
+    // Peat Security (10300-10399)
     pub const KEY_ANNOUNCEMENT: u16 = 10300;
     pub const KEY_ROTATION: u16 = 10301;
     pub const ACCESS_GRANT: u16 = 10302;
@@ -37747,7 +37995,7 @@ pub mod kinds {
 Adopt the `h` tag pattern for hierarchical scoping:
 
 ```rust
-/// PEAT Hierarchical Scope Tags
+/// Peat Hierarchical Scope Tags
 /// 
 /// Tag structure: ["h", "<echelon>/<unit-id>"]
 /// Examples:
@@ -38078,9 +38326,9 @@ impl EventFilter {
 
 ## Architectural Comparison
 
-### Nostr vs PEAT: Where They Diverge
+### Nostr vs Peat: Where They Diverge
 
-| Aspect | Nostr | PEAT |
+| Aspect | Nostr | Peat |
 |--------|-------|------|
 | **Problem Domain** | Censorship-resistant social | Real-time tactical coordination |
 | **Network Assumption** | Cloud relays always available | No cloud, contested comms |
@@ -38105,11 +38353,11 @@ The architectures address different constraints:
             │                           │
       ┌─────┴─────┐               ┌─────┴─────┐
       │           │               │           │
-   Nostr      Federation      PEAT-Full   PEAT-Lite
+   Nostr      Federation      Peat-Full   Peat-Lite
    Relays     (Mastodon)      (Platoon+)  (Wearables)
 ```
 
-PEAT's hierarchical aggregation is what Nostr would need if relays disappeared and nodes had to form their own coordination structure.
+Peat's hierarchical aggregation is what Nostr would need if relays disappeared and nodes had to form their own coordination structure.
 
 ---
 
@@ -38118,7 +38366,7 @@ PEAT's hierarchical aggregation is what Nostr would need if relays disappeared a
 ### Phase 1: Event Format Adoption (Immediate)
 
 1. Update `peat-core` event structures to Nostr compatibility
-2. Implement kind registry with PEAT-specific ranges
+2. Implement kind registry with Peat-specific ranges
 3. Add `h` tag parsing and scope filtering
 4. Validate events with Schnorr signatures
 
@@ -38139,9 +38387,9 @@ PEAT's hierarchical aggregation is what Nostr would need if relays disappeared a
 ### Phase 4: Interoperability Testing (Q3 2026)
 
 1. Test Nostr client connectivity (read-only)
-2. Evaluate hybrid Nostr/PEAT scenarios
+2. Evaluate hybrid Nostr/Peat scenarios
 3. Document interop limitations
-4. Consider Nostr relay mode for PEAT nodes
+4. Consider Nostr relay mode for Peat nodes
 
 ---
 
@@ -38198,7 +38446,7 @@ PEAT's hierarchical aggregation is what Nostr would need if relays disappeared a
 - ADR-021: Document-Oriented Architecture
 - ADR-027: Event Routing and Aggregation Protocol
 - ADR-034: Record Deletion and Tombstone Management
-- ADR-035: PEAT-Lite Embedded Nodes
+- ADR-035: Peat-Lite Embedded Nodes
 
 ---
 
@@ -38255,9 +38503,9 @@ Fingerprint computation:
 
 ---
 
-## Appendix C: PEAT vs Nostr Tag Mapping
+## Appendix C: Peat vs Nostr Tag Mapping
 
-| Nostr Tag | PEAT Usage | Example |
+| Nostr Tag | Peat Usage | Example |
 |-----------|------------|---------|
 | `e` | Reference to event | `["e", "<event-id>"]` |
 | `p` | Reference to pubkey/node | `["p", "<node-pubkey>"]` |
@@ -38266,18 +38514,18 @@ Fingerprint computation:
 | `d` | Unique identifier (replaceable) | `["d", "capability-summary"]` |
 | `previous` | Causal reference | `["previous", "<id-prefix>", ...]` |
 | `expiration` | TTL timestamp | `["expiration", "1702656000"]` |
-| `echelon` | PEAT-specific: echelon level | `["echelon", "squad"]` |
-| `capability` | PEAT-specific: capability type | `["capability", "isr", "sigint"]` |
+| `echelon` | Peat-specific: echelon level | `["echelon", "squad"]` |
+| `capability` | Peat-specific: capability type | `["capability", "isr", "sigint"]` |
 
 ---
 
 ## Appendix D: Community Reception Analysis
 
-The [Hacker News discussion](https://news.ycombinator.com/item?id=46225803) (December 2025) of Brander's article surfaced several critiques that validate PEAT's architectural choices.
+The [Hacker News discussion](https://news.ycombinator.com/item?id=46225803) (December 2025) of Brander's article surfaced several critiques that validate Peat's architectural choices.
 
 ### Key Critiques and Responses
 
-| Critique | Nostr Response | PEAT Response |
+| Critique | Nostr Response | Peat Response |
 |----------|----------------|---------------|
 | Centralization inevitable | Accept it, users choose relays | Structure it via designed hierarchy |
 | "Relays don't actually relay" | Clients push to multiple relays | Echelon nodes actively aggregate and forward |
@@ -38292,43 +38540,43 @@ The [Hacker News discussion](https://news.ycombinator.com/item?id=46225803) (Dec
 **On relays not relaying** (treyd):
 > "If you and another party aren't using the same relay, there is 0 way for you to interact... The protocol explicitly forbids relays from forwarding to each other."
 
-*PEAT insight*: This validates active coordination. Nostr punts message flow to clients; PEAT explicitly defines information flow through echelon nodes.
+*Peat insight*: This validates active coordination. Nostr punts message flow to clients; Peat explicitly defines information flow through echelon nodes.
 
 **On inevitable centralization** (treyd):
 > "Email is currently more decentralized than Nostr is in practice."
 
-*PEAT insight*: Networks centralize due to physics. The question is whether centralization is emergent/unplanned (Nostr) or designed/accountable (PEAT hierarchy).
+*Peat insight*: Networks centralize due to physics. The question is whether centralization is emergent/unplanned (Nostr) or designed/accountable (Peat hierarchy).
 
 **On protocol simplicity vs robustness** (treyd):
 > "Nostr is a very simple protocol that could have been invented in essence in 1995. There's a reason it wasn't invented until recently, because it's difficult to build *robust* protocols with good guarantees about discoverability and reliability with a foundation that is as limited as it is."
 
-*PEAT insight*: This captures the fundamental tradeoff. Nostr optimizes for simplicity in connected environments. PEAT accepts complexity cost to provide robustness guarantees in contested environments.
+*Peat insight*: This captures the fundamental tradeoff. Nostr optimizes for simplicity in connected environments. Peat accepts complexity cost to provide robustness guarantees in contested environments.
 
 **On key management** (rglullis):
 > "Nostr will always be a fringe network. The normies do not want to manage their own keys... What happens if you lose the cryptographic key to your nostr account? Who do you call for help?"
 
-*PEAT insight*: Less relevant for military/industrial use cases where devices have HSMs, key provisioning is part of deployment, and recovery involves issuing new credentials through existing C2. Trained operators, not "normies."
+*Peat insight*: Less relevant for military/industrial use cases where devices have HSMs, key provisioning is part of deployment, and recovery involves issuing new credentials through existing C2. Trained operators, not "normies."
 
 **On moderation as sewage filtering** (bflesch):
 > "Their statement underlines the fact that nostr is a stream of dirty sewage and they want users to submit their valuable user-created content into this sewage."
 
-*PEAT insight*: Military hierarchies *are* moderation systems. Classification levels, need-to-know, commander's authority—content moderation by another name. Hierarchical scoping provides natural boundaries.
+*Peat insight*: Military hierarchies *are* moderation systems. Classification levels, need-to-know, commander's authority—content moderation by another name. Hierarchical scoping provides natural boundaries.
 
 **On incentives** (wmf):
 > "I'm also not aware of any incentives for the relay operators either."
 
-*PEAT insight*: Military systems don't need economic incentives—they have mission requirements. The squad leader runs the squad node because that's their job, not because they get paid per message.
+*Peat insight*: Military systems don't need economic incentives—they have mission requirements. The squad leader runs the squad node because that's their job, not because they get paid per message.
 
 ### The Outbox Model Defense
 
 Nostr advocates (shark_laser) cite the "outbox model" as solving discovery:
 > "You post to your own preferred relays, as well as to the preferred relays of others who are involved in the conversation, as well as to a couple of global relays for easy discoverability."
 
-This parallels PEAT's capability advertisement (ADR-018)—nodes announce authoritative data sources. The difference: PEAT aggregates at each echelon, so consumers query the squad node rather than every squad member.
+This parallels Peat's capability advertisement (ADR-018)—nodes announce authoritative data sources. The difference: Peat aggregates at each echelon, so consumers query the squad node rather than every squad member.
 
 ### Strategic Positioning
 
-| Dimension | Nostr | PEAT |
+| Dimension | Nostr | Peat |
 |-----------|-------|------|
 | Optimization target | Simplicity | Robustness |
 | Environment assumption | Cloud available | Contested, disconnected |
@@ -38337,7 +38585,7 @@ This parallels PEAT's capability advertisement (ADR-018)—nodes announce author
 | Moderation model | User filtering | Hierarchical scope (OPSEC) |
 | Incentive model | Economic (Zaps) | Mission requirement |
 
-**Summary**: Nostr and PEAT solve different problems. Nostr provides censorship resistance for social media in connected environments. PEAT provides coordination robustness for human-machine teams in contested environments. The HN critiques of Nostr largely don't apply to PEAT's domain, while validating PEAT's choice to accept architectural complexity for operational guarantees.
+**Summary**: Nostr and Peat solve different problems. Nostr provides censorship resistance for social media in connected environments. Peat provides coordination robustness for human-machine teams in contested environments. The HN critiques of Nostr largely don't apply to Peat's domain, while validating Peat's choice to accept architectural complexity for operational guarantees.
 
 ---
 
@@ -38345,24 +38593,23 @@ This parallels PEAT's capability advertisement (ADR-018)—nodes announce author
 
 | Date | Version | Author | Changes |
 |------|---------|--------|---------|
-| 2025-12-15 | 0.1 | Kit Plummer, Codex | Initial draft |
-| 2025-12-15 | 0.2 | Kit Plummer, Codex | Added Appendix D: HN community analysis |
+| 2025-12-15 | 0.1 | Kit Plummer, Claude | Initial draft |
+| 2025-12-15 | 0.2 | Kit Plummer, Claude | Added Appendix D: HN community analysis |
 
----
 
 # ADR-041: Multi-Transport Architecture and Embedded Integration
 
 **Status**: Accepted
 **Date**: 2024-12-22
-**Authors**: Kit Plummer, Codex
-**Organization**: (r)evolve - Revolve Team LLC (https://revolveteam.com)
-**Relates To**: ADR-035 (PEAT-Lite Embedded Nodes), ADR-039 (PEAT-BTLE Mesh Transport), ADR-032 (Pluggable Transport Abstraction), ADR-007 (Automerge Sync Engine), ADR-011 (Ditto vs AutomergeIroh)
+**Authors**: Kit Plummer, Claude
+**Organization**: Defense Unicorns (https://defenseunicorns.com)
+**Relates To**: ADR-035 (Peat-Lite Embedded Nodes), ADR-039 (Peat-BTLE Mesh Transport), ADR-032 (Pluggable Transport Abstraction), ADR-007 (Automerge Sync Engine), ADR-011 (Ditto vs AutomergeIroh)
 
 ---
 
 ## Executive Summary
 
-This ADR defines how PEAT supports multiple simultaneous transports (AutomergeIroh, peat-btle, future transports) and how embedded devices integrate with full PEAT nodes. The key insight is that Automerge is too resource-intensive for embedded targets (ESP32, Pico), requiring a **gateway translation architecture** where full PEAT nodes translate between Automerge documents and peat-btle's lightweight CRDT format.
+This ADR defines how Peat supports multiple simultaneous transports (AutomergeIroh, peat-btle, future transports) and how embedded devices integrate with full Peat nodes. The key insight is that Automerge is too resource-intensive for embedded targets (ESP32, Pico), requiring a **gateway translation architecture** where full Peat nodes translate between Automerge documents and peat-btle's lightweight CRDT format.
 
 ---
 
@@ -38370,7 +38617,7 @@ This ADR defines how PEAT supports multiple simultaneous transports (AutomergeIr
 
 ### The Multi-Transport Reality
 
-PEAT must operate across diverse network conditions:
+Peat must operate across diverse network conditions:
 
 | Scenario | Transport | Bandwidth | Typical Nodes |
 |----------|-----------|-----------|---------------|
@@ -38379,13 +38626,13 @@ PEAT must operate across diverse network conditions:
 | Degraded network | Either/both | Variable | All nodes adapt |
 | Air-gapped | BLE only | Very low | Field operations |
 
-A phone running PEAT may have both transports active simultaneously:
+A phone running Peat may have both transports active simultaneously:
 - WiFi/cellular: Syncing with cloud/HQ via Iroh
 - BLE: Syncing with nearby embedded sensors via peat-btle
 
 ### The Automerge Problem
 
-Per ADR-007 and ADR-011, PEAT's primary sync engine is AutomergeIroh - Automerge CRDTs synced via Iroh networking. However:
+Per ADR-007 and ADR-011, Peat's primary sync engine is AutomergeIroh - Automerge CRDTs synced via Iroh networking. However:
 
 **Automerge Resource Requirements:**
 - Binary size: ~2-3MB compiled
@@ -38403,7 +38650,7 @@ Per ADR-007 and ADR-011, PEAT's primary sync engine is AutomergeIroh - Automerge
 
 ### Current Backend Situation
 
-PEAT currently supports two sync backends:
+Peat currently supports two sync backends:
 1. **AutomergeIroh** - Open source, Automerge CRDTs + Iroh transport
 2. **Ditto** - Commercial, proprietary CRDTs + proprietary transport
 
@@ -38415,11 +38662,11 @@ peat-btle introduces a third CRDT implementation (GCounter, LWW-Register, etc.) 
 
 ### Architecture: Gateway Translation Model
 
-Full PEAT nodes act as **gateways** that translate between Automerge documents and peat-btle's lightweight format:
+Full Peat nodes act as **gateways** that translate between Automerge documents and peat-btle's lightweight format:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
-│                        Full PEAT Node (Phone/Server)                        │
+│                        Full Peat Node (Phone/Server)                        │
 │  ┌──────────────────────────────────────────────────────────────────────┐  │
 │  │                         AutomergeIroh                                 │  │
 │  │              (Full Automerge documents, sync via Iroh)                │  │
@@ -38428,7 +38675,7 @@ Full PEAT nodes act as **gateways** that translate between Automerge documents a
 │  ┌──────────────────────────────────────────────────────────────────────┐  │
 │  │                      Translation Layer                                │  │
 │  │         (Maps peat-btle primitives ↔ Automerge document fields)       │  │
-│  │                      OWNED BY PEAT REPO                               │  │
+│  │                      OWNED BY Peat REPO                               │  │
 │  └──────────────────────────────────────────────────────────────────────┘  │
 │                                    ↕                                        │
 │  ┌──────────────────────────────────────────────────────────────────────┐  │
@@ -38448,38 +38695,38 @@ Full PEAT nodes act as **gateways** that translate between Automerge documents a
 
 ### Key Principles
 
-#### 1. Schema Ownership Lives in PEAT
+#### 1. Schema Ownership Lives in Peat
 
-The canonical schema definition lives in the PEAT repository, not in peat-btle:
+The canonical schema definition lives in the Peat repository, not in peat-btle:
 
 | Component | Owner | Description |
 |-----------|-------|-------------|
-| **Schema definition** | PEAT repo | Canonical field names, types, semantics |
-| **Automerge representation** | PEAT repo | Full documents for std nodes |
+| **Schema definition** | Peat repo | Canonical field names, types, semantics |
+| **Automerge representation** | Peat repo | Full documents for std nodes |
 | **Lightweight representation** | peat-btle | Embedded-friendly projection |
-| **Translation logic** | PEAT repo | Maps between representations |
+| **Translation logic** | Peat repo | Maps between representations |
 | **BLE transport** | peat-btle | Document-agnostic byte transport |
 
 #### 2. peat-btle is Transport + Lightweight CRDTs
 
 peat-btle provides two things:
 1. **BLE Transport**: Discovery, connections, GATT, chunking - document agnostic
-2. **Lightweight CRDTs**: GCounter, LWW-Register, Peripheral - the "embedded projection" of PEAT schema
+2. **Lightweight CRDTs**: GCounter, LWW-Register, Peripheral - the "embedded projection" of Peat schema
 
 The lightweight CRDTs exist because embedded devices can't run Automerge. They represent the **same semantic data** as the full schema, just in a format that fits in 256KB RAM.
 
 #### 3. peat-btle Can Stand Alone
 
 peat-btle must be usable independently for:
-- Pure embedded deployments (ESP32 mesh without any full PEAT nodes)
+- Pure embedded deployments (ESP32 mesh without any full Peat nodes)
 - Open source release (standalone BLE mesh library)
 - Testing and development
 
-When used standalone, the lightweight CRDTs ARE the schema. When integrated with full PEAT, they become a projection that gets translated.
+When used standalone, the lightweight CRDTs ARE the schema. When integrated with full Peat, they become a projection that gets translated.
 
 #### 4. BLE-First Schema Design
 
-PEAT's schema should be designed with BLE constraints in mind:
+Peat's schema should be designed with BLE constraints in mind:
 
 ```
 DESIGN PRINCIPLE: If it works well on BLE, it works everywhere.
@@ -38494,10 +38741,10 @@ Benefits:
 
 ### Integration Points
 
-#### Full PEAT Node Receiving from Embedded
+#### Full Peat Node Receiving from Embedded
 
 ```rust
-// In PEAT repo (not peat-btle)
+// In Peat repo (not peat-btle)
 impl TranslationLayer {
     /// Receive lightweight document from BLE, update Automerge
     fn on_ble_document_received(&mut self, data: &[u8]) -> Result<()> {
@@ -38539,10 +38786,10 @@ impl TranslationLayer {
 }
 ```
 
-#### Full PEAT Node Sending to Embedded
+#### Full Peat Node Sending to Embedded
 
 ```rust
-// In PEAT repo (not peat-btle)
+// In Peat repo (not peat-btle)
 impl TranslationLayer {
     /// Build lightweight document from Automerge for BLE broadcast
     fn build_ble_document(&self) -> Vec<u8> {
@@ -38564,10 +38811,10 @@ impl TranslationLayer {
 
 ### Transport Abstraction
 
-For true multi-transport support, PEAT should have a transport abstraction:
+For true multi-transport support, Peat should have a transport abstraction:
 
 ```rust
-// In PEAT repo
+// In Peat repo
 trait PeatTransport {
     /// Send data to a peer
     async fn send(&self, peer_id: &NodeId, data: &[u8]) -> Result<()>;
@@ -38613,7 +38860,7 @@ When network conditions change:
 |----------|----------|
 | Full connectivity | Use Iroh for full Automerge sync |
 | WiFi fails, BLE available | Fall back to BLE, sync lightweight format |
-| Only BLE available | Full PEAT nodes act as BLE mesh participants |
+| Only BLE available | Full Peat nodes act as BLE mesh participants |
 | BLE to embedded | Translate and sync lightweight format |
 
 The translation layer ensures data flows correctly regardless of which transport is active.
@@ -38626,7 +38873,7 @@ The translation layer ensures data flows correctly regardless of which transport
 
 1. **Embedded devices can participate** - No Automerge requirement
 2. **Clean separation** - peat-btle is standalone and useful independently
-3. **Single source of truth** - Schema owned by PEAT, not duplicated
+3. **Single source of truth** - Schema owned by Peat, not duplicated
 4. **Graceful degradation** - BLE works when WiFi fails
 5. **OSS-friendly** - peat-btle can be released standalone
 
@@ -38646,7 +38893,7 @@ The translation layer ensures data flows correctly regardless of which transport
 
 ## Schema Mapping Guidelines
 
-When designing PEAT schema, consider BLE representation:
+When designing Peat schema, consider BLE representation:
 
 | Full Schema Field | BLE Representation | Notes |
 |-------------------|-------------------|-------|
@@ -38666,7 +38913,7 @@ When designing PEAT schema, consider BLE representation:
 
 ### Phase 1: Document Architecture (This ADR)
 - [x] Define gateway translation model
-- [x] Clarify ownership (schema in PEAT, transport in peat-btle)
+- [x] Clarify ownership (schema in Peat, transport in peat-btle)
 - [x] Document integration points
 
 ### Phase 2: peat-btle Standalone (Current Work)
@@ -38676,9 +38923,9 @@ When designing PEAT schema, consider BLE representation:
 - [ ] PeatMesh facade
 - [ ] Platform bindings (UniFFI, JNI)
 
-### Phase 3: PEAT Translation Layer (Future)
+### Phase 3: Peat Translation Layer (Future)
 - [ ] Define schema-to-lightweight mapping
-- [ ] Implement TranslationLayer in PEAT repo
+- [ ] Implement TranslationLayer in Peat repo
 - [ ] Integrate with AutomergeIroh documents
 
 ### Phase 4: Transport Abstraction (Future)
@@ -38694,8 +38941,8 @@ When designing PEAT schema, consider BLE representation:
 - ADR-007: Automerge-Based Sync Engine
 - ADR-011: Ditto vs AutomergeIroh Analysis
 - ADR-032: Pluggable Transport Abstraction
-- ADR-035: PEAT-Lite Embedded Nodes
-- ADR-039: PEAT-BTLE Mesh Transport Crate
+- ADR-035: Peat-Lite Embedded Nodes
+- ADR-039: Peat-BTLE Mesh Transport Crate
 - [Automerge](https://automerge.org/) - CRDT library
 - [Iroh](https://iroh.computer/) - P2P networking
 
@@ -38706,17 +38953,16 @@ When designing PEAT schema, consider BLE representation:
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2024-12-22 | Gateway translation model | Automerge too heavy for ESP32, need lightweight alternative |
-| 2024-12-22 | Schema ownership in PEAT | Single source of truth, peat-btle is projection |
+| 2024-12-22 | Schema ownership in Peat | Single source of truth, peat-btle is projection |
 | 2024-12-22 | peat-btle standalone capability | OSS release, pure embedded deployments |
 | 2024-12-22 | BLE-first schema design | If it works on BLE, it works everywhere |
 
----
 
 # ADR-042: Direct-to-UDP Bypass Pathway
 
 **Status**: Proposed
 **Date**: 2026-01-06
-**Authors**: Kit Plummer, Codex
+**Authors**: Kit Plummer, Claude
 **Related ADRs**:
 - [ADR-010](010-transport-layer-udp-tcp.md) (Transport Layer - UDP vs TCP, superseded)
 - [ADR-011](011-ditto-vs-automerge-iroh.md) (Automerge + Iroh Integration)
@@ -38729,7 +38975,7 @@ When designing PEAT schema, consider BLE representation:
 
 ### Problem Statement
 
-PEAT Protocol uses CRDT-based synchronization (Automerge over Iroh/QUIC) for data consistency across mesh networks. This approach provides:
+Peat Protocol uses CRDT-based synchronization (Automerge over Iroh/QUIC) for data consistency across mesh networks. This approach provides:
 - Conflict-free eventual consistency
 - Automatic merge of concurrent updates
 - Reliable, ordered delivery via QUIC
@@ -39092,7 +39338,7 @@ Bypass messages use a compact header for identification and TTL:
 /// Bypass message header (12 bytes)
 #[repr(C, packed)]
 struct BypassHeader {
-    /// Magic number (0xPEAT)
+    /// Magic number (0xPeat)
     magic: [u8; 4],
 
     /// Message type/collection hash (4 bytes)
@@ -39109,7 +39355,7 @@ struct BypassHeader {
 }
 
 impl BypassHeader {
-    const MAGIC: [u8; 4] = [0x48, 0x49, 0x56, 0x45]; // "PEAT"
+    const MAGIC: [u8; 4] = [0x48, 0x49, 0x56, 0x45]; // "Peat"
 
     fn is_valid(&self) -> bool {
         self.magic == Self::MAGIC
@@ -39447,18 +39693,131 @@ Two data paths increase debugging complexity.
 **Last Updated**: 2026-01-06
 **Status**: PROPOSED - Awaiting review
 
----
 
-# ADR-043: Consumer Interface Adapters
+# ADR-043: Consumer Interface Adapters (Compatibility Layer)
 
-**Status**: Proposed
-**Date**: 2026-01-06
-**Authors**: Kit Plummer, Codex
+**Status**: Proposed  
+**Date**: 2026-01-06 (Updated: 2025-01-31)  
+**Authors**: Kit Plummer, Claude  
+**Organization**: Defense Unicorns (https://defenseunicorns.com)  
 **Related ADRs**:
 - [ADR-029](029-tak-transport-adapter.md) (TAK Transport Adapter)
 - [ADR-032](032-pluggable-transport-abstraction.md) (Pluggable Transport Abstraction)
 - [ADR-042](042-direct-udp-bypass-pathway.md) (Direct UDP Bypass Pathway)
 - [ADR-005](005-datasync-abstraction-layer.md) (Data Sync Abstraction Layer)
+- [ADR-049](049-schema-extraction-and-codegen.md) (Schema Extraction)
+- [ADR-050](050-sdk-integration.md) (Peat SDK - Optimal Integration Path)
+
+---
+
+## Executive Summary
+
+This ADR defines **Consumer Interface Adapters** - network-based interfaces (WebSocket, TCP, HTTP/REST) that enable external systems to interact with Peat nodes.
+
+> **⚠️ IMPORTANT**: Consumer interface adapters are the **compatibility layer**, not the optimal integration path. Systems that can integrate the Peat SDK directly (ADR-050) should do so for better performance, offline capability, and full CRDT benefits. These adapters exist for systems that **cannot** be modified to embed the SDK.
+
+---
+
+## Integration Path Guidance
+
+### Decision Tree
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│           Can you modify the external system?                │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+              ┌───────────┴───────────┐
+              │                       │
+              ▼                       ▼
+┌─────────────────────────┐   ┌─────────────────────────────────┐
+│          YES            │   │              NO                  │
+│                         │   │                                  │
+│  Use peat-sdk           │   │  Use Consumer Interface Adapters│
+│  (ADR-050)              │   │  (This ADR)                     │
+│                         │   │                                  │
+│  • Full CRDT sync       │   │  • Request/response only        │
+│  • Offline capable      │   │  • Requires adapter reachable   │
+│  • Minimal latency      │   │  • +50-200ms latency            │
+│  • Native hierarchy     │   │  • Flat data model              │
+└─────────────────────────┘   └─────────────────────────────────┘
+```
+
+### Comparison: SDK vs Consumer Interface Adapters
+
+| Capability | SDK (ADR-050) | Adapters (This ADR) |
+|------------|---------------|---------------------|
+| **Latency** | Sync only (~10-50ms) | +50-200ms overhead |
+| **Offline Operation** | ✅ Full - queues changes, syncs on reconnect | ❌ None - requires adapter |
+| **CRDT Conflict Resolution** | ✅ Automatic, deterministic | ❌ Last-write-wins at adapter |
+| **Hierarchical Membership** | ✅ Full cell participation | ❌ Not a cell member |
+| **Capability Aggregation** | ✅ Contributes to cell capabilities | ❌ Not aggregated |
+| **Bandwidth Efficiency** | ✅ Delta sync only | ❌ Full message per request |
+| **Peer-to-Peer** | ✅ Direct sync with any peer | ❌ Must go through adapter |
+| **Multi-Transport** | ✅ Iroh, BLE, LoRa, etc. | ❌ HTTP/WS/TCP only |
+
+### When to Use Each Path
+
+**Use Consumer Interface Adapters (This ADR) for:**
+- Existing ATAK/WinTAK installations that cannot run custom plugins
+- Legacy GCS software with no extension capability
+- Legacy C2 systems built on older stacks
+- IoT hubs that only speak MQTT
+- Web browsers (until WASM SDK is available)
+- Monitoring dashboards and debugging tools
+- Compliance bridges (e.g., mandatory Link 16 feeds)
+- Third-party services needing event streams
+
+**Use the SDK (ADR-050) for:**
+- New autonomous platforms (UAS, UGV, USV)
+- Custom C2 applications
+- ROS2 robots and robotic systems
+- ATAK plugins (can embed SDK)
+- Mobile apps with native development
+- Any system where you control the software
+
+---
+
+## Latency Analysis
+
+### SDK Integration (Optimal Path)
+
+```
+Platform A ──CRDT Sync──► Platform B
+           ~10-50ms (network dependent)
+           
+• No intermediate hops
+• Delta sync (only changes)
+• Offline queue when disconnected
+• Reconnect automatically syncs
+```
+
+### Adapter Integration (Compatibility Path)
+
+```
+Legacy System ──HTTP/WS──► Adapter ──Query──► Peat ──Response──► Adapter ──HTTP/WS──► Legacy
+              ~20ms        ~5ms      ~10ms     ~5ms      ~5ms       ~20ms
+                                                                    
+Total: ~65ms minimum, typically 100-200ms
+```
+
+**Latency Breakdown**:
+
+| Component | Latency | Notes |
+|-----------|---------|-------|
+| Network to Adapter | 10-50ms | Depends on network topology |
+| Protocol parsing | 1-5ms | JSON/Protobuf decode |
+| Peat query | 5-20ms | Local CRDT read |
+| Response serialization | 1-5ms | JSON/Protobuf encode |
+| Network from Adapter | 10-50ms | Return path |
+| **Total** | **50-200ms** | Per request |
+
+**Additional Adapter Limitations**:
+- No offline operation (adapter must be reachable)
+- No automatic conflict resolution (last-write-wins at adapter)
+- No hierarchical aggregation for external system
+- Polling required for updates (or WebSocket with its own overhead)
+- Single point of failure if adapter node goes down
 
 ---
 
@@ -39466,15 +39825,15 @@ Two data paths increase debugging complexity.
 
 ### Problem Statement
 
-PEAT Protocol's primary interface is via **direct Rust API integration** using the `peat-protocol` and `peat-ffi` crates. However, many potential consumers cannot integrate at this level:
+Peat Protocol's primary interface is via **direct Rust API integration** using the `peat-protocol` and `peat-ffi` crates, or the **Peat SDK** (ADR-050) for multi-language support. However, many potential consumers cannot integrate at this level:
 
 1. **Legacy C2 Systems**: Existing command and control systems built on older stacks
 2. **Web Dashboards**: Browser-based monitoring and control interfaces
-3. **Scripting/Automation**: Python, Node.js, or other runtime integrations
+3. **Scripting/Automation**: Python, Node.js, or other runtime integrations (when SDK is unavailable)
 4. **Hardware Devices**: Embedded systems with limited language support
 5. **Third-Party Services**: Cloud services needing event streams
 
-These systems require **network-based interfaces** that don't require Rust compilation or FFI bindings.
+These systems require **network-based interfaces** that don't require Rust compilation, FFI bindings, or SDK embedding.
 
 ### Consumer Interface Requirements
 
@@ -39499,7 +39858,7 @@ pub trait TakTransport: Send + Sync {
 }
 ```
 
-This pattern works for **outbound integration** (PEAT → TAK). We need the inverse for **consumer interfaces** (External Systems → PEAT).
+This pattern works for **outbound integration** (Peat → TAK). We need the inverse for **consumer interfaces** (External Systems → Peat).
 
 ### Existing Infrastructure
 
@@ -39523,33 +39882,49 @@ This needs extension for:
 
 ### Consumer Interface Adapter Architecture
 
-We will implement **Consumer Interface Adapters** as a facade layer over the PEAT Protocol API, supporting multiple transport protocols with unified semantics.
+We will implement **Consumer Interface Adapters** as a facade layer over the Peat Protocol API, supporting multiple transport protocols with unified semantics.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                   Consumer Interface Layer                       │
-│                                                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
-│  │  WebSocket   │  │    TCP       │  │  HTTP/REST   │           │
-│  │   Adapter    │  │   Adapter    │  │   Adapter    │           │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘           │
-│         │                 │                 │                    │
-│         └─────────────────┼─────────────────┘                    │
-│                           │                                      │
-│                           ▼                                      │
-│                  ┌────────────────┐                              │
-│                  │  Interface     │                              │
-│                  │  Coordinator   │                              │
-│                  └────────┬───────┘                              │
-│                           │                                      │
-├───────────────────────────┼──────────────────────────────────────┤
-│                           ▼                                      │
-│                  ┌────────────────┐                              │
-│                  │ peat-protocol  │                              │
-│                  │     API        │                              │
-│                  └────────────────┘                              │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         Peat Node                                        │
+│                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │               Consumer Interface Layer (This ADR)                │   │
+│  │                                                                  │   │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │   │
+│  │  │  WebSocket   │  │    TCP       │  │  HTTP/REST   │          │   │
+│  │  │   Adapter    │  │   Adapter    │  │   Adapter    │          │   │
+│  │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘          │   │
+│  │         │                 │                 │                   │   │
+│  │         └─────────────────┼─────────────────┘                   │   │
+│  │                           │                                     │   │
+│  │                           ▼                                     │   │
+│  │                  ┌────────────────┐                             │   │
+│  │                  │   Interface    │                             │   │
+│  │                  │  Coordinator   │                             │   │
+│  │                  └────────┬───────┘                             │   │
+│  │                           │                                     │   │
+│  └───────────────────────────┼─────────────────────────────────────┘   │
+│                              │                                          │
+│                              ▼                                          │
+│                     ┌────────────────┐                                  │
+│                     │ peat-protocol  │                                  │
+│                     │     API        │                                  │
+│                     └────────────────┘                                  │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    ▲
+                                    │
+              ┌─────────────────────┼─────────────────────┐
+              │                     │                     │
+              ▼                     ▼                     ▼
+       ┌──────────┐          ┌──────────┐          ┌──────────┐
+       │  Legacy  │          │   Web    │          │   IoT    │
+       │   C2     │          │Dashboard │          │   Hub    │
+       │ (TCP)    │          │  (WS)    │          │ (HTTP)   │
+       └──────────┘          └──────────┘          └──────────┘
+       
+       These are NOT full mesh participants - they query/command only
 ```
 
 ### Core Traits
@@ -39763,63 +40138,17 @@ impl ConsumerAdapter for WebSocketAdapter {
     }
 
     async fn start(&self) -> Result<(), AdapterError> {
-        let listener = TcpListener::bind(&self.config.listen_addr).await?;
-        self.running.store(true, Ordering::SeqCst);
-
-        let sessions = self.sessions.clone();
-        let peat = self.peat.clone();
-        let metrics = self.metrics.clone();
-        let config = self.config.clone();
-        let mut shutdown = self.shutdown.subscribe();
-
-        tokio::spawn(async move {
-            loop {
-                tokio::select! {
-                    result = listener.accept() => {
-                        match result {
-                            Ok((stream, addr)) => {
-                                let session = WebSocketSession::new(
-                                    stream, addr, peat.clone(), config.clone()
-                                ).await;
-
-                                if let Ok(session) = session {
-                                    let session = Arc::new(session);
-                                    sessions.write().await.insert(
-                                        session.session_id().to_string(),
-                                        session.clone()
-                                    );
-                                    metrics.connections.fetch_add(1, Ordering::Relaxed);
-
-                                    // Spawn session handler
-                                    tokio::spawn(Self::handle_session(session, peat.clone()));
-                                }
-                            }
-                            Err(e) => {
-                                warn!("WebSocket accept error: {:?}", e);
-                            }
-                        }
-                    }
-                    _ = shutdown.recv() => {
-                        break;
-                    }
-                }
-            }
-        });
-
-        info!("WebSocket adapter started on {}", self.config.listen_addr);
-        Ok(())
+        // Bind WebSocket server
+        // Accept connections
+        // Spawn session handlers
+        todo!()
     }
 
     async fn stop(&self) -> Result<(), AdapterError> {
-        self.running.store(false, Ordering::SeqCst);
-        let _ = self.shutdown.send(());
-
+        // Signal shutdown
         // Close all sessions
-        for session in self.sessions.read().await.values() {
-            let _ = session.close().await;
-        }
-
-        Ok(())
+        // Wait for cleanup
+        todo!()
     }
 
     fn is_running(&self) -> bool {
@@ -39827,29 +40156,9 @@ impl ConsumerAdapter for WebSocketAdapter {
     }
 
     fn metrics(&self) -> AdapterMetrics {
-        (*self.metrics).clone()
+        self.metrics.as_ref().clone()
     }
 }
-```
-
-### WebSocket Protocol
-
-**Connection flow**:
-```
-Client                                    Server
-   │                                         │
-   ├─► GET /ws (HTTP Upgrade) ─────────────►│
-   │                                         │
-   │◄─ 101 Switching Protocols ─────────────│
-   │                                         │
-   ├─► {"type": "Subscribe",                │
-   │     "collection": "cells"} ───────────►│
-   │                                         │
-   │◄─ {"type": "DocumentUpdate",           │
-   │     "collection": "cells", ...} ───────│
-   │                                         │
-   │◄─ (push updates as they happen) ───────│
-   │                                         │
 ```
 
 ---
@@ -39858,12 +40167,12 @@ Client                                    Server
 
 ### Overview
 
-TCP provides simple framed messaging for legacy systems:
+TCP provides a simple, reliable interface for legacy systems:
 
-- **Reliable**: Guaranteed delivery and ordering
-- **Simple**: Basic length-prefixed framing
-- **Persistent**: Long-lived connections
-- **Efficient**: Binary or JSON payloads
+- **Reliable**: Ordered, guaranteed delivery
+- **Simple**: No HTTP overhead
+- **Framed**: Length-prefixed or newline-delimited
+- **Long-lived**: Persistent connections
 
 ### Implementation
 
@@ -39880,27 +40189,24 @@ pub struct TcpAdapter {
 
 #[derive(Debug, Clone)]
 pub struct TcpConfig {
-    /// Listen address
+    /// Listen address (e.g., "0.0.0.0:5151")
     pub listen_addr: SocketAddr,
 
-    /// Enable TLS
-    pub tls: Option<TlsConfig>,
-
     /// Message framing mode
-    pub framing: TcpFraming,
+    pub framing: FramingMode,
 
     /// Maximum message size
     pub max_message_size: usize,
 
-    /// Read timeout
-    pub read_timeout: Duration,
-
-    /// Authentication required
+    /// Require authentication
     pub require_auth: bool,
+
+    /// Idle timeout
+    pub idle_timeout: Duration,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum TcpFraming {
+pub enum FramingMode {
     /// 4-byte big-endian length prefix
     LengthPrefixed,
 
@@ -39908,106 +40214,34 @@ pub enum TcpFraming {
     NewlineDelimited,
 
     /// Custom delimiter
-    Delimiter(u8),
+    Delimited(u8),
 }
 
-/// TCP message frame
-struct TcpFrame {
-    length: u32,
-    payload: Vec<u8>,
-}
-
-impl TcpAdapter {
-    /// Read a framed message from TCP stream
-    async fn read_frame(
-        stream: &mut TcpStream,
-        framing: TcpFraming,
-        max_size: usize,
-    ) -> Result<Vec<u8>, AdapterError> {
-        match framing {
-            TcpFraming::LengthPrefixed => {
-                let mut len_buf = [0u8; 4];
-                stream.read_exact(&mut len_buf).await?;
-                let len = u32::from_be_bytes(len_buf) as usize;
-
-                if len > max_size {
-                    return Err(AdapterError::MessageTooLarge(len));
-                }
-
-                let mut payload = vec![0u8; len];
-                stream.read_exact(&mut payload).await?;
-                Ok(payload)
-            }
-            TcpFraming::NewlineDelimited => {
-                let mut line = String::new();
-                let mut reader = BufReader::new(stream);
-                reader.read_line(&mut line).await?;
-                Ok(line.into_bytes())
-            }
-            TcpFraming::Delimiter(delim) => {
-                let mut buf = Vec::new();
-                loop {
-                    let mut byte = [0u8; 1];
-                    stream.read_exact(&mut byte).await?;
-                    if byte[0] == delim {
-                        break;
-                    }
-                    buf.push(byte[0]);
-                    if buf.len() > max_size {
-                        return Err(AdapterError::MessageTooLarge(buf.len()));
-                    }
-                }
-                Ok(buf)
-            }
-        }
+#[async_trait]
+impl ConsumerAdapter for TcpAdapter {
+    fn adapter_type(&self) -> AdapterType {
+        AdapterType::Tcp
     }
 
-    /// Write a framed message to TCP stream
-    async fn write_frame(
-        stream: &mut TcpStream,
-        framing: TcpFraming,
-        payload: &[u8],
-    ) -> Result<(), AdapterError> {
-        match framing {
-            TcpFraming::LengthPrefixed => {
-                let len = (payload.len() as u32).to_be_bytes();
-                stream.write_all(&len).await?;
-                stream.write_all(payload).await?;
-            }
-            TcpFraming::NewlineDelimited => {
-                stream.write_all(payload).await?;
-                stream.write_all(b"\n").await?;
-            }
-            TcpFraming::Delimiter(delim) => {
-                stream.write_all(payload).await?;
-                stream.write_all(&[delim]).await?;
-            }
-        }
-        Ok(())
+    async fn start(&self) -> Result<(), AdapterError> {
+        // Bind TCP listener
+        // Accept connections
+        // Spawn session handlers with framing codec
+        todo!()
+    }
+
+    async fn stop(&self) -> Result<(), AdapterError> {
+        todo!()
+    }
+
+    fn is_running(&self) -> bool {
+        self.running.load(Ordering::SeqCst)
+    }
+
+    fn metrics(&self) -> AdapterMetrics {
+        self.metrics.as_ref().clone()
     }
 }
-```
-
-### TCP Protocol
-
-**Length-prefixed framing**:
-```
-┌─────────────────────────────────────────────┐
-│  4 bytes     │         N bytes             │
-│  length (BE) │         payload             │
-└─────────────────────────────────────────────┘
-```
-
-**Example exchange**:
-```
-Client                                    Server
-   │                                         │
-   ├─► TCP Connect ────────────────────────►│
-   │                                         │
-   ├─► [len][{"type":"Subscribe",...}] ────►│
-   │                                         │
-   │◄─ [len][{"type":"DocumentUpdate",...}]─│
-   │                                         │
 ```
 
 ---
@@ -40016,268 +40250,146 @@ Client                                    Server
 
 ### Overview
 
-HTTP/REST provides request/response semantics for scripting and automation:
+HTTP/REST provides a familiar interface for scripting and automation:
 
-- **Stateless**: Each request independent
-- **Cacheable**: GET responses can be cached
-- **Simple**: Standard HTTP verbs and status codes
-- **Widely supported**: Works with any HTTP client
+- **Request/Response**: Simple query model
+- **Stateless**: No connection management
+- **Cacheable**: Standard HTTP caching
+- **SSE**: Server-Sent Events for streaming
 
 ### Implementation
 
 ```rust
 /// HTTP/REST consumer adapter
-pub struct HttpRestAdapter {
-    config: HttpRestConfig,
+pub struct HttpAdapter {
+    config: HttpConfig,
     peat: Arc<PeatClient>,
     metrics: Arc<AdapterMetrics>,
     running: AtomicBool,
-    server_handle: Option<ServerHandle>,
+    shutdown: broadcast::Sender<()>,
 }
 
 #[derive(Debug, Clone)]
-pub struct HttpRestConfig {
-    /// Listen address
+pub struct HttpConfig {
+    /// Listen address (e.g., "0.0.0.0:8081")
     pub listen_addr: SocketAddr,
+
+    /// Base path for API (e.g., "/api/v1")
+    pub base_path: String,
 
     /// Enable TLS
     pub tls: Option<TlsConfig>,
 
-    /// API base path (e.g., "/api/v1")
-    pub base_path: String,
-
-    /// Enable CORS
+    /// CORS configuration
     pub cors: CorsConfig,
-
-    /// Authentication configuration
-    pub auth: AuthConfig,
 
     /// Rate limiting
     pub rate_limit: Option<RateLimitConfig>,
+
+    /// Authentication required
+    pub require_auth: bool,
 }
 
-impl HttpRestAdapter {
-    /// Build HTTP routes
-    fn routes(&self) -> Router {
-        let peat = self.peat.clone();
+#[async_trait]
+impl ConsumerAdapter for HttpAdapter {
+    fn adapter_type(&self) -> AdapterType {
+        AdapterType::HttpRest
+    }
 
-        Router::new()
-            // Node status
-            .route("/status", get(Self::get_status))
-            .route("/node", get(Self::get_node))
+    async fn start(&self) -> Result<(), AdapterError> {
+        // Build Axum router with endpoints:
+        // GET  /api/v1/status
+        // GET  /api/v1/peers
+        // GET  /api/v1/cell
+        // GET  /api/v1/documents/:collection
+        // GET  /api/v1/documents/:collection/:id
+        // POST /api/v1/documents/:collection
+        // PUT  /api/v1/documents/:collection/:id
+        // POST /api/v1/command
+        // GET  /api/v1/stream (SSE)
+        todo!()
+    }
 
-            // Peers
-            .route("/peers", get(Self::get_peers))
+    async fn stop(&self) -> Result<(), AdapterError> {
+        todo!()
+    }
 
-            // Cell operations
-            .route("/cells", get(Self::list_cells))
-            .route("/cells/:cell_id", get(Self::get_cell))
+    fn is_running(&self) -> bool {
+        self.running.load(Ordering::SeqCst)
+    }
 
-            // Document operations
-            .route("/collections/:collection", get(Self::query_collection))
-            .route("/collections/:collection", post(Self::write_document))
-            .route("/collections/:collection/:doc_id", get(Self::get_document))
-            .route("/collections/:collection/:doc_id", put(Self::update_document))
-            .route("/collections/:collection/:doc_id", delete(Self::delete_document))
-
-            // Commands
-            .route("/commands", post(Self::send_command))
-            .route("/commands/:command_id", get(Self::get_command_status))
-
-            // Subscriptions via Server-Sent Events (SSE)
-            .route("/stream", get(Self::event_stream))
-            .route("/stream/:collection", get(Self::collection_stream))
-
-            .with_state(peat)
+    fn metrics(&self) -> AdapterMetrics {
+        self.metrics.as_ref().clone()
     }
 }
-```
-
-### REST API Endpoints
-
-```yaml
-# Base path: /api/v1
-
-# Node status
-GET /status
-  Response: { "status": "healthy", "node_id": "...", "uptime_secs": 3600 }
-
-# Node information
-GET /node
-  Response: { "id": "...", "platform": "UAV", "capabilities": [...] }
-
-# Peers
-GET /peers
-  Response: [{ "id": "...", "connected": true, "address": "..." }, ...]
-
-# Cells
-GET /cells
-  Response: [{ "id": "...", "leader": "...", "members": [...] }, ...]
-
-GET /cells/{cell_id}
-  Response: { "id": "...", "leader": "...", "members": [...], "capabilities": [...] }
-
-# Collections (documents)
-GET /collections/{collection}
-  Query params: ?filter={json}&limit=100&offset=0
-  Response: { "documents": [...], "total": 42, "has_more": true }
-
-GET /collections/{collection}/{doc_id}
-  Response: { "id": "...", "data": {...}, "updated_at": "..." }
-
-POST /collections/{collection}
-  Body: { "data": {...} }
-  Response: { "id": "new_doc_id", "created": true }
-
-PUT /collections/{collection}/{doc_id}
-  Body: { "data": {...} }
-  Response: { "id": "...", "updated": true }
-
-DELETE /collections/{collection}/{doc_id}
-  Response: { "deleted": true }
-
-# Commands
-POST /commands
-  Body: { "target": "cell:abc", "action": "move_to", "params": {...} }
-  Response: { "command_id": "...", "status": "pending" }
-
-GET /commands/{command_id}
-  Response: { "command_id": "...", "status": "completed", "result": {...} }
-
-# Server-Sent Events (SSE) for streaming
-GET /stream
-  Headers: Accept: text/event-stream
-  Response: SSE stream of all updates
-
-GET /stream/{collection}
-  Headers: Accept: text/event-stream
-  Query params: ?filter={json}
-  Response: SSE stream of collection updates
-```
-
-### Server-Sent Events (SSE)
-
-For HTTP clients that need streaming without WebSocket:
-
-```rust
-/// Server-Sent Events endpoint
-async fn event_stream(
-    State(peat): State<Arc<PeatClient>>,
-    Query(params): Query<StreamParams>,
-) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
-    let stream = peat.subscribe_all(params.filter).await.unwrap();
-
-    let sse_stream = stream.map(|update| {
-        let data = serde_json::to_string(&update).unwrap();
-        Ok(Event::default()
-            .event("update")
-            .data(data))
-    });
-
-    Sse::new(sse_stream)
-        .keep_alive(KeepAlive::default())
-}
-```
-
-**SSE format**:
-```
-event: update
-data: {"type":"DocumentUpdate","collection":"cells",...}
-
-event: update
-data: {"type":"PeerUpdate","peer_id":"abc123",...}
-
-: keepalive
-
-event: update
-data: {"type":"DocumentUpdate","collection":"nodes",...}
 ```
 
 ---
 
 ## Interface Coordinator
 
-The Interface Coordinator manages all adapters and provides unified configuration:
-
 ```rust
-/// Coordinates all consumer interface adapters
+/// Coordinates multiple consumer interface adapters
 pub struct InterfaceCoordinator {
     adapters: Vec<Box<dyn ConsumerAdapter>>,
-    peat: Arc<PeatClient>,
-    config: InterfaceConfig,
-    metrics: CoordinatorMetrics,
-}
-
-#[derive(Debug, Clone)]
-pub struct InterfaceConfig {
-    /// WebSocket adapter configuration (optional)
-    pub websocket: Option<WebSocketConfig>,
-
-    /// TCP adapter configuration (optional)
-    pub tcp: Option<TcpConfig>,
-
-    /// HTTP/REST adapter configuration (optional)
-    pub http: Option<HttpRestConfig>,
-
-    /// Shared authentication configuration
-    pub auth: SharedAuthConfig,
+    config: CoordinatorConfig,
+    metrics: Arc<CoordinatorMetrics>,
 }
 
 impl InterfaceCoordinator {
-    pub fn new(config: InterfaceConfig, peat: Arc<PeatClient>) -> Self {
+    pub fn new(config: CoordinatorConfig, peat: Arc<PeatClient>) -> Self {
         let mut adapters: Vec<Box<dyn ConsumerAdapter>> = Vec::new();
 
-        if let Some(ws_config) = &config.websocket {
+        if config.websocket.enabled {
             adapters.push(Box::new(WebSocketAdapter::new(
-                ws_config.clone(),
+                config.websocket.clone(),
                 peat.clone(),
             )));
         }
 
-        if let Some(tcp_config) = &config.tcp {
+        if config.tcp.enabled {
             adapters.push(Box::new(TcpAdapter::new(
-                tcp_config.clone(),
+                config.tcp.clone(),
                 peat.clone(),
             )));
         }
 
-        if let Some(http_config) = &config.http {
-            adapters.push(Box::new(HttpRestAdapter::new(
-                http_config.clone(),
+        if config.http.enabled {
+            adapters.push(Box::new(HttpAdapter::new(
+                config.http.clone(),
                 peat.clone(),
             )));
         }
 
         Self {
             adapters,
-            peat,
             config,
-            metrics: CoordinatorMetrics::default(),
+            metrics: Arc::new(CoordinatorMetrics::default()),
         }
     }
 
-    /// Start all configured adapters
-    pub async fn start(&self) -> Result<(), AdapterError> {
+    pub async fn start_all(&self) -> Result<(), AdapterError> {
         for adapter in &self.adapters {
             adapter.start().await?;
-            info!("Started {:?} adapter", adapter.adapter_type());
         }
         Ok(())
     }
 
-    /// Stop all adapters
-    pub async fn stop(&self) -> Result<(), AdapterError> {
+    pub async fn stop_all(&self) -> Result<(), AdapterError> {
         for adapter in &self.adapters {
             adapter.stop().await?;
         }
         Ok(())
     }
 
-    /// Get aggregated metrics
     pub fn metrics(&self) -> CoordinatorMetrics {
-        let mut metrics = self.metrics.clone();
+        let mut metrics = CoordinatorMetrics::default();
         for adapter in &self.adapters {
-            metrics.merge(adapter.metrics());
+            match adapter.adapter_type() {
+                AdapterType::WebSocket => metrics.websocket = adapter.metrics(),
+                AdapterType::Tcp => metrics.tcp = adapter.metrics(),
+                AdapterType::HttpRest => metrics.http = adapter.metrics(),
+            }
         }
         metrics
     }
@@ -40534,7 +40646,7 @@ pub struct CoordinatorMetrics {
 - [ ] WebSocket: 1000+ concurrent connections
 - [ ] TCP: 500+ concurrent connections
 - [ ] HTTP: 1000+ requests/second
-- [ ] Latency: <10ms for local operations
+- [ ] Latency: <200ms for operations (acceptable for compatibility layer)
 
 ### Testing
 
@@ -40573,32 +40685,69 @@ pub struct CoordinatorMetrics {
 
 ---
 
+## Consequences
+
+### Positive
+
+- **Legacy integration** without modifying external systems
+- **Multiple protocols** (WS, TCP, HTTP) for different use cases
+- **Unified semantics** across all adapters
+- **Standard APIs** familiar to developers
+- **Debugging/monitoring** - useful for dashboards even when SDK is primary
+
+### Negative
+
+- **Latency overhead** adds 50-200ms vs SDK integration
+- **No offline support** - external system depends on adapter availability
+- **No CRDT benefits** - external system doesn't get conflict resolution
+- **Not a mesh participant** - cannot contribute to hierarchy/aggregation
+- **Potential misuse** - developers may use adapters when SDK is better choice
+
+### Neutral
+
+- Coexists with SDK (ADR-050) - different tools for different situations
+- Can be disabled if not needed (reduces attack surface)
+
+---
+
 ## References
 
 1. [ADR-029](029-tak-transport-adapter.md) - TAK Transport pattern
 2. [ADR-032](032-pluggable-transport-abstraction.md) - Transport abstraction
-3. [WebSocket RFC 6455](https://tools.ietf.org/html/rfc6455)
-4. [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events)
-5. [Axum Web Framework](https://docs.rs/axum)
-6. [Tokio-tungstenite](https://docs.rs/tokio-tungstenite)
+3. [ADR-050](050-sdk-integration.md) - Peat SDK (Optimal Integration Path)
+4. [ADR-049](049-schema-extraction-and-codegen.md) - Schema Extraction
+5. [WebSocket RFC 6455](https://tools.ietf.org/html/rfc6455)
+6. [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events)
+7. [Axum Web Framework](https://docs.rs/axum)
+8. [Tokio-tungstenite](https://docs.rs/tokio-tungstenite)
 
 ---
 
-**Last Updated**: 2026-01-06
+## Decision Log
+
+| Date | Decision | Rationale |
+|------|----------|-----------|
+| 2026-01-06 | Consumer Interface Adapters for legacy integration | Network-based access for systems that can't embed SDK |
+| 2025-01-31 | Position as compatibility layer, not optimal path | SDK provides full CRDT benefits; adapters are fallback |
+| 2025-01-31 | Document latency tradeoffs explicitly | Clear guidance on when to use adapters vs SDK |
+| 2025-01-31 | Add references to ADR-049, ADR-050 | Complete integration picture |
+
+---
+
+**Last Updated**: 2025-01-31  
 **Status**: PROPOSED - Awaiting review
 
----
 
 # ADR-044: End-to-End Encryption and Key Management
 
 **Status**: Proposed
 **Date**: 2025-01-07
-**Authors**: Codex, Kit Plummer
+**Authors**: Claude, Kit Plummer
 **Related**: ADR-006 (Security Architecture), ADR-042 (UDP Bypass), ADR-005 (Data Sync)
 
 ## Context
 
-PEAT Protocol has a solid security foundation (ADR-006) with:
+Peat Protocol has a solid security foundation (ADR-006) with:
 - Device identity (Ed25519 keypairs)
 - Peer-to-peer encryption (X25519 + ChaCha20-Poly1305)
 - Formation keys (pre-shared secret authentication)
@@ -40618,7 +40767,7 @@ The current `GroupKey` implementation can generate and rotate keys, but has no p
 Kerkour's research notes highlight a critical insight:
 > "Removing server-side validation creates vulnerability where malicious clients could introduce invalid mutations, compromising data structure integrity."
 
-In PEAT's mesh topology:
+In Peat's mesh topology:
 - Any node can propose CRDT mutations
 - Compromised nodes could inject malformed documents
 - Replay attacks could revert document state
@@ -40661,7 +40810,7 @@ We will integrate the Messaging Layer Security protocol for cell-level key manag
 | X.509 Support | Limited | Full |
 | Audit Status | Partial | None |
 
-OpenMLS aligns with PEAT's existing crypto (ChaCha20-Poly1305, Ed25519) and has more real-world deployment experience.
+OpenMLS aligns with Peat's existing crypto (ChaCha20-Poly1305, Ed25519) and has more real-world deployment experience.
 
 ### Architecture
 
@@ -41017,7 +41166,7 @@ pub enum BypassAuthMode {
 | **Simplicity** | Just a keypair | Certificate chains, CAs, validity periods |
 | **Key size** | 32 bytes public | ~1-2KB per cert |
 | **Revocation** | Manual tracking | CRL/OCSP infrastructure |
-| **Interop** | PEAT-specific | DoD PKI, NATO systems |
+| **Interop** | Peat-specific | DoD PKI, NATO systems |
 | **Metadata** | None built-in | Org unit, clearance, role in cert |
 | **Offline validation** | Always works | Needs cached CRLs |
 
@@ -41035,7 +41184,7 @@ pub enum PeatCredential {
 
 ## Hardware Root of Trust
 
-For tactical deployment, software-only keys are insufficient. Captured devices could have keys extracted. PEAT should support hardware-backed identity where available.
+For tactical deployment, software-only keys are insufficient. Captured devices could have keys extracted. Peat should support hardware-backed identity where available.
 
 ### Physical Unclonable Functions (PUFs)
 
@@ -41162,7 +41311,7 @@ pub enum AttestationProof {
 
 ### Hardware Support Matrix
 
-| Platform | PUF | TPM | Secure Enclave | PEAT Target |
+| Platform | PUF | TPM | Secure Enclave | Peat Target |
 |----------|-----|-----|----------------|-------------|
 | NXP i.MX RT | ✅ SRAM PUF | ❌ | ✅ TrustZone | UAVs, edge |
 | Microchip ATECC608 | ✅ Built-in | ❌ | ✅ Secure element | Small UAS, sensors |
@@ -41224,13 +41373,12 @@ Use cases:
 - [Kerkour: CRDT + E2E Encryption Research Notes](https://kerkour.com/crdt-end-to-end-encryption-research-notes)
 - [Martin Kleppmann: Secure Group Messaging for CRDTs](https://speakerdeck.com/ept/adapting-secure-group-messaging-for-encrypted-crdts)
 
----
 
 # ADR-045: Zarf/UDS Integration for Tactical Software Delivery
 
 **Status**: Proposed
 **Date**: 2025-01-09
-**Authors**: Kit Plummer, Codex
+**Authors**: Kit Plummer, Claude
 **Relates to**: ADR-013 (Distributed Software Ops), ADR-022 (Edge MLOps), ADR-025 (Blob Transfer)
 
 ## Context
@@ -41250,7 +41398,7 @@ Existing solutions address parts of this problem:
 | **Zarf** | Air-gap packaging, OCI distribution | Single cluster focus, no mesh coordination |
 | **Kubernetes** | Container orchestration | Assumes connected control plane |
 | **GitOps (Flux/Argo)** | Declarative deployment | Requires Git connectivity |
-| **PEAT** | Mesh sync, hierarchical coordination | No container/K8s deployment |
+| **Peat** | Mesh sync, hierarchical coordination | No container/K8s deployment |
 
 ### Defense Unicorns Ecosystem
 
@@ -41270,35 +41418,35 @@ Existing solutions address parts of this problem:
 
 ### Integration Opportunity
 
-PEAT + Zarf/UDS creates a complete tactical software delivery stack:
+Peat + Zarf/UDS creates a complete tactical software delivery stack:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                     Cloud / Enterprise                                   │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                  │
-│  │ Zarf Build  │───▶│ OCI Registry│───▶│ PEAT Gateway│                  │
+│  │ Zarf Build  │───▶│ OCI Registry│───▶│ Peat Gateway│                  │
 │  │  Pipeline   │    │  (packages) │    │  (metadata) │                  │
 │  └─────────────┘    └─────────────┘    └──────┬──────┘                  │
 └─────────────────────────────────────────────────┼────────────────────────┘
-                                                  │ PEAT Sync
+                                                  │ Peat Sync
                     ┌─────────────────────────────┼─────────────────────────┐
                     │           FOB / Base        ▼                         │
                     │  ┌─────────────┐    ┌─────────────┐                   │
-                    │  │ Zarf Mirror │◀───│ PEAT Node   │                   │
+                    │  │ Zarf Mirror │◀───│ Peat Node   │                   │
                     │  │  Registry   │    │ (metadata)  │                   │
                     │  └──────┬──────┘    └──────┬──────┘                   │
                     └─────────┼──────────────────┼─────────────────────────┘
-                              │                  │ PEAT Sync
+                              │                  │ Peat Sync
               ┌───────────────┼──────────────────┼───────────────┐
               │     Vehicle   ▼                  ▼               │
               │  ┌─────────────┐    ┌─────────────┐              │
-              │  │ Zarf Deploy │◀───│ PEAT Node   │              │
+              │  │ Zarf Deploy │◀───│ Peat Node   │              │
               │  │   (K3s)     │    │ (commands)  │              │
               │  └─────────────┘    └─────────────┘              │
               └──────────────────────────────────────────────────┘
 ```
 
-**PEAT provides:**
+**Peat provides:**
 - Package metadata propagation across the mesh
 - Deployment intent/command distribution
 - Status aggregation up the hierarchy
@@ -41313,9 +41461,9 @@ PEAT + Zarf/UDS creates a complete tactical software delivery stack:
 
 ## Decision
 
-### 1. PEAT as Metadata Backplane
+### 1. Peat as Metadata Backplane
 
-PEAT synchronizes **metadata about packages and deployments**, not the packages themselves:
+Peat synchronizes **metadata about packages and deployments**, not the packages themselves:
 
 ```protobuf
 // Package availability advertisement
@@ -41394,9 +41542,9 @@ package_mirrors/         # Which registries have which packages
 1. BUILD (Cloud)
    ├─ CI/CD builds Zarf package
    ├─ Pushes to OCI registry
-   └─ Publishes ZarfPackageAvailable to PEAT
+   └─ Publishes ZarfPackageAvailable to Peat
 
-2. PROPAGATE (PEAT Sync)
+2. PROPAGATE (Peat Sync)
    ├─ Package metadata syncs through hierarchy
    ├─ Each node learns what packages exist
    └─ Mirrors can pre-pull packages
@@ -41412,7 +41560,7 @@ package_mirrors/         # Which registries have which packages
    ├─ Executes: zarf package deploy
    └─ Reports DeploymentStatus
 
-5. AGGREGATE (PEAT Hierarchy)
+5. AGGREGATE (Peat Hierarchy)
    ├─ Status documents sync upward
    ├─ Leaders aggregate subordinate status
    └─ Operator sees convergence progress
@@ -41447,7 +41595,7 @@ store.write_targeted(
 
 ### 5. Integration Points
 
-#### PEAT Side
+#### Peat Side
 
 ```rust
 // New crate: peat-zarf (or module in peat-protocol)
@@ -41477,24 +41625,24 @@ impl ZarfIntegration {
 Alternatively, integrate via Kubernetes:
 
 ```typescript
-// Pepr capability that watches PEAT and triggers Zarf
+// Pepr capability that watches Peat and triggers Zarf
 When(PeatDeploymentIntent)
   .IsCreated()
   .Then(async (intent) => {
-    // Pull package from nearest PEAT-advertised mirror
+    // Pull package from nearest Peat-advertised mirror
     const mirror = await findNearestMirror(intent.packageName);
 
     // Execute Zarf deployment
     await exec(`zarf package deploy ${mirror}/${intent.packageName}`);
 
-    // Report status back to PEAT
+    // Report status back to Peat
     await reportDeploymentStatus(intent.id, "DEPLOYED");
   });
 ```
 
 ### 6. Security Considerations
 
-- **Deployment intents MUST be signed** by authorized issuer (uses PEAT security layer)
+- **Deployment intents MUST be signed** by authorized issuer (uses Peat security layer)
 - **Package verification** via Zarf's built-in signature/SBOM verification
 - **RBAC**: Only authorized nodes can issue deployment intents
 - **Audit trail**: All intents and status changes recorded in CRDT history
@@ -41503,10 +41651,10 @@ When(PeatDeploymentIntent)
 
 ### Positive
 
-- **Complete stack**: PEAT + Zarf covers cloud-to-edge software delivery
+- **Complete stack**: Peat + Zarf covers cloud-to-edge software delivery
 - **Disconnected operation**: Both tools designed for air-gap/intermittent connectivity
 - **Open source**: Full stack is FOSS, no vendor lock-in
-- **Separation of concerns**: PEAT does coordination, Zarf does deployment
+- **Separation of concerns**: Peat does coordination, Zarf does deployment
 - **Existing ecosystem**: Leverage UDS Core, Pepr, existing Zarf packages
 
 ### Negative
@@ -41518,14 +41666,14 @@ When(PeatDeploymentIntent)
 
 ### Neutral
 
-- **Not replacing Zarf features**: PEAT doesn't do OCI, Helm, or K8s deployment
-- **Not replacing PEAT features**: Zarf doesn't do mesh sync or CRDT
+- **Not replacing Zarf features**: Peat doesn't do OCI, Helm, or K8s deployment
+- **Not replacing Peat features**: Zarf doesn't do mesh sync or CRDT
 
 ## Alternatives Considered
 
-### 1. PEAT-Native Package Distribution
+### 1. Peat-Native Package Distribution
 
-Build package distribution into PEAT using blob transfer (ADR-025).
+Build package distribution into Peat using blob transfer (ADR-025).
 
 **Rejected**: Reinventing Zarf's capabilities. Zarf already handles air-gap packaging well.
 
@@ -41537,7 +41685,7 @@ Use GitOps for deployment coordination.
 
 ### 3. Direct Zarf Push
 
-Use Zarf's OCI push capabilities directly without PEAT.
+Use Zarf's OCI push capabilities directly without Peat.
 
 **Rejected**: No mesh coordination, no status aggregation, no store-and-forward.
 
@@ -41553,7 +41701,7 @@ Use Zarf's OCI push capabilities directly without PEAT.
 - Selector-based targeting
 - Delivery confirmation
 
-### Phase 3: PEAT-Zarf Bridge
+### Phase 3: Peat-Zarf Bridge
 - Watch for intents, execute Zarf
 - Package advertisement
 - Status reporting
@@ -41572,20 +41720,19 @@ Use Zarf's OCI push capabilities directly without PEAT.
 - ADR-022: Edge MLOps Architecture
 - ADR-025: Blob Transfer Protocol
 
----
 
 # ADR-046: Targeted Message Delivery
 
 **Status**: Proposed
 **Date**: 2025-01-09
-**Authors**: Kit Plummer, Codex
+**Authors**: Kit Plummer, Claude
 **Relates to**: ADR-007 (Sync Engine), ADR-016 (TTL/Lifecycle), ADR-042 (UDP Bypass), ADR-045 (Zarf Integration)
 
 ## Context
 
 ### Current Model: Broadcast Replication
 
-PEAT's CRDT synchronization replicates documents to **all nodes** in a cell. When a document is written to a collection, every node eventually receives and persists a copy.
+Peat's CRDT synchronization replicates documents to **all nodes** in a cell. When a document is written to a collection, every node eventually receives and persists a copy.
 
 ```
 Writer → Node A → Node B → Node C → Node D
@@ -42327,2855 +42474,5130 @@ Build routing on top of sync, not integrated.
 - ADR-045: Zarf/UDS Integration
 - Kubernetes Label Selectors: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
 
----
 
----
+# ADR-047: Firmware OTA Distribution via Peat Mesh
 
-## Technical Deep Dives
+**Status**: Accepted
+**Date**: 2026-02-22
+**Authors**: Kit Plummer, Claude
+**Relates to**: ADR-013 (Distributed Software Ops), ADR-022 (Edge MLOps), ADR-025 (Blob Transfer), ADR-026 (Software Orchestration), ADR-035 (Peat-Lite), ADR-045 (Zarf/UDS Integration)
 
+## Context
 
----
-marp: true
-theme: default
-paginate: true
-backgroundColor: #fff
-backgroundImage: url('https://marp.app/assets/hero-background.svg')
-header: 'PEAT Protocol - Technology Deep Dive | **COMPETITION SENSITIVE**'
-footer: '© 2025 (r)evolve. All Rights Reserved. | **COMPETITION SENSITIVE**'
-style: |
-  section {
-    font-size: 18px;
-    padding: 40px 60px;
-  }
-  h1 {
-    font-size: 42px;
-    margin-bottom: 0.3em;
-  }
-  h2 {
-    font-size: 32px;
-    margin-bottom: 0.3em;
-    margin-top: 0.3em;
-  }
-  h3 {
-    font-size: 24px;
-    margin-bottom: 0.2em;
-    margin-top: 0.2em;
-  }
-  table {
-    font-size: 15px;
-    margin: 0.5em 0;
-  }
-  code {
-    font-size: 14px;
-  }
-  pre {
-    font-size: 13px;
-    padding: 0.5em;
-    margin: 0.5em 0;
-  }
-  li {
-    margin-bottom: 0.15em;
-    line-height: 1.3;
-  }
-  ul, ol {
-    margin: 0.3em 0;
-  }
-  p {
-    margin: 0.3em 0;
-  }
-  header {
-    font-size: 11px;
-    color: #666;
-  }
-  footer {
-    font-size: 10px;
-    color: #666;
-  }
----
+### The Missing Middle
 
-<!-- _class: lead -->
-# PEAT Protocol
-## Technology Deep Dive
+Peat has strong coverage for two ends of the software delivery spectrum:
 
-**Capability Aggregation Protocol**
-Scalable Distributed Coordination for Autonomous Systems
+- **Server/K8s workloads** — Zarf packages containers, Peat coordinates deployment (ADR-045)
+- **Sensor/MCU nodes** — Peat-Lite enables ESP32-class devices to participate in the mesh (ADR-035)
 
-*For Investors & Potential Acquirers*
+Between these sits a large class of platforms that need **firmware updates** but don't run Kubernetes:
 
----
+| Platform | Processor | OS/Runtime | Examples |
+|----------|-----------|------------|----------|
+| Drone autopilots | STM32, NXP i.MX | NuttX, FreeRTOS | PX4, ArduPilot |
+| Vehicle ECUs | ARM Cortex-R/M | RTOS, bare metal | Engine, braking, comms modules |
+| Radio systems | FPGA + DSP | Custom, embedded Linux | Software-defined radios, tactical radios |
+| Camera/sensor payloads | ARM, RISC-V | Embedded Linux, RTOS | EO/IR systems, LIDAR processors |
+| Robotics controllers | Various ARM | ROS2/embedded Linux | Motor controllers, navigation boards |
+| Gateway devices | ARM Cortex-A | Embedded Linux | Network bridges, protocol translators |
+| Weapon system controllers | Safety-rated MCU | Safety-certified RTOS | Fire control, fuzing, guidance |
 
-# Executive Summary
+These platforms share common characteristics:
+- **No container runtime** — firmware is a monolithic binary image, not a layered OCI artifact
+- **No on-device orchestrator** — no K8s, no Zarf, no package manager
+- **Hardware-coupled** — firmware must match exact board revision, peripheral configuration
+- **Boot-critical** — a failed update can brick the device (unlike a failed container deploy that gets restarted)
+- **Resource constrained** — limited storage, often single-digit MB of RAM
+- **Safety-critical** — some platforms have certification requirements (DO-178C, IEC 61508)
 
-**The Problem**: Autonomous systems fail at scale due to O(n²) communication complexity
-- Current approaches saturate at 10-20 nodes
-- No human oversight in distributed networks
-- Safety-critical systems need coordination guarantees
+### Why Existing OTA Solutions Fall Short
 
-**The Solution**: PEAT Protocol
-- **95%+ bandwidth reduction** through hierarchical CRDT aggregation
-- **Validated with 12-node ContainerLab** across 3 topology modes
-- **Graduated human authority** for distributed autonomous control
-- **Production-ready** with 330+ tests, 100% sync success
+Several open-source and commercial firmware OTA solutions exist:
 
-**The State:** 0-1 Startup
-- Bootstrapped, no capital investment, fully liquid
-- Rapidly evolving codebase with features, tests and laboratory experimentation
-- Ontology -> Schema -> Code
-- Abstractions for persistence, CRDT, and network functions
+| Solution | Approach | Gap for Tactical Edge |
+|----------|----------|----------------------|
+| **Mender** | Client-server, A/B partition updates | Requires continuous server connectivity |
+| **SWUpdate** | Local update agent, delta updates | No distributed coordination or fleet management |
+| **RAUC** | Slot-based updates, cryptographic verification | Single-device focus, no mesh distribution |
+| **Balena** | Container-based device management | Assumes connectivity to balenaCloud |
+| **hawkBit** | Eclipse IoT, campaign management | Centralized server architecture |
 
----
+Common gaps across all:
+1. **Centralized architecture** — require connectivity to a management server
+2. **No mesh distribution** — can't leverage peer-to-peer transfer in bandwidth-constrained environments
+3. **No hierarchical coordination** — flat fleet model, no echelon-based rollout
+4. **No cross-platform orchestration** — firmware-only; can't coordinate with model/container updates on the same platform
+5. **No DIL operation** — designed for IoT with reliable cloud connectivity, not contested networks
 
-<!-- _class: lead -->
-# Part 1: The Problem Space
+### The Multi-Artifact Platform Problem
 
----
+Modern tactical platforms are not single-firmware devices. A typical drone carries:
 
-# The Autonomous Systems Scalability Crisis
+```
+Drone Platform (single asset)
+├── Autopilot firmware        (STM32/NuttX)      ← Firmware OTA
+├── Companion computer OS     (Jetson/Linux)      ← Container or firmware
+├── AI perception model       (ONNX on Jetson)    ← Model delivery (ADR-022)
+├── Camera sensor firmware    (FPGA bitstream)     ← Firmware OTA
+├── Radio firmware            (SDR baseband)       ← Firmware OTA
+├── Battery management FW     (BMS MCU)            ← Firmware OTA
+└── Mission config/ROE        (all processors)     ← Config sync via CRDT
+```
 
-## DIU COD Experience (2024)
-- Defense Innovation Unit Collaborative Operations in Denied (COD) program
-- **All-to-all communication saturates at 10-20 nodes**
-- O(n²) message complexity becomes unbearable
-- No solution for tactical edge networks (high latency, partitions, disconnectivity/DDIL)
+Today, updating this platform requires 4+ separate systems with no coordination between them. An operator cannot answer: "Is this drone fully updated and mission-ready?" without checking each system independently.
 
-## Industry-Wide Challenge
-- IoT swarms: Can't coordinate beyond small groups
-- Robotics: Fleet coordination breaks down at scale
-- Defense: Squad-level autonomy requires 12+ nodes minimum
-- Cloud: Investments still tilting towards centralization
-- Edge: Pushing cloud tech outward is failing
+### Customer Demand Signal
 
----
+Defense and intelligence customers are asking for:
+1. **Deliver firmware to platforms that don't run K8s** — extend UDS beyond the enterprise edge
+2. **Deliver AI models to inference hardware** — GPU nodes, edge accelerators
+3. **Unified fleet visibility** — "what firmware/model/config is running on every asset?"
+4. **Coordinated multi-artifact updates** — update autopilot firmware AND perception model as an atomic operation
+5. **Disconnected operation** — updates must work over intermittent tactical links
 
-# Why Traditional Solutions Fail
+## Decision
 
-| Approach | Limitation | Example |
-|----------|-----------|---------|
-| **Centralized Control** | Single point of failure, no partition tolerance | Cloud orchestration |
-| **Broadcast Communication** | O(n²) complexity, network saturation | Traditional UAV swarms |
-| **Consensus Algorithms** | Requires majority, high latency, no partition tolerance | Paxos, Raft |
-| **Pure CRDTs** | No coordination primitives, eventual consistency only | Automerge, Yjs |
+### Extend Peat's Distribution Layer to Firmware Targets
 
-**Gap**: No system provides hierarchical coordination + partition tolerance + human authority
+Add firmware as a first-class artifact type alongside containers (Zarf), AI models (ONNX), and configuration (CRDT), using the same Peat protocol primitives for coordination.
 
----
+### Architecture
 
-# CRDTs Have a Problem
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                        Peat Protocol Layer                            │
+│  BlobStore, DeploymentDirective, CapabilityAdvertisement, PeatEvent  │
+│  Convergence Tracking, QoS, Hierarchical Distribution                │
+├───────────┬───────────┬───────────┬──────────────┬───────────────────┤
+│ Zarf      │ Firmware  │ AI Model  │ Config       │ Peat-Lite         │
+│ Adapter   │ OTA Agent │ Runtime   │ Sync         │ Gossip            │
+│           │           │           │              │                   │
+│ K8s/K3s   │ Embedded  │ GPU/NPU   │ All nodes    │ MCU sensors       │
+│ clusters  │ platforms │ platforms │              │                   │
+└───────────┴───────────┴───────────┴──────────────┴───────────────────┘
+```
 
- - CRDTs will never match raw TCP socket latency - Differential sync engines have inherent overhead for conflict-free replication vs
-  direct message passing
-  - Convergence induces latency - The "eventual" in eventual consistency means sync propagation takes time, especially in multi-hop P2P
-   topologies
-  - Value proposition is CAP theorem trade-offs - Accept higher latency for partition tolerance, eventual availability, and
-  offline-first operation that traditional client-server can't provide
-  - Hierarchical P2P enables scale-out - While individual sync may be slower, architecture can handle network partitions and scale
-  horizontally where centralized approaches fail
+### 1. Firmware Manifest Schema
 
----
+Firmware manifests describe what's being delivered and to what hardware:
 
-<!-- _class: lead -->
-# Part 2: Core Innovations
+```protobuf
+message FirmwareManifest {
+  // Identity
+  string firmware_id = 1;           // e.g., "px4-autopilot"
+  string version = 2;               // e.g., "1.14.3"
+  string display_name = 3;          // Human-readable name
 
----
+  // Artifact
+  string blob_hash = 4;             // Content-addressed hash (BlobStore)
+  uint64 size_bytes = 5;
+  FirmwareFormat format = 6;
 
-# Innovation 1: Hierarchical Capability Composition
+  // Hardware Compatibility
+  repeated HardwareTarget targets = 7;
 
-## The Insight
-Military squads naturally organize hierarchically:
-- **Squad** (12 nodes) → **Platoon** (3 squads) → **Company** (3 platoons)
-- Each level aggregates capabilities from subordinates
-- O(n log n) message complexity vs O(n²) for flat networks
+  // Update Policy
+  UpdatePolicy update_policy = 8;
 
-## Technical Approach
-- **CRDTs for state**: Conflict-free replicated data types (Ditto SDK)
-- **Composition rules**: Additive, emergent, redundant, constraint-based
-- **Hierarchical aggregation**: Capabilities bubble up, commands flow down
+  // Provenance
+  Provenance provenance = 9;
 
----
-
-# Composition Rule Patterns
-
-```rust
-// 1. Additive: Union of capabilities
-squad.sensors = uav1.sensors ∪ uav2.sensors ∪ ugv1.sensors
-
-// 2. Emergent: New capabilities from combinations
-if squad.has(SENSOR_IR) && squad.has(SENSOR_RF) {
-    squad.add(CAPABILITY_TARGET_CORRELATION)
+  // Dependencies
+  repeated FirmwareDependency dependencies = 10;
 }
 
-// 3. Redundant: Threshold requirements
-if squad.count(CAPABILITY_SURVEILLANCE) >= 2 {
-    squad.add(CAPABILITY_PERSISTENT_ISR)
+enum FirmwareFormat {
+  RAW_BINARY = 0;          // Flat binary image
+  ELF = 1;                 // ELF executable
+  INTEL_HEX = 2;           // Intel HEX format
+  SREC = 3;                // Motorola S-record
+  UF2 = 4;                 // USB Flashing Format
+  FPGA_BITSTREAM = 5;      // FPGA configuration
+  DELTA_PATCH = 6;         // Binary diff against known base version
+  SIGNED_ENVELOPE = 7;     // Encrypted/signed wrapper (unwrapped on device)
 }
 
-// 4. Constraint-based: Dependencies and exclusions
-if squad.has(JAMMER_ACTIVE) {
-    squad.remove(CAPABILITY_RADIO_RELAY)  // Mutual exclusion
+message HardwareTarget {
+  string board_id = 1;              // e.g., "pixhawk6x", "stm32h7-rev-b"
+  string cpu_architecture = 2;      // e.g., "arm-cortex-m7", "aarch64"
+  string bootloader_version_min = 3;// Minimum bootloader version required
+  string bootloader_version_max = 4;// Maximum compatible bootloader
+  string board_revision_min = 5;    // Minimum board hardware revision
+  repeated string peripheral_requirements = 6;  // Required peripherals
+}
+
+message UpdatePolicy {
+  ActivationMode activation = 1;
+  RollbackPolicy rollback = 2;
+  repeated SafetyConstraint safety_constraints = 3;
+  uint32 max_concurrent_updates = 4;  // Per formation
+  bool requires_human_approval = 5;
+}
+
+enum ActivationMode {
+  IMMEDIATE_REBOOT = 0;    // Apply and reboot now
+  DEFERRED_REBOOT = 1;     // Stage now, reboot at maintenance window
+  HOT_SWAP = 2;            // Live update without reboot (if supported)
+  MANUAL_ACTIVATION = 3;   // Stage only, operator triggers activation
+}
+
+message RollbackPolicy {
+  bool auto_rollback_on_boot_failure = 1;
+  uint32 boot_verification_timeout_sec = 2;  // How long to wait for health check
+  string golden_image_version = 3;           // Fallback if all else fails
+  uint32 max_rollback_attempts = 4;
+}
+
+message SafetyConstraint {
+  string constraint_type = 1;       // "min_battery", "stable_power", "not_in_flight"
+  string constraint_value = 2;      // "80", "true", "true"
+  string description = 3;           // Human-readable explanation
+}
+
+message FirmwareDependency {
+  string firmware_id = 1;           // Depends on this other firmware
+  string version_min = 2;           // Minimum version
+  string version_max = 3;           // Maximum version
+  DependencyType type = 4;
+}
+
+enum DependencyType {
+  REQUIRES = 0;             // Must be present before this firmware installs
+  CONFLICTS = 1;            // Must NOT be present
+  CO_DEPLOY = 2;            // Should be deployed together (atomic group)
+}
+
+message Provenance {
+  string signed_by = 1;
+  bytes signature = 2;
+  string trust_chain = 3;
+  string build_id = 4;              // CI/CD build identifier
+  string source_commit = 5;         // Source control reference
+  string sbom_reference = 6;        // Software Bill of Materials
+  google.protobuf.Timestamp built_at = 7;
 }
 ```
 
----
+### 2. Firmware OTA Lifecycle
 
-# Validation: Hierarchical Aggregation Efficiency
-
-## ContainerLab Multi-Node Validation Results
-
-| Topology Mode | Nodes | Sync Success | Convergence Time | Bandwidth Reduction |
-|---------------|-------|--------------|------------------|---------------------|
-| Client-Server | 12 | 100% | 0.3s | 96% vs broadcast |
-| Hub-Spoke | 12 | 100% | 0.5s | 95% vs broadcast |
-| Dynamic Mesh | 12 | 100% | 0.8s | 94% vs broadcast |
-
-**Key Finding**: Protocol maintains 100% sync success with hierarchical efficiency
-- Real Docker networking with network constraints (latency, packet loss)
-- Three topology modes validated
-- Consistent bandwidth reduction across all modes
-
-*Source: ADR-015, VALIDATION_RESULTS.md*
-
----
-
-# Innovation 2: Graduated Human Authority Control
-
-## The Problem
-Autonomous weapons systems need human oversight, but:
-- Centralized control fails during network partitions
-- Binary autonomous/manual modes are insufficient
-- No audit trail for accountability
-
-## Five-Level Authority Taxonomy
+The update lifecycle is more complex than container or model deployment because of the boot-critical nature:
 
 ```
-FULL_AUTO ────→ No human approval required
-SUPERVISED ───→ Human notified, can observe
-COLLABORATIVE → Human works alongside system
-MONITORED ────→ Human must explicitly approve actions
-MANUAL ───────→ Direct human control only
+┌──────────────────────────────────────────────────────────────────────┐
+│                    Firmware OTA State Machine                         │
+│                                                                      │
+│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐       │
+│  │ AVAILABLE│───▶│DOWNLOADING│───▶│ STAGED   │───▶│ACTIVATING│       │
+│  │          │    │          │    │          │    │          │       │
+│  └──────────┘    └────┬─────┘    └────┬─────┘    └────┬─────┘       │
+│                       │               │               │              │
+│                       ▼               ▼               ▼              │
+│                  ┌──────────┐    ┌──────────┐    ┌──────────┐       │
+│                  │  FAILED  │    │  FAILED  │    │VERIFYING │       │
+│                  │(download)│    │(staging) │    │  (boot)  │       │
+│                  └──────────┘    └──────────┘    └────┬─────┘       │
+│                                                       │              │
+│                                            ┌──────────┴──────────┐   │
+│                                            ▼                     ▼   │
+│                                      ┌──────────┐         ┌────────┐│
+│                                      │COMMITTED │         │ROLLBACK││
+│                                      │ (active) │         │        ││
+│                                      └──────────┘         └────────┘│
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
----
+**State definitions:**
 
-# Authority Control: Technical Implementation
+| State | Description | Peat Action |
+|-------|-------------|-------------|
+| `AVAILABLE` | Firmware manifest received via Peat sync | Node evaluates hardware compatibility |
+| `DOWNLOADING` | Blob transfer in progress via BlobStore | Progress reported via PeatEvent |
+| `STAGED` | Firmware written to inactive partition/slot | Awaiting activation trigger |
+| `ACTIVATING` | Reboot initiated (or hot-swap in progress) | Node goes temporarily offline |
+| `VERIFYING` | New firmware booted, running health checks | Boot verification timer started |
+| `COMMITTED` | Health checks passed, new firmware is active | CapabilityAdvertisement updated |
+| `ROLLBACK` | Boot verification failed, reverted to previous | PeatEvent with failure details |
+| `FAILED` | Unrecoverable failure at any stage | Alert event, manual intervention needed |
 
-## Distributed Enforcement
-- Authority level stored in CRDT (LWW-Register)
-- Propagates through P2P mesh without centralized coordination
-- **Hierarchical override**: Higher echelons can preempt local settings
+### 3. Firmware OTA Agent
 
-## Partition Tolerance
-- Nodes operate autonomously during network splits
-- Configurable timeout policies for human unavailability
-- Deterministic conflict resolution when network reconverges
-
-## Audit Trail
-- Cryptographic signatures on all decisions
-- Immutable log of human interventions
-- Compliance with DoD autonomy directives
-
----
-
-# Innovation 3: Distributed Coordination Primitives
-
-## Beyond State Synchronization
-
-CRDTs provide eventual consistency, but tactical operations need:
-
-| Requirement | Solution |
-|-------------|----------|
-| Track deconfliction | Distributed claims registry |
-| Fire control coordination | Priority-based conflict resolution |
-| Formation control | Synchronized state transitions |
-| Resource allocation | Temporal claims with timeouts |
-| Safety zones | Spatial exclusion zone manager |
-
-**Key Innovation**: Coordination layer on top of CRDT sync that maintains safety during partitions
-
----
-
-# Coordination Example: Target Deconfliction
+A lightweight agent that runs on (or alongside) firmware targets:
 
 ```rust
-// Platform 1 claims target
-let claim = Claim {
-    id: "claim-uuid-1",
-    resource: Target::ID("enemy-tank-42"),
-    claimant: "uav-alpha-1",
-    priority: Priority::HIGH,
-    expires_at: now() + 30.seconds(),
-};
+/// Firmware OTA Agent — runs on the target platform or its companion processor
+///
+/// Responsibilities:
+/// - Receive deployment directives via Peat mesh
+/// - Download firmware blobs via BlobStore
+/// - Manage partition staging and activation
+/// - Report status through Peat events
+///
+/// The agent is transport-agnostic — it works over QUIC, BLE, or UDP
+/// depending on what the platform supports.
 
-// Platform 2 also tries to engage same target
-// Conflict resolver uses deterministic rules:
-if claim2.priority > claim1.priority {
-    grant_to(claim2);  // Higher priority wins
-} else if claim2.priority == claim1.priority {
-    grant_to(min(claim1.claimant, claim2.claimant));  // Lexical tiebreak
+pub struct FirmwareOtaAgent {
+    /// Peat mesh connection (may be QUIC, BLE, or UDP)
+    peat_node: Arc<dyn PeatNode>,
+
+    /// Local firmware partition manager
+    partition_mgr: Box<dyn PartitionManager>,
+
+    /// Hardware identity
+    hardware_info: HardwareInfo,
+
+    /// Current firmware state
+    state: RwLock<FirmwareState>,
 }
 
-// Audit trail records both claims and resolution
-audit_log.append(CoordinationEvent { claim1, claim2, resolution });
+/// Platform-specific partition management
+///
+/// Implementations exist for different update mechanisms:
+/// - A/B partition scheme (Linux, Android)
+/// - Bank-swap (STM32 dual-bank flash)
+/// - External flash staging (SPI NOR/NAND)
+/// - File-based (embedded Linux with initramfs)
+#[async_trait]
+pub trait PartitionManager: Send + Sync {
+    /// Get current active firmware info
+    async fn active_firmware(&self) -> Result<FirmwareInfo>;
+
+    /// Get inactive/staging slot info
+    async fn staging_slot(&self) -> Result<SlotInfo>;
+
+    /// Write firmware image to staging slot
+    async fn stage_firmware(
+        &self,
+        image: &[u8],
+        manifest: &FirmwareManifest,
+    ) -> Result<()>;
+
+    /// Mark staging slot as bootable and trigger activation
+    async fn activate(&self) -> Result<()>;
+
+    /// Confirm current firmware is good (commit after boot verification)
+    async fn commit(&self) -> Result<()>;
+
+    /// Revert to previous firmware
+    async fn rollback(&self) -> Result<()>;
+
+    /// Check if platform meets safety constraints for update
+    async fn check_safety_constraints(
+        &self,
+        constraints: &[SafetyConstraint],
+    ) -> Result<Vec<ConstraintResult>>;
+}
+
+pub struct HardwareInfo {
+    pub board_id: String,
+    pub board_revision: String,
+    pub cpu_architecture: String,
+    pub bootloader_version: String,
+    pub current_firmware_version: String,
+    pub storage_available_bytes: u64,
+    pub peripherals: Vec<String>,
+}
 ```
 
----
-
-# Innovation 4: Multi-Layer Conflict Resolution
-
-## The Challenge
-CRDT eventual consistency alone doesn't provide enough control for safety-critical systems
-
-## Three-Layer Approach
-
-1. **Policy Engine (Write-time)**
-   - Custom composition rules per capability type
-   - Optimistic concurrency control (OCC)
-   - Local enforcement before CRDT sync
-
-2. **CRDT Semantics (Sync-time)**
-   - LWW-Register for single-value fields (leader, position)
-   - OR-Set for multi-value fields (membership)
-   - Deterministic conflict resolution
-
-3. **Application Logic (Read-time)**
-   - Interpret CRDT state for tactical decisions
-   - Safety checks and validation
-   - Human-in-the-loop approval gates
-
----
-
-<!-- _class: lead -->
-# Part 3: Experimental Validation
-
----
-
-# Validation Methodology
-
-## Four-Tier Validation Strategy
-
-### 1. Unit & Integration Tests (Development)
-- 330+ tests covering all protocol phases
-- Property-based testing with `proptest`
-- Fast feedback loop (<1s per test)
-
-### 2. ContainerLab Multi-Node Validation (System)
-- 12-24 node topologies with real Docker networking
-- Network constraints: 10-500ms latency, 0-5% packet loss
-- Four protocol modes tested across bandwidth constraints
-
-### 3. Comprehensive Bandwidth Testing (E11)
-- 16 test configurations (4 modes × 4 bandwidths)
-- Bandwidths: 1Gbps, 100Mbps, 1Mbps, 256Kbps tactical radio
-- Validates hierarchical aggregation efficiency (95%+ bandwidth reduction)
-
-### 4. Traditional IoT Baseline Validation (E12)
-- Empirical scaling study: 2-193 nodes
-- Measured O(n^1.69) super-linear scaling in traditional architectures
-- Single-machine testing up to 190+ nodes validated
-
----
-
-# ContainerLab Validation: Multi-Node Testing
-
-## Test Environment
-- 12-24 containerized PEAT Protocol nodes
-- Ditto SDK 4.12+ for real CRDT synchronization
-- Real Docker networking (not mocked/simulated)
-- Network constraints via Linux traffic control (tc)
-
-## Key Results (E11 Comprehensive Bandwidth Testing)
-- ✅ **16 test configurations** across 4 modes and 4 bandwidths
-- ✅ **100% synchronization success** across all modes and bandwidths
-- ✅ **Mode 4 Hierarchical**: 95.3% bandwidth reduction validated
-- ✅ Protocol maintains functionality from gigabit ethernet to 256Kbps tactical radio
-- ✅ P2P latency: 13-242ms avg across all bandwidth constraints
-- ✅ Node discovery: <2s average
-- ✅ Cell formation: <5s for 4-node cells
-
-*Source: test-bandwidth-suite-20251109-191705/BANDWIDTH_SUITE_REPORT.md*
-
----
-
-# ContainerLab Network Topology Modes
-
-## Four Validation Topologies
-
-**1. Client-Server** (Baseline)
-- All nodes connect to central server
-- Validates basic sync functionality
-- 12 nodes, latency: 13-38ms avg
-
-**2. Hub-Spoke** (Hierarchical Realistic)
-- Mimics military squad hierarchy
-- Squad leaders as hubs, members as spokes
-- 12 nodes, latency: 16-29ms avg
-
-**3. Dynamic Mesh** (Autonomous)
-- Nodes discover and form cells autonomously
-- Geographic self-organization
-- 12 nodes, latency: 14-21ms avg
-
-**4. Hierarchical Aggregation** (Production)
-- 3 squads + platoon leader architecture
-- Squad leaders aggregate → Platoon leader aggregates
-- 24 nodes, latency: 133-242ms avg, **95.3% bandwidth reduction**
-
----
-
-# Comprehensive Bandwidth Testing Results (E11)
-
-## Test Matrix: 4 Modes × 4 Bandwidths = 16 Configurations
-
-| Mode | 1Gbps | 100Mbps | 1Mbps | 256Kbps |
-|------|-------|---------|-------|---------|
-| **Mode 1** (Client-Server) | 15ms | 13ms | 38ms | 14ms |
-| **Mode 2** (Hub-Spoke) | 16ms | 29ms | 17ms | 16ms |
-| **Mode 3** (Dynamic Mesh) | 15ms | 21ms | 21ms | 14ms |
-| **Mode 4** (Hierarchical) | 206ms | 133ms | 243ms | 212ms |
-
-*Values shown: Average latency across all nodes*
-
-**Key Findings**:
-- ✅ 100% synchronization success across all 16 configurations
-- ✅ Mode 4 achieves 95.3% bandwidth reduction through hierarchical aggregation
-- ✅ Protocol maintains functionality from gigabit to tactical radio bandwidths
-
----
-
-# Traditional IoT Scaling Study (E12)
-
-## Empirical Baseline: Traditional Full-State Replication
-
-**Test Configuration**:
-- Architecture: Periodic full-state messages (5-second cycle)
-- No differential sync, no CRDTs
-- Scales: 2, 12, 24, 48, 96, 193 nodes
-- Single-machine validation
-
-**Measured Scaling Behavior**:
-- **O(n^1.69) super-linear scaling complexity**
-- 2 nodes: 0.06 MB/60s
-- 96 nodes: 37.94 MB/60s
-- 48x node increase → 682x traffic increase
-
-**Division-Scale Projection (1,536 nodes)**:
-- **4.06 GB per minute** (67 MB/second sustained)
-- Impractical for bandwidth-constrained tactical networks
-
----
-
-# Single-Machine Testing Achievement (E12)
-
-## Infrastructure Validation
-
-**Docker Image Optimization**:
-- Original size: 11.8 GB
-- Optimized size: 242 MB
-- **98% size reduction** (48.8x smaller)
-
-**Scale Validated**:
-- Successfully tested 193-node topology on single machine
-- Automated deployment, measurement, and teardown
-- 5-second interval Docker stats collection with per-node granularity
-
-**Resource Efficiency**:
-- ~46 GB RAM for 193 containers
-- vs ~2.3 TB unoptimized
-- Enables rapid battalion-scale iteration before distributed deployment
-
-**Testing Framework Capabilities**:
-- ContainerLab-based automated topology deployment
-- Comprehensive data processing and analysis pipeline
-- Validated across 6 scales: 2, 12, 24, 48, 96, 193 nodes
-
----
-
-# Protocol Migration Validation (ADR-012)
-
-## Protobuf Schema Migration
-
-**Objective**: Migrate all core models to protobuf for extensibility and performance
-
-**Scope**:
-- Capability, Node, Cell, Zone models → protobuf
-- Delta system removed (superseded by CRDT engines)
-- Backward compatibility maintained
-
-**Results**:
-- ✅ All 330+ tests pass post-migration
-- ✅ Zero API breaking changes
-- ✅ Performance neutral or +5% (protobuf efficiency)
-- ✅ Schema extensibility validated
-
----
-
-# Systems Integration & Interoperability
-
-## The Integration Challenge
-
-**Problem**: Modern military operations require integrating:
-- **Greenfield systems**: New autonomous platforms (UGVs, UAVs, UUVs)
-- **Brownfield systems**: Legacy C2, sensors, communications
-- **Commercial robotics**: ROS-based drones, ground robots
-- **Existing doctrine**: TTPs, command structures, approval workflows
-
-**CAP Solution**: Protocol-agnostic integration layer that transforms at interfaces
-
----
-
-# Greenfield vs Brownfield Integration
-
-## Greenfield Systems (New Autonomous Platforms)
-
-**Integration Approach**: Native PEAT protocol implementation
-
-| System Type | Integration Method | CAP Benefits |
-|-------------|-------------------|--------------|
-| **New UAVs/UGVs** | Native CAP client | Full capability advertisement, autonomous cell formation |
-| **AI-enabled sensors** | CAP SDK integration | Real-time data sharing, distributed coordination |
-| **Next-gen robotics** | Built with CAP from day 1 | Zero translation overhead, native CRDT sync |
-
-**Example**: New quadcopter swarm designed with PEAT protocol
-```rust
-let cap_node = CapNode::new(NodeCapabilities {
-    role: Role::Scout,
-    sensors: vec![Sensor::EO, Sensor::IR],
-    mobility: MobilityType::Aerial { max_altitude: 500 },
-});
-cap_node.advertise_capabilities();
-cap_node.join_nearest_cell();
-```
-
----
-
-# Brownfield Integration Patterns
-
-## Legacy C2 Systems Integration
-
-**Challenge**: Existing C2 systems use centralized architectures (ATAK, AFATDS, DCGS)
-
-**CAP Integration Strategy**:
-
-### 1. Gateway Translation Layer
-```
-Legacy C2 (ATAK/AFATDS)
-    ↓ (Link16/VMF)
-CAP Gateway Node
-    ↓ (CRDT documents)
-CAP Mesh Network (Autonomous Platforms)
-```
-
-**Gateway Functions**:
-- Translates legacy messages → CAP capability documents
-- Aggregates CAP state → C2 common operating picture
-- Enforces authority levels (human-in-loop for legacy systems)
-- Maintains audit trail for compliance
-
----
-
-# C2 Integration: Doctrine Preservation
-
-## Maintaining Existing TTPs
-
-**Key Principle**: CAP adapts to doctrine, not vice versa
-
-### Command Authority Mapping
-
-| Legacy C2 Role | CAP Authority Level | Integration |
-|----------------|---------------------|-------------|
-| **Battalion Commander** | MANUAL | All autonomous actions require explicit approval |
-| **Company Commander** | MONITORED | Approval required for fires, movement |
-| **Platoon Leader** | COLLABORATIVE | Collaborate on target selection |
-| **Squad Leader** | SUPERVISED | Observe autonomous recommendations |
-| **Team Member** | SUPERVISED | Observe sensor feeds, status |
-
-**Implementation**:
-- CAP gateway receives commander's authority level setting
-- Propagates through CRDT to all autonomous platforms
-- Platforms enforce locally during network partitions
-- Audit trail flows back to C2 for accountability
-
----
-
-# Commercial Robotics Integration (ROS/ROS2)
-
-## ROS-to-CAP Bridge
-
-**Problem**: Commercial drones/robots use Robot Operating System (ROS)
-- Topic-based pub/sub messaging
-- Centralized roscore (single point of failure)
-- No native support for partitioned operations
-
-**CAP Bridge Architecture**:
-```
-ROS Node (Drone autopilot)
-    ↓ /mavros topics
-ROS-CAP Bridge
-    ↓ Capability documents
-CAP Mesh Network
-```
-
-### Bridge Functions
-
-**Outbound (ROS → CAP)**:
-- `/mavros/state` → CAP Node heartbeat
-- `/mavros/global_position` → CAP Zone awareness
-- `/camera/image` → CAP Sensor data capability
-
-**Inbound (CAP → ROS)**:
-- CAP coordination commands → `/mavros/setpoint_position`
-- CAP authority level → Flight controller safety constraints
-- CAP cell membership → ROS namespace allocation
-
----
-
-# Interface Transformation Strategy
-
-## Multi-Layer Integration
-
-CAP enables transformation at **every interface layer**:
-
-### 1. Data Layer
-- **Transform**: Sensor feeds → Capability documents
-- **Benefit**: Heterogeneous sensors appear uniform to consumers
-
-### 2. Coordination Layer
-- **Transform**: C2 orders → Distributed claims/coordination primitives
-- **Benefit**: Centralized commands work in partitioned networks
-
-### 3. Authority Layer
-- **Transform**: Doctrine-based ROE → CAP authority levels
-- **Benefit**: Human oversight preserved across legacy/modern systems
-
-### 4. Network Layer
-- **Transform**: Link16/SATCOM → P2P CRDT mesh
-- **Benefit**: Protocols interoperate without central infrastructure
-
----
-
-# Real-World Integration Example
-
-## Scenario: Integrate Commercial DJI Drones into Army Squad
-
-**Existing Setup**:
-- Squad uses ATAK on Android tablets (C2)
-- DJI drones run proprietary firmware
-- No coordination between drones and ground units
-
-**With CAP Integration**:
-
-```
-┌─────────────┐
-│ ATAK Tablet │ (Legacy C2)
-└──────┬──────┘
-       │ TAK Protocol
-   ┌───▼────┐
-   │ Gateway│ (Raspberry Pi w/ CAP SDK)
-   └───┬────┘
-       │ CRDT Mesh
-   ┌───▼────┐     ┌─────────┐
-   │ UGV    │────►│ DJI UAV │ (w/ CAP bridge)
-   └────────┘     └─────────┘
-       │               │
-   ┌───▼───┐       ┌───▼───┐
-   │Soldier│       │Soldier│ (w/ CAP-enabled radios)
-   └───────┘       └───────┘
-```
-
-**Integration Points**:
-1. ATAK → CAP Gateway: TAK protocol translated to CAP documents
-2. DJI → CAP Bridge: DJI SDK calls wrapped in CAP client
-3. Radios: Native PEAT protocol (greenfield)
-
-**Result**: Commercial drones coordinate with military units using existing C2
-
----
-
-# Integration Benefits Summary
-
-## Interoperability Advantages
-
-| Benefit | Impact |
-|---------|--------|
-| **Doctrine Preservation** | Existing TTPs, command structures, ROE remain unchanged |
-| **Gradual Adoption** | Mix legacy and modern systems during transition |
-| **Vendor Neutrality** | Any drone/robot can integrate (not locked to single vendor) |
-| **Future-Proof** | New platforms integrate without rearchitecting C2 |
-| **Partition Tolerance** | Systems coordinate even when gateway offline |
-
-## Economic Advantages
-
-- **Reuse existing C2 investments**: No need to replace ATAK, AFATDS, etc.
-- **Commercial robotics leverage**: Use $1K DJI drones, not $100K mil-spec
-- **Incremental deployment**: Start with gateway + few platforms, scale up
-- **Training reduction**: Soldiers use familiar C2 interfaces
-
----
-
-<!-- _class: lead -->
-# Part 4: Technical Architecture
-
----
-
-# Three-Phase Protocol Architecture
-
-```
-┌────────────────────────────────────────────────────────┐
-│  Phase 1: Discovery                                    │
-│  - Geographic self-organization via beacon propagation │
-│  - C2-directed assignment                              │
-│  - Capability-based queries                            │
-└────────────────────────────────────────────────────────┘
-                         ↓
-┌────────────────────────────────────────────────────────┐
-│  Phase 2: Cell Formation                               │
-│  - Capability exchange and aggregation                 │
-│  - Leader election (deterministic tie-breaking)        │
-│  - Role assignment based on capabilities               │
-└────────────────────────────────────────────────────────┘
-                         ↓
-┌────────────────────────────────────────────────────────┐
-│  Phase 3: Hierarchical Operations                      │
-│  - Constrained messaging (O(n log n) complexity)       │
-│  - Multi-level aggregation (squad → platoon → company) │
-│  - Priority-based routing and flow control             │
-└────────────────────────────────────────────────────────┘
-```
-
----
-
-# Data Flow Architecture
-
-```
-┌─────────────────────────────────────────────────┐
-│         Application Layer (Tactical Logic)       │
-│  - Mission planning, target engagement, etc.    │
-└─────────────────────────────────────────────────┘
-                       ↓
-┌─────────────────────────────────────────────────┐
-│       Coordination Layer (Deconfliction)        │
-│  - Distributed claims, exclusion zones          │
-└─────────────────────────────────────────────────┘
-                       ↓
-┌─────────────────────────────────────────────────┐
-│     Policy Engine (Validation & Composition)    │
-│  - OCC, composition rules, safety checks        │
-└─────────────────────────────────────────────────┘
-                       ↓
-┌─────────────────────────────────────────────────┐
-│          CRDT Store (Ditto SDK 4.12+)           │
-│  - G-Set, OR-Set, LWW-Register, PN-Counter      │
-└─────────────────────────────────────────────────┘
-                       ↓
-┌─────────────────────────────────────────────────┐
-│           P2P Mesh (Bluetooth, WiFi, etc.)      │
-│  - Observer-based sync (no polling)             │
-└─────────────────────────────────────────────────┘
-```
-
----
-
-# CRDT Types & Usage
-
-| CRDT Type | Use Case | Example |
-|-----------|----------|---------|
-| **G-Set** (Grow-only Set) | Static capabilities | `sensors: {IR, RF, GPS}` |
-| **OR-Set** (Observed-Remove Set) | Dynamic membership | `cell_members: {uav1, uav2, ugv1}` |
-| **LWW-Register** (Last-Write-Wins) | Single-value fields | `leader: "uav-alpha-1"`, `position: (lat, lon)` |
-| **PN-Counter** (Positive-Negative) | Numeric values | `fuel_level: 75`, `ammo_count: 120` |
-
-**Key Property**: All CRDTs are commutative, associative, and idempotent
-→ Eventual consistency guaranteed regardless of message order or network partitions
-
----
-
-# Repository Architecture
-
-```
-cap/
-├── peat-protocol/          # Core protocol library (17K+ lines Rust)
-│   ├── src/
-│   │   ├── discovery/     # Phase 1: Bootstrap
-│   │   ├── cell/          # Phase 2: Cell Formation
-│   │   ├── hierarchy/     # Phase 3: Hierarchical Operations
-│   │   ├── composition/   # Capability composition engine
-│   │   ├── models/        # Core data structures (protobuf)
-│   │   ├── storage/       # Ditto CRDT integration
-│   │   └── testing/       # E2E test harness
-│   └── tests/             # Integration & E2E tests (330+)
-├── peat-schema/            # Protocol Buffers definitions
-├── peat-persistence/       # TTL & data lifecycle management
-├── peat-transport/         # Network transport abstraction
-└── peat-sim/               # Reference simulator application
-```
-
-**Code Quality**: Rust safety guarantees, 330+ tests, comprehensive documentation
-
----
-
-# Technology Stack
-
-| Layer | Technology | Rationale |
-|-------|-----------|-----------|
-| **Language** | Rust | Memory safety, performance, embedded-ready |
-| **CRDT Engine** | Ditto SDK 4.12+ | P2P mesh, observer-based sync, production-ready |
-| **Schema** | Protocol Buffers | Efficient serialization, extensibility, cross-language |
-| **Testing** | Rust test + proptest | Unit, integration, E2E with real CRDT mesh |
-| **Simulation** | ContainerLab | Multi-node validation with real Docker networking |
-| **Build** | Cargo + Makefile | Fast builds, reproducible, CI/CD friendly |
-
-**Key Decision**: Ditto SDK chosen over Automerge/Iroh for production-readiness and P2P mesh support (ADR-011)
-
----
-
-<!-- _class: lead -->
-# Part 5: Intellectual Property
-
----
-
-# Patent Strategy
-
-## Two Provisional Patent Applications
-
-### 1. Hierarchical Capability Composition (45 pages)
-**Innovation**: CRDT-based hierarchical aggregation for autonomous systems
-**Key Claims**:
-- Additive, emergent, redundant, constraint-based composition patterns
-- O(n log n) message complexity through hierarchical aggregation
-- Partition-tolerant capability composition with eventual consistency
-
-### 2. Graduated Human Authority Control (42 pages)
-**Innovation**: Five-level distributed human oversight system
-**Key Claims**:
-- Five-level authority taxonomy (FULL_AUTO → MANUAL)
-- Distributed enforcement via CRDT mesh without centralization
-- Cryptographic audit trail for accountability
-- Partition-tolerant with configurable timeout policies
-
----
-
-# Patent Pledge: Defensive Use Only
-
-## Commitment to Open Innovation
-
-**Who is Protected**:
-- ✅ Government and defense organizations
-- ✅ Academic and research institutions
-- ✅ Open-source contributors
-- ✅ Non-commercial use
-
-**Intent**: Defensive protection against competitors/patent trolls, not offensive assertion
-
-**Precedent**: Google, Red Hat, Tesla use this approach
-- Patents for defense and M&A value
-- Pledge for openness and collaboration
-
-*Full strategy: docs/patents/*
-
----
-
-# IP Documentation
-
-## Comprehensive Technical Documentation
-
-**16 Architecture Decision Records (ADRs)**:
-- Every major technical decision documented with rationale
-- Trade-offs analyzed, alternatives considered
-- References to validation results
-
-**Examples**:
-- ADR-001: PEAT Protocol POC (core architecture)
-- ADR-014: Distributed Coordination Primitives (novel contribution)
-- ADR-015: Experimental Validation (scientific methodology)
-
-**Value for Acquirer**: Complete understanding of design decisions and IP boundaries
-
----
-
-<!-- _class: lead -->
-# Part 6: Market Opportunity
-
----
-
-# Primary Market: Defense & Tactical Edge
-
-## Total Addressable Market (TAM)
-
-| Segment | Market Size | Growth | CAP Fit |
-|---------|-------------|--------|---------|
-| **DoD Autonomous Systems** | $5.4B (2024) | 12% CAGR | ⭐⭐⭐ Perfect |
-| **UAV/UGV Swarms** | $2.1B (2024) | 18% CAGR | ⭐⭐⭐ Perfect |
-| **Tactical Edge AI** | $1.8B (2024) | 22% CAGR | ⭐⭐⭐ Perfect |
-| **C4ISR Modernization** | $12.3B (2024) | 8% CAGR | ⭐⭐ Strong |
-
-**Target Customers**: USAF, Army, SOCOM, DARPA, DIU, NATO allies
-
-**Key Drivers**:
-- DIU COD experience shows need for scalable coordination
-- DoD autonomy directives require human oversight (Directive 3000.09)
-- JADC2 initiatives need distributed coordination at tactical edge
-
----
-
-# Secondary Market: Commercial Applications
-
-## High-Value Adjacent Markets
-
-### IoT & Edge Computing ($47B by 2027)
-- Smart city infrastructure coordination
-- Industrial IoT fleet management
-- Distributed sensor networks
-
-### Robotics & Automation ($74B by 2026)
-- Warehouse robot coordination (Amazon, Ocado)
-- Autonomous vehicle fleets (logistics, delivery)
-- Agricultural robot swarms
-
-### Satellite Constellations ($23B by 2030)
-- LEO mega-constellation coordination (Starlink, OneWeb)
-- Formation flying and collision avoidance
-- Distributed ground station networks
-
----
-
-# Competitive Landscape
-
-## Direct Competitors (Distributed Coordination)
-
-| Competitor | Approach | Limitation |
-|------------|----------|------------|
-| **DIU COD** | O(n²) broadcast | Saturates at 10-20 nodes |
-| **ROS 2 DDS** | Pub/Sub broadcast | No hierarchical coordination |
-| **Swarm-level autonomy (academic)** | Consensus-based | No partition tolerance |
-| **Proprietary defense systems** | Centralized control | Single point of failure |
-
-## Indirect Competitors (CRDT/Sync)
-
-| Product | Use Case | Missing in CAP |
-|---------|----------|----------------|
-| **Automerge/Yjs** | Document collaboration | No coordination primitives, no hierarchy |
-| **Conflict-free replicated data** | General state sync | No tactical operations support |
-
-**Competitive Advantage**: Only solution combining hierarchy + partition tolerance + human authority + coordination primitives
-
----
-
-# Go-to-Market Strategy
-
-## Phase 1: GOTS/SBIR (Years 1-2)
-- Government Off-The-Shelf (GOTS) positioning
-- SBIR Phase I/II funding ($1M-$3M)
-- Pilot programs with USAF, Army, SOCOM
-- NATO standardization efforts
-
-## Phase 2: Prime Integrator Partnerships (Years 2-4)
-- License to defense primes (Northrop, Lockheed, RTX)
-- Integration into existing platforms (UAVs, C2 systems)
-- Dual-use commercial applications (IoT, robotics)
-
-## Phase 3: Platform Play (Years 4+)
-- CAP-as-a-Service for edge computing
-- Developer ecosystem and tooling
-- Industry standards and reference implementations
-
----
-
-<!-- _class: lead -->
-# Part 7: Development Roadmap
-
----
-
-# Current Status: Production-Ready
-
-## Completed (100%)
-
-✅ **Core Protocol Implementation**
-- Three-phase protocol (discovery, cell formation, hierarchical operations)
-- CRDT-based state synchronization (Ditto SDK)
-- Hierarchical capability composition with 4 rule patterns
-
-✅ **Advanced Features**
-- Graduated human authority control (5 levels)
-- Policy engine with optimistic concurrency control
-- TTL & data lifecycle management
-- Protobuf schema migration for extensibility
-
-✅ **Validation & Testing**
-- 330+ tests (unit, integration, E2E)
-- ContainerLab 12-node validation (100% success rate)
-- ContainerLab multi-node validation (12 nodes, 3 topology modes)
-
----
-
-# Roadmap: Next 12 Months
-
-## Q1 2025: Hardening & Security
-- [ ] Cryptographic identity and authentication
-- [ ] End-to-end encryption for sensitive data
-- [ ] Security audit and penetration testing
-- [ ] FIPS 140-2 compliance investigation
-
-## Q2 2025: Distributed Coordination Primitives
-- [ ] Complete ADR-014 implementation (claims registry)
-- [ ] Spatial exclusion zones for safety
-- [ ] Time-bounded operations with temporal constraints
-- [ ] Audit trail with cryptographic signatures
-
-## Q3 2025: Multi-Backend Transport
-- [ ] Automerge/Iroh backend implementation
-- [ ] Transport abstraction layer finalization
-- [ ] Benchmark Ditto vs Automerge performance
-- [ ] Multi-language bindings (Python, C++ via FFI)
-
----
-
-# Roadmap: 12-24 Months
-
-## Q4 2025: Production Deployment
-- [ ] Government customer pilot program
-- [ ] Integration with existing C2 systems
-- [ ] Field testing with real autonomous platforms
-- [ ] Documentation for operators and integrators
-
-## 2026: Ecosystem Development
-- [ ] Reference implementations for common use cases
-- [ ] Developer SDK and tooling
-- [ ] Visualization and monitoring tools
-- [ ] Training and certification programs
-
-## 2026+: Advanced Features
-- [ ] Machine learning for capability prediction
-- [ ] Adaptive topology optimization
-- [ ] Cross-domain coordination (air-ground-sea)
-- [ ] Embedded hardware ports (ARM, RISC-V)
-
----
-
-<!-- _class: lead -->
-# Part 8: Risk Assessment
-
----
-
-# Technical Risks
-
-| Risk | Probability | Impact | Mitigation |
-|------|-------------|--------|------------|
-| **CRDT performance at large scale** | Medium | High | ContainerLab validates 12-node deployment, Ditto tested to 10K+ nodes by vendor |
-| **Network partition duration** | Low | Medium | Configurable timeouts, deterministic reconvergence tested |
-| **Security vulnerabilities** | Medium | High | Rust memory safety, security audit planned Q1 2025 |
-| **Ditto SDK vendor lock-in** | Low | Medium | Transport abstraction (ADR-011), Automerge backend planned |
-
-**Overall Technical Risk**: **Low** - Core protocol validated, production-ready codebase
-
----
-
-# Market & Business Risks
-
-| Risk | Probability | Impact | Mitigation |
-|------|-------------|--------|------------|
-| **Government budget cuts** | Medium | High | Dual-use commercial applications, NATO allies |
-| **Competitor solution emerges** | Low | High | Patents + 2-year head start, proven at scale |
-| **Integration complexity** | Medium | Medium | Reference implementations, professional services |
-| **Regulatory/export control** | Low | Medium | GOTS strategy, open-source with patent pledge |
-
-**Overall Market Risk**: **Medium** - Defense market cyclicality, but strong dual-use story
-
----
-
-# IP & Legal Risks
-
-| Risk | Probability | Impact | Mitigation |
-|------|-------------|--------|------------|
-| **Prior art invalidates patents** | Low | Medium | Provisional applications cite DIU COD, novel claims focus on CAP-specific innovations |
-| **Open-source licensing issues** | Very Low | Low | Apache-2.0/MIT dual-license, all dependencies permissive |
-| **Patent assertion by competitor** | Low | Medium | Defensive patent strategy, prior art documentation |
-
-**Overall IP Risk**: **Low** - Strong patent position, defensive use pledge
-
----
-
-<!-- _class: lead -->
-# Part 9: Investment Thesis
-
----
-
-# Why PEAT Protocol Wins
-
-## 1. Proven Technology
-- ✅ **100% sync success** under realistic network constraints
-- ✅ **12-node ContainerLab** validation across 3 topology modes
-- ✅ **95%+ bandwidth reduction** confirmed experimentally
-- ✅ **330+ tests** including comprehensive E2E validation
-
-## 2. Novel IP
-- 🔒 **2 provisional patents** covering core innovations
-- 🔒 **16 ADRs** documenting technical decisions and IP boundaries
-- 🔒 **First to solve** hierarchy + partition tolerance + human authority
-
-## 3. Validated Performance
-- ✅ **100% sync success** under realistic network constraints
-- ✅ **12-node ContainerLab** deployment validated across 3 topology modes
-- ✅ **95%+ bandwidth reduction** vs traditional broadcast approaches
-
-## 4. Market Timing
-- 📈 DIU COD failure creates urgent need (2024)
-- 📈 DoD autonomy directives require human oversight
-- 📈 JADC2 initiatives need distributed coordination
-- 📈 Commercial IoT/robotics markets growing 15%+ CAGR
-
----
-
-# Acquisition Value Proposition
-
-## For Defense Primes (Northrop, Lockheed, RTX)
-- **Technology Gap**: No internal solution for scalable autonomous coordination
-- **Time to Market**: 2+ years ahead of building in-house
-- **IP Portfolio**: Patents strengthen competitive position
-- **Integration**: Drop-in replacement for existing O(n²) approaches
-
-## For Platform Companies (Google, Amazon, Microsoft)
-- **Cloud Edge**: CAP enables distributed edge computing at scale
-- **IoT Portfolio**: Solves coordination problem for IoT/robotics products
-- **AI/ML Integration**: Foundation for multi-agent AI systems
-- **Strategic**: Defensible technology moat via patents
-
-## For VC-Backed Autonomy Startups
-- **Acqui-hire**: Experienced team with proven technical chops
-- **Technology Acceleration**: Skip 2 years of R&D
-- **Customer Traction**: Government validation via GOTS/SBIR
-
----
-
-# Financial Projections (Illustrative)
-
-## Revenue Potential (Year 5, assuming GOTS + licensing)
-
-| Revenue Stream | Conservative | Aggressive | Notes |
-|----------------|--------------|------------|-------|
-| **Government Contracts** | $5M | $15M | SBIR Phase III, production contracts |
-| **Prime Integrator Licensing** | $3M | $10M | 3-5 primes @ $1M-$2M/year |
-| **Commercial Licensing** | $1M | $5M | IoT, robotics, cloud edge |
-| **Professional Services** | $1M | $3M | Integration, training, support |
-| **Total Revenue** | **$10M** | **$33M** | |
-
-**Valuation Multiple**: 8-12x revenue (defense software SaaS comparable)
-**Implied Valuation (Year 5)**: $80M - $400M
-
-*Note: Projections are illustrative and depend on execution, market adoption, and strategic partnerships*
-
----
-
-<!-- _class: lead -->
-# Part 10: Ask & Next Steps
-
----
-
-# Investment Ask
-
-## Seed Round: $2M - $3M
-**Use of Funds**:
-- **Engineering (60%)**: Security hardening, distributed coordination primitives, multi-backend
-- **Go-to-Market (25%)**: SBIR applications, pilot programs, defense industry partnerships
-- **Operations (15%)**: Legal (patent prosecution), infrastructure, administrative
-
-**Milestones**:
-- ✅ Security audit and FIPS compliance (Q1 2025)
-- ✅ SBIR Phase I award ($250K-$300K) (Q2 2025)
-- ✅ First pilot program with government customer (Q3 2025)
-- ✅ Prime integrator partnership or licensing deal (Q4 2025)
-
-**Exit Strategy**: Acquisition by defense prime or platform company within 3-5 years
-
----
-
-# Acquisition Scenarios
-
-## Strategic Acquirer Profile
-
-### Tier 1: Defense Primes ($50M - $150M)
-- Northrop Grumman, Lockheed Martin, Raytheon
-- **Rationale**: Fills technology gap in autonomous systems portfolio
-- **Timing**: After SBIR Phase II or first production contract
-
-### Tier 2: Platform Companies ($30M - $80M)
-- Google (Cloud Edge), Amazon (IoT/Robotics), Microsoft (Azure Edge)
-- **Rationale**: Enables distributed edge computing strategy
-- **Timing**: After commercial traction in IoT/robotics
-
-### Tier 3: Autonomy Startups ($20M - $50M)
-- Shield AI, Anduril, Skydio (autonomy-focused)
-- **Rationale**: Accelerates coordination technology roadmap
-- **Timing**: Earlier acquisition for team + technology
-
----
-
-# Due Diligence Materials
-
-## Available Now
-✅ **Technical Documentation**: 16 ADRs, IP_OVERVIEW.md, VALIDATION_RESULTS.md
-✅ **Code Repository**: Full source code, 330+ tests, CI/CD pipeline
-✅ **Patent Applications**: 2 provisional applications (87 pages), patent strategy
-✅ **Validation Data**: ContainerLab test logs, network topology validation results
-✅ **Roadmap**: 24-month development plan with milestones
-
-## Next Steps for Interested Parties
-
-1. **Technical Deep Dive** (Week 1-2): Engineering team review of codebase and validation
-2. **IP Review** (Week 2-3): Patent attorney review of provisional applications
-3. **Market Validation** (Week 3-4): Customer discovery with potential government buyers
-4. **Term Sheet** (Week 4-6): Investment or acquisition proposal
-
----
-
-<!-- _class: lead -->
-# Appendix: Technical Deep Dives
-
----
-
-# Appendix A: CRDT Fundamentals
-
-## What are CRDTs?
-**Conflict-free Replicated Data Types** - data structures that guarantee eventual consistency without coordination
-
-## Key Properties
-1. **Commutative**: Order of operations doesn't matter
-2. **Associative**: Grouping of operations doesn't matter
-3. **Idempotent**: Applying same operation multiple times has same effect as once
-
-## Why CRDTs for CAP?
-- ✅ No centralized coordination required
-- ✅ Partition tolerance built-in
-- ✅ Provably convergent (mathematical guarantees)
-- ✅ Production-ready implementations (Ditto, Automerge)
-
-**CAP Innovation**: CRDTs alone aren't enough - we add hierarchy, human authority, and coordination primitives
-
----
-
-# Appendix B: Ditto SDK Integration
-
-## Why Ditto over Automerge/Iroh?
-
-| Feature | Ditto | Automerge | Iroh |
-|---------|-------|-----------|------|
-| **Production-ready** | ✅ 4.12+ stable | ⚠️ Still evolving | ⚠️ Early stage |
-| **P2P mesh networking** | ✅ Built-in | ❌ BYO transport | ✅ Built-in |
-| **Observer pattern** | ✅ Event-driven | ❌ Polling required | ⚠️ Limited |
-| **Platform support** | ✅ iOS, Android, embedded | ✅ Web-focused | ✅ Rust-focused |
-| **Commercial support** | ✅ Enterprise SLA | ❌ Community | ❌ Community |
-
-**Decision**: Ditto for initial implementation, abstraction layer for future flexibility (ADR-011)
-
----
-
-# Appendix C: Observer-Based Sync Pattern
-
-## Why Not Polling?
+**Agent operation flow:**
 
 ```rust
-// ❌ BAD: Polling (adds latency, wastes CPU)
-loop {
-    let state = store.query("SELECT * FROM nodes");
-    if state_changed(&state) {
-        handle_update(state);
+impl FirmwareOtaAgent {
+    /// Main loop — watches for deployment directives and executes them
+    pub async fn run(&self) -> Result<()> {
+        // 1. Advertise hardware capabilities on startup
+        self.advertise_hardware().await?;
+
+        // 2. Watch for firmware deployment directives targeting this node
+        let mut directives = self.peat_node
+            .subscribe_directives("firmware_deployments")
+            .await?;
+
+        while let Some(directive) = directives.next().await {
+            // 3. Verify directive is signed by authorized source
+            if !self.verify_directive_signature(&directive)? {
+                self.report_event(FirmwareEvent::RejectedUnauthorized {
+                    directive_id: directive.id.clone(),
+                }).await?;
+                continue;
+            }
+
+            // 4. Check hardware compatibility
+            let manifest = &directive.firmware_manifest;
+            if !self.is_compatible(manifest) {
+                self.report_event(FirmwareEvent::IncompatibleHardware {
+                    directive_id: directive.id.clone(),
+                    reason: self.compatibility_mismatch(manifest),
+                }).await?;
+                continue;
+            }
+
+            // 5. Check safety constraints
+            let safety_results = self.partition_mgr
+                .check_safety_constraints(&manifest.update_policy.safety_constraints)
+                .await?;
+            if safety_results.iter().any(|r| !r.passed) {
+                self.report_event(FirmwareEvent::SafetyConstraintFailed {
+                    directive_id: directive.id.clone(),
+                    failures: safety_results.iter()
+                        .filter(|r| !r.passed)
+                        .cloned()
+                        .collect(),
+                }).await?;
+                continue;
+            }
+
+            // 6. Execute the update
+            self.execute_update(directive).await?;
+        }
+
+        Ok(())
     }
-    sleep(100ms);  // Arbitrary delay
+
+    async fn execute_update(&self, directive: DeploymentDirective) -> Result<()> {
+        let manifest = &directive.firmware_manifest;
+        let directive_id = &directive.id;
+
+        // Download firmware blob
+        self.update_state(FirmwareOtaState::Downloading).await;
+        self.report_status(directive_id, "DOWNLOADING").await?;
+
+        let blob = self.peat_node.blob_store()
+            .fetch_blob(&manifest.blob_hash, |progress| {
+                // Report download progress periodically
+            }).await?;
+
+        // Verify hash
+        if !verify_hash(&blob.data, &manifest.blob_hash) {
+            self.report_event(FirmwareEvent::HashVerificationFailed {
+                directive_id: directive_id.clone(),
+            }).await?;
+            return Err(anyhow!("Firmware hash verification failed"));
+        }
+
+        // Stage to inactive partition
+        self.update_state(FirmwareOtaState::Staging).await;
+        self.report_status(directive_id, "STAGED").await?;
+
+        self.partition_mgr
+            .stage_firmware(&blob.data, manifest)
+            .await?;
+
+        // Activate based on policy
+        match manifest.update_policy.activation {
+            ActivationMode::ImmediateReboot => {
+                self.update_state(FirmwareOtaState::Activating).await;
+                self.report_status(directive_id, "ACTIVATING").await?;
+                self.partition_mgr.activate().await?;
+                // Device reboots here — post-boot verification happens
+                // in the boot_verification() method on next startup
+            }
+            ActivationMode::DeferredReboot => {
+                // Stay in STAGED state until maintenance window
+                self.report_status(directive_id, "STAGED_AWAITING_WINDOW").await?;
+            }
+            ActivationMode::ManualActivation => {
+                self.report_status(directive_id, "STAGED_AWAITING_MANUAL").await?;
+            }
+            ActivationMode::HotSwap => {
+                // Platform-specific live update
+                self.partition_mgr.activate().await?;
+                self.boot_verification(directive_id).await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Called on startup after a firmware update activation
+    async fn boot_verification(&self, directive_id: &str) -> Result<()> {
+        self.update_state(FirmwareOtaState::Verifying).await;
+        self.report_status(directive_id, "VERIFYING").await?;
+
+        let timeout = self.pending_manifest()
+            .map(|m| m.update_policy.rollback.boot_verification_timeout_sec)
+            .unwrap_or(60);
+
+        // Run platform-specific health checks
+        match tokio::time::timeout(
+            Duration::from_secs(timeout as u64),
+            self.run_health_checks(),
+        ).await {
+            Ok(Ok(())) => {
+                // Health checks passed — commit the new firmware
+                self.partition_mgr.commit().await?;
+                self.update_state(FirmwareOtaState::Committed).await;
+                self.report_status(directive_id, "COMMITTED").await?;
+
+                // Update capability advertisement with new version
+                self.advertise_hardware().await?;
+            }
+            _ => {
+                // Health checks failed or timed out — rollback
+                self.partition_mgr.rollback().await?;
+                self.update_state(FirmwareOtaState::RolledBack).await;
+                self.report_event(FirmwareEvent::RollbackTriggered {
+                    directive_id: directive_id.to_string(),
+                    reason: "Boot verification failed".to_string(),
+                }).await?;
+            }
+        }
+
+        Ok(())
+    }
 }
+```
 
-// ✅ GOOD: Observer pattern (event-driven, instant)
-let (tx, rx) = mpsc::unbounded_channel();
-let observer = store.register_observer_v2(&query, move |result| {
-    tx.send(Event::StateChanged(result));  // Instant notification
-});
+### 4. Hardware Capability Advertisement
 
-// React immediately to changes
-while let Some(event) = rx.recv().await {
-    handle_update(event);  // <1ms latency
+Firmware targets advertise their hardware identity and current firmware state through Peat's existing `CapabilityAdvertisement`:
+
+```protobuf
+message FirmwareCapability {
+  // Hardware identity
+  string board_id = 1;
+  string board_revision = 2;
+  string cpu_architecture = 3;
+  string bootloader_version = 4;
+
+  // Current firmware state
+  string firmware_id = 5;
+  string firmware_version = 6;
+  string firmware_hash = 7;
+  FirmwareOtaState ota_state = 8;
+
+  // Resources
+  uint64 staging_storage_bytes = 9;
+  uint64 battery_percent = 10;
+  bool external_power = 11;
+
+  // OTA agent capabilities
+  repeated FirmwareFormat supported_formats = 12;
+  bool supports_delta_updates = 13;
+  bool supports_hot_swap = 14;
+  bool supports_a_b_partitions = 15;
 }
 ```
 
-**Impact**: Sub-millisecond propagation latency vs 100ms+ with polling
+This enables the control plane to:
+- **Discover** all firmware targets in the mesh and their hardware types
+- **Assess compatibility** before issuing deployment directives
+- **Track convergence** — which devices have which firmware version
+- **Identify stragglers** — devices stuck in DOWNLOADING, STAGED, or FAILED states
 
----
+### 5. Delta/Differential Firmware Updates
 
-# Appendix D: Testing Philosophy
-
-## Test Pyramid for Distributed Systems
+For bandwidth-constrained tactical networks, full firmware image transfers are expensive. Peat supports differential firmware updates using binary diff algorithms:
 
 ```
-           ┌─────────┐
-           │   E2E   │  10% effort, 100% mission assurance
-           │ (Real   │  - Real Ditto instances
-           │  CRDT)  │  - Observer-based validation
-           └─────────┘  - Isolated test sessions
-          ┌───────────┐
-          │Integration│ 20% effort
-          │   Tests   │ - Component interaction
-          │           │ - Mock CRDT for speed
-          └───────────┘
-       ┌──────────────┐
-       │  Unit Tests  │ 70% effort
-       │  (Business   │ - Fast (<1ms per test)
-       │   Logic)     │ - Deterministic
-       └──────────────┘
+Full PX4 firmware image:     2.1 MB
+Binary diff (v1.14.2→1.14.3): 180 KB  (91% reduction)
 ```
 
-**Critical**: E2E tests with real Ditto instances validate distributed CRDT mesh behavior
-→ Unit tests can't catch distributed race conditions or partition scenarios
-
----
-
-# Appendix E: Performance Benchmarks
-
-## Measured Performance (12-Node ContainerLab)
-
-| Metric | Measured | Target | Status |
-|--------|----------|--------|--------|
-| Node state update | 4.2ms (p99) | <10ms | ✅ |
-| Capability composition | 8.7ms (p99) | <20ms | ✅ |
-| Leader election | 3.8s (avg) | <5s | ✅ |
-| Discovery (12 nodes) | 18s (avg) | <60s | ✅ |
-| CRDT convergence | 0.3s (avg) | <1s | ✅ |
-| Command propagation | 67ms/level (avg) | <100ms | ✅ |
-
-**All performance targets met** in realistic network conditions (100ms latency, 1% packet loss)
-
-*Source: VALIDATION_RESULTS.md, ContainerLab test logs*
-
----
-
-# Appendix F: Comparison to Academic State-of-Art
-
-## Related Work
-
-| Paper/System | Year | Approach | Limitation vs CAP |
-|--------------|------|----------|-------------------|
-| **Raft** (Ongaro, 2014) | 2014 | Consensus | No partition tolerance, requires majority |
-| **CRDTs** (Shapiro, 2011) | 2011 | Eventual consistency | No coordination primitives, no hierarchy |
-| **Swarm robotics** (various) | 2015+ | Consensus/gossip | No human authority, limited scale |
-| **JADC2 architectures** (DoD) | 2020+ | Centralized | Single point of failure |
-
-**CAP Contribution**: First to combine hierarchical CRDT aggregation + human authority + coordination primitives + partition tolerance
-
-**Publications**: Paper in preparation for IEEE Transactions on Robotics (target: Q2 2025)
-
----
-
-# Appendix G: Deployment Scenarios
-
-## Scenario 1: Tactical UAV Squad (12 Nodes)
-- 4 ISR UAVs (quadcopters, 30min endurance)
-- 4 Strike UAVs (fixed-wing, 60min endurance)
-- 2 UGVs (ground surveillance, persistent)
-- 1 Ground Control Station (human operator)
-- 1 C2 Relay (network backbone)
-
-**Network**: Tactical radios (900MHz), 100ms latency, 1% packet loss
-**Authority Level**: MONITORED (human approval for strikes)
-**Validated**: ✅ 100% sync success in ContainerLab hub-spoke topology
-
----
-
-## Scenario 2: IoT Smart Building (Scaled Deployment)
-- Multiple 12-node hierarchical groups
-- HVAC, lighting, security, access control
-- Squad-level coordination within building zones
-
-**Network**: WiFi mesh, 50ms latency, <0.1% packet loss
-**Authority Level**: FULL_AUTO (no human approval needed)
-**Scalability**: ContainerLab validates building block, hierarchical composition enables scale
-
----
-
-## Scenario 3: Warehouse Robot Fleet (Scaled Deployment)
-- Multiple 12-node robot squads
-- Autonomous mobile robots (AMRs)
-- Hierarchical coordination across warehouse zones
-
-**Network**: 5GHz WiFi, 20ms latency, <0.1% packet loss
-**Authority Level**: SUPERVISED (human notified, can intervene)
-**Scalability**: Client-server topology validates basic coordination
-
----
-
-<!-- _class: lead -->
-# Questions?
-
-**Contact Information**
-- Technical Questions: See docs/IP_OVERVIEW.md
-- Business Inquiries: [Contact Information]
-- Repository: github.com/[repository]
-
-**Available Materials**
-- Full codebase and documentation
-- Patent applications and strategy
-- Validation results and test data
-- 24-month development roadmap
-
----
-
-<!-- _class: lead -->
-# Thank You
-
-**PEAT Protocol: Scalable Autonomous Coordination**
-
-*Validated. Production-Ready. Defensible IP.*
-
----
-
-# PEAT ↔ CoT Schema Mapping Specification
-
-**Document Type**: Technical Specification
-**Date**: 2025-11-26
-**Version**: 1.0
-**Source**: peat-m1-poc message definitions
-
-## Overview
-
-This document provides field-by-field mapping between PEAT M1 message types and Cursor-on-Target (CoT) XML schema. These mappings enable bidirectional translation for TAK integration.
-
----
-
-## 1. TrackUpdate → CoT Event (PEAT → TAK)
-
-### PEAT Source Structure
+**Approach:**
 
 ```rust
-pub struct TrackUpdate {
-    pub track_id: String,           // "TRACK-001"
-    pub classification: String,      // "person", "vehicle"
-    pub confidence: f64,            // 0.89
-    pub position: Position,
-    pub velocity: Option<Velocity>,
-    pub attributes: HashMap<String, Value>,
-    pub source_platform: String,    // "Alpha-2"
-    pub source_model: String,       // "Alpha-3"
-    pub model_version: String,      // "1.3.0"
-    pub timestamp: DateTime<Utc>,
-}
-
-pub struct Position {
-    pub lat: f64,
-    pub lon: f64,
-    pub cep_m: Option<f64>,
-    pub hae: Option<f64>,
-}
-
-pub struct Velocity {
-    pub bearing: f64,       // degrees, 0 = North
-    pub speed_mps: f64,     // meters per second
+/// Generate delta patch between firmware versions
+///
+/// Uses bsdiff/bspatch algorithm for binary deltas.
+/// The patch is stored as a regular blob in BlobStore
+/// with FirmwareFormat::DELTA_PATCH.
+pub struct FirmwareDelta {
+    pub base_version: String,
+    pub base_hash: String,
+    pub target_version: String,
+    pub target_hash: String,
+    pub patch_blob_hash: String,
+    pub patch_size_bytes: u64,
+    pub full_image_size_bytes: u64,
 }
 ```
 
-### CoT Target Structure
+The firmware manifest declares whether a delta is available:
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<event version="2.0"
-       uid="{track_id}"
-       type="{cot_type}"
-       time="{timestamp}"
-       start="{timestamp}"
-       stale="{timestamp + stale_duration}"
-       how="m-g">
-
-  <point lat="{position.lat}"
-         lon="{position.lon}"
-         hae="{position.hae | 0.0}"
-         ce="{position.cep_m | 9999999.0}"
-         le="9999999.0"/>
-
-  <detail>
-    <track course="{velocity.bearing}"
-           speed="{velocity.speed_mps}"/>
-
-    <remarks>{classification}: {formatted_attributes} ({confidence}% confidence)</remarks>
-
-    <_peat_ version="1.0">
-      <source platform="{source_platform}"
-              model="{source_model}"
-              model_version="{model_version}"/>
-      <confidence value="{confidence}"/>
-      <attributes>
-        {for (key, value) in attributes}
-        <attr key="{key}">{value}</attr>
-        {end}
-      </attributes>
-    </_peat_>
-
-    <link uid="{source_platform}" type="a-f-G-U-C" relation="o-o"/>
-  </detail>
-</event>
-```
-
-### Field Mapping Table
-
-| PEAT Field | CoT Field | Transformation | Notes |
-|------------|-----------|----------------|-------|
-| `track_id` | `event@uid` | Direct | Unique track identifier |
-| `classification` | `event@type` | Lookup table | See classification mapping |
-| `timestamp` | `event@time` | RFC 3339 format | ISO 8601 timestamp |
-| `timestamp` | `event@start` | Same as time | Event validity start |
-| `timestamp` | `event@stale` | time + 30s | Configurable stale duration |
-| - | `event@how` | Constant `m-g` | Machine-generated |
-| `position.lat` | `point@lat` | Direct | WGS84 latitude |
-| `position.lon` | `point@lon` | Direct | WGS84 longitude |
-| `position.hae` | `point@hae` | Default 0.0 | Height above ellipsoid (m) |
-| `position.cep_m` | `point@ce` | Default 9999999.0 | Circular error (m) |
-| - | `point@le` | Constant 9999999.0 | Linear error (unknown) |
-| `velocity.bearing` | `track@course` | Direct | Degrees from north |
-| `velocity.speed_mps` | `track@speed` | Direct | Meters per second |
-| `classification` + `attributes` + `confidence` | `remarks` | Formatted string | Human-readable summary |
-| `source_platform` | `_peat_/source@platform` | Direct | PEAT extension |
-| `source_model` | `_peat_/source@model` | Direct | PEAT extension |
-| `model_version` | `_peat_/source@model_version` | Direct | PEAT extension |
-| `confidence` | `_peat_/confidence@value` | Direct | PEAT extension |
-| `attributes` | `_peat_/attributes/attr` | Key-value pairs | PEAT extension |
-| `source_platform` | `link@uid` | Direct | Links to sensor platform |
-
-### Classification → CoT Type Mapping
-
-| Classification | CoT Type | Description |
-|---------------|----------|-------------|
-| `person` | `a-f-G-E-S` | Friendly Ground Equipment - Sensor (tracked entity) |
-| `vehicle` | `a-f-G-E-V` | Friendly Ground Equipment - Vehicle |
-| `aircraft` | `a-f-A` | Friendly Air |
-| `vessel` | `a-f-S` | Friendly Surface (maritime) |
-| `unknown` | `a-u-G` | Unknown Ground |
-| `hostile_person` | `a-h-G-U-C-I` | Hostile Ground - Infantry |
-| `hostile_vehicle` | `a-h-G-E-V` | Hostile Ground Equipment - Vehicle |
-
-### Example Conversion
-
-**PEAT TrackUpdate**:
 ```json
 {
-  "track_id": "TRACK-001",
-  "classification": "person",
-  "confidence": 0.89,
-  "position": {
-    "lat": 33.7749,
-    "lon": -84.3958,
-    "cep_m": 2.5,
-    "hae": 0.0
+  "firmware_id": "px4-autopilot",
+  "version": "1.14.3",
+  "full_image": {
+    "blob_hash": "sha256:abc123...",
+    "size_bytes": 2202009
   },
-  "velocity": {
-    "bearing": 45.0,
-    "speed_mps": 1.2
-  },
-  "attributes": {
-    "jacket_color": "blue",
-    "has_backpack": true
-  },
-  "source_platform": "Alpha-2",
-  "source_model": "Alpha-3",
-  "model_version": "1.3.0",
-  "timestamp": "2025-11-26T14:10:00Z"
+  "deltas": [
+    {
+      "base_version": "1.14.2",
+      "base_hash": "sha256:def456...",
+      "patch_blob_hash": "sha256:789abc...",
+      "patch_size_bytes": 184320
+    },
+    {
+      "base_version": "1.14.1",
+      "base_hash": "sha256:ghi789...",
+      "patch_blob_hash": "sha256:jkl012...",
+      "patch_size_bytes": 312400
+    }
+  ]
 }
 ```
 
-**CoT Event**:
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<event version="2.0"
-       uid="TRACK-001"
-       type="a-f-G-E-S"
-       time="2025-11-26T14:10:00Z"
-       start="2025-11-26T14:10:00Z"
-       stale="2025-11-26T14:10:30Z"
-       how="m-g">
+The OTA agent checks its current version, selects the appropriate delta if available, and falls back to full image if no delta exists for its current version.
 
-  <point lat="33.7749"
-         lon="-84.3958"
-         hae="0.0"
-         ce="2.5"
-         le="9999999.0"/>
+### 6. Multi-Artifact Coordinated Updates
 
-  <detail>
-    <track course="45.0" speed="1.2"/>
+For platforms that carry multiple firmware images and models, Peat supports coordinated deployment:
 
-    <remarks>person: blue jacket, has backpack (89% confidence)</remarks>
+```protobuf
+message PlatformUpdateBundle {
+  string bundle_id = 1;
+  string platform_type = 2;          // e.g., "recon-drone-mk3"
+  string bundle_version = 3;         // e.g., "2026-Q1-release"
 
-    <_peat_ version="1.0">
-      <source platform="Alpha-2"
-              model="Alpha-3"
-              model_version="1.3.0"/>
-      <confidence value="0.89"/>
-      <attributes>
-        <attr key="jacket_color">blue</attr>
-        <attr key="has_backpack">true</attr>
-      </attributes>
-    </_peat_>
+  // All artifacts to deploy as a unit
+  repeated BundleArtifact artifacts = 4;
 
-    <link uid="Alpha-2" type="a-f-G-U-C" relation="o-o"/>
-  </detail>
-</event>
+  // Ordering constraints
+  repeated DeploymentStep steps = 5;
+
+  // Bundle-level verification
+  BundleVerification verification = 6;
+}
+
+message BundleArtifact {
+  string artifact_id = 1;
+  oneof artifact {
+    FirmwareManifest firmware = 2;
+    ModelManifest model = 3;
+    ZarfPackageAvailable container = 4;
+    ConfigPackage config = 5;
+  }
+}
+
+message DeploymentStep {
+  uint32 order = 1;                  // Execution order
+  repeated string artifact_ids = 2;  // Artifacts in this step (parallel)
+  string precondition = 3;           // Must be true before step executes
+  string postcondition = 4;          // Must be true after step completes
+}
+
+message BundleVerification {
+  // System-level health check after all artifacts deployed
+  string health_check_command = 1;
+  uint32 verification_timeout_sec = 2;
+  RollbackScope rollback_on_failure = 3;
+}
+
+enum RollbackScope {
+  ROLLBACK_ALL = 0;      // Revert entire bundle
+  ROLLBACK_FAILED = 1;   // Revert only the failed artifact
+  NO_ROLLBACK = 2;       // Leave as-is, alert operator
+}
+```
+
+**Example: Drone platform update bundle:**
+
+```json
+{
+  "bundle_id": "recon-drone-mk3-2026q1",
+  "platform_type": "recon-drone-mk3",
+  "bundle_version": "2026-Q1",
+  "artifacts": [
+    {
+      "artifact_id": "autopilot-fw",
+      "firmware": {
+        "firmware_id": "px4-autopilot",
+        "version": "1.14.3"
+      }
+    },
+    {
+      "artifact_id": "perception-model",
+      "model": {
+        "model_id": "target_recognition_yolov8",
+        "version": "4.2.1"
+      }
+    },
+    {
+      "artifact_id": "radio-fw",
+      "firmware": {
+        "firmware_id": "sdr-baseband",
+        "version": "3.7.0"
+      }
+    },
+    {
+      "artifact_id": "mission-config",
+      "config": {
+        "config_id": "roe-2026q1",
+        "version": "1.0.0"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "order": 1,
+      "artifact_ids": ["radio-fw"],
+      "postcondition": "radio_link_active"
+    },
+    {
+      "order": 2,
+      "artifact_ids": ["autopilot-fw", "perception-model"],
+      "precondition": "radio_link_active",
+      "postcondition": "autopilot_healthy AND model_loaded"
+    },
+    {
+      "order": 3,
+      "artifact_ids": ["mission-config"],
+      "precondition": "autopilot_healthy",
+      "postcondition": "mission_config_applied"
+    }
+  ],
+  "verification": {
+    "health_check_command": "full_system_bist",
+    "verification_timeout_sec": 120,
+    "rollback_on_failure": "ROLLBACK_ALL"
+  }
+}
+```
+
+### 7. Fleet Firmware Management
+
+Firmware state for all devices aggregates through Peat's hierarchy:
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                    Battalion (Fleet View)                              │
+│                                                                       │
+│  Firmware: px4-autopilot                                             │
+│  ┌────────────────────────────────────────────────────────────┐      │
+│  │ v1.14.3 ████████████████████████████████░░░░░  85% (170)  │      │
+│  │ v1.14.2 ██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  12% (24)   │      │
+│  │ v1.14.1 █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   3% (6)    │      │
+│  └────────────────────────────────────────────────────────────┘      │
+│                                                                       │
+│  Convergence to v1.14.3:                                             │
+│  ├─ Company Alpha: 95% (38/40 drones)                                │
+│  │   ├─ Platoon 1: 100% (10/10) ✓                                   │
+│  │   ├─ Platoon 2: 90% (9/10) — 1 downloading                       │
+│  │   ├─ Platoon 3: 100% (10/10) ✓                                   │
+│  │   └─ Platoon 4: 90% (9/10) — 1 failed (battery constraint)       │
+│  ├─ Company Bravo: 82% (41/50 drones)                                │
+│  │   └─ ...                                                          │
+│  └─ Stragglers:                                                      │
+│      ├─ drone-047: FAILED — battery below 80%                        │
+│      ├─ drone-112: DOWNLOADING — 67% complete (low bandwidth link)   │
+│      └─ drone-189: STAGED — awaiting maintenance window              │
+│                                                                       │
+│  Blockers: 2 safety constraint failures, 1 connectivity issue        │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+This is implemented using the same convergence tracking pattern from ADR-013:
+
+```rust
+/// Fleet firmware status — aggregated through Peat hierarchy
+pub struct FleetFirmwareStatus {
+    pub firmware_id: String,
+    pub target_version: String,
+    pub total_targets: usize,
+
+    /// Version distribution across fleet
+    pub version_distribution: HashMap<String, usize>,
+
+    /// Convergence state
+    pub converged: usize,
+    pub downloading: usize,
+    pub staged: usize,
+    pub activating: usize,
+    pub failed: usize,
+
+    /// Blockers preventing convergence
+    pub blockers: Vec<ConvergenceBlocker>,
+
+    /// Per-formation breakdown
+    pub formation_status: HashMap<String, FormationFirmwareStatus>,
+}
+```
+
+### 8. Transport Considerations for Firmware Targets
+
+Firmware targets may connect to the Peat mesh via different transports:
+
+| Transport | Bandwidth | Use Case | Blob Transfer |
+|-----------|-----------|----------|---------------|
+| QUIC (via companion CPU) | High | Drone companion computer, vehicle gateway | Full-speed blob transfer |
+| BLE (direct) | Low (≈100KB/s) | Close-range maintenance, sensor payloads | Small firmware only |
+| UDP/Peat-Lite | Medium | WiFi-connected embedded Linux | Chunked blob transfer |
+| Serial bridge | Low | MCUs behind a gateway | Gateway proxies blob download |
+
+For devices that can't directly participate in Peat mesh (bare-metal MCUs with no network stack), a **companion/gateway pattern** is used:
+
+```
+┌─────────────┐     Serial/SPI     ┌──────────────┐     QUIC     ┌──────────┐
+│  MCU with   │◄──────────────────▶│  Companion   │◄────────────▶│  Peat    │
+│  firmware   │   flash commands   │  processor   │  mesh peer   │  Mesh    │
+│  (target)   │                    │  (OTA agent) │              │          │
+└─────────────┘                    └──────────────┘              └──────────┘
+```
+
+The OTA agent runs on the companion processor and manages the MCU's firmware via standard flashing interfaces (SWD, JTAG, UART bootloader, etc.).
+
+### 9. Safety and Security
+
+Firmware updates are safety-critical. Additional safeguards beyond standard Peat security (ADR-006):
+
+**Pre-flight checks before activation:**
+- Battery level above threshold (prevents bricking during flash)
+- Platform in safe state (not in flight, not in motion, not actively engaged)
+- Stable power source confirmed
+- Sufficient staging storage available
+- Hardware compatibility verified against manifest
+- All dependency versions satisfied
+
+**Cryptographic verification chain:**
+- Firmware image signed by build system
+- Signature countersigned by deployment authority
+- OTA agent verifies both signatures before staging
+- Bootloader verifies image signature before booting (hardware root of trust)
+
+**Rollback guarantee:**
+- A/B partition scheme ensures one known-good slot at all times
+- Boot verification timer — if health checks don't pass within timeout, automatic rollback
+- Golden image — if both A and B slots fail, fall back to factory firmware in protected storage
+- All state transitions logged as Peat events for audit trail
+
+## Implementation: Peat-Lite ESP32 OTA (Phase 0)
+
+The first concrete implementation of firmware OTA in the Peat ecosystem targets Peat-Lite on ESP32 (M5Stack Core2). This validates the core protocol and A/B partition update lifecycle end-to-end over the existing UDP gossip transport.
+
+### Wire Protocol
+
+OTA messages extend the existing Peat-Lite packet format (ADR-035). All messages share the standard 16-byte header:
+
+```
+┌──────────┬─────────┬──────────┬──────────┬──────────┬──────────────┐
+│  MAGIC   │ Version │   Type   │  Flags   │  NodeID  │   SeqNum     │
+│ "Peat"   │  0x01   │  0x10-16 │  2 bytes │  4 bytes │   4 bytes    │
+└──────────┴─────────┴──────────┴──────────┴──────────┴──────────────┘
+```
+
+Seven OTA message types are defined in `peat-lite-protocol`:
+
+| Type | Code | Direction | Payload |
+|------|------|-----------|---------|
+| `OtaOffer` | `0x10` | Full → Lite | version[16] + size[4] + chunks[2] + chunk_size[2] + sha256[32] + session_id[2] + flags[2] + signature[64]? |
+| `OtaAccept` | `0x11` | Lite → Full | session_id[2] + resume_chunk[2] |
+| `OtaData` | `0x12` | Full → Lite | session_id[2] + chunk_num[2] + chunk_len[2] + data[≤448] |
+| `OtaAck` | `0x13` | Lite → Full | session_id[2] + acked_chunk[2] |
+| `OtaComplete` | `0x14` | Full → Lite | session_id[2] |
+| `OtaResult` | `0x15` | Lite → Full | session_id[2] + result_code[1] + reserved[1] |
+| `OtaAbort` | `0x16` | Either | session_id[2] + reason[1] + reserved[1] |
+
+The offer supports two formats: legacy unsigned (76 bytes) and v2 signed (140 bytes, with Ed25519 signature over the SHA256 digest). The `OTA_FLAG_SIGNED` (0x0001) flag distinguishes them.
+
+Result codes: `SUCCESS` (0x00), `HASH_MISMATCH` (0x01), `FLASH_ERROR` (0x02), `INVALID_OFFER` (0x03), `SIGNATURE_INVALID` (0x04), `SIGNATURE_REQUIRED` (0x05).
+
+Abort reasons: `TIMEOUT` (0x01), `SESSION_MISMATCH` (0x02), `USER_CANCEL` (0x03), `TOO_MANY_RETRIES` (0x04).
+
+### Transfer Protocol
+
+Stop-and-wait: the sender transmits one chunk at a time and waits for an `OtaAck` before sending the next. This keeps the receiver simple (no reordering buffer, no window management) and naturally adapts to the link speed.
+
+```
+Sender (Full node)                    Receiver (Lite node)
+    │                                       │
+    │──── OtaOffer ────────────────────────▶│ Parse offer, verify signature,
+    │                                       │ erase target partition
+    │◀──── OtaAccept ──────────────────────│
+    │                                       │
+    │──── OtaData (chunk 0) ──────────────▶│ Write to flash, update SHA256
+    │◀──── OtaAck (chunk 0) ──────────────│
+    │                                       │
+    │──── OtaData (chunk 1) ──────────────▶│
+    │◀──── OtaAck (chunk 1) ──────────────│
+    │          ...                          │
+    │──── OtaData (chunk N-1) ────────────▶│
+    │◀──── OtaAck (chunk N-1) ────────────│
+    │                                       │
+    │──── OtaComplete ────────────────────▶│ Verify SHA256, write validation
+    │                                       │ record, update otadata
+    │◀──── OtaResult (SUCCESS) ───────────│
+    │                                       │ Reboot into new firmware
+```
+
+### Partition Layout
+
+The ESP32 flash uses an A/B OTA partition scheme (`partitions_ota.csv`):
+
+| Name | Type | Offset | Size |
+|------|------|--------|------|
+| `nvs` | NVS | 0x9000 | 20 KB |
+| `otadata` | OTA data | 0xE000 | 8 KB |
+| `ota_0` | App (OTA 0) | 0x10000 | 3 MB |
+| `ota_1` | App (OTA 1) | 0x310000 | 3 MB |
+
+The receiver reads `otadata` to determine which partition is currently active and writes the new firmware to the other. After SHA256 verification, it updates `otadata` with a new sequence number pointing to the newly written partition.
+
+### Boot Validation and Rollback
+
+A validation record at `VALIDATION_OFFSET` (0x9000, first NVS sector) tracks pending OTA updates:
+
+```
+┌──────────┬───────┬─────────┬──────┬──────────┬──────────┬──────────┬──────────┬─────┬─────┐
+│  Magic   │ State │ Attempts│ Max  │ Prev Part│ Prev Seq │ New Part │ New Seq  │ CRC │ Pad │
+│ "OTVA"   │  1B   │   1B    │  1B  │   4B     │   4B     │   4B     │   4B     │ 4B  │ 4B  │
+└──────────┴───────┴─────────┴──────┴──────────┴──────────┴──────────┴──────────┴─────┴─────┘
+```
+
+**Critical ordering:** The validation record is written BEFORE `otadata` is updated. This ensures that if power is lost after writing `otadata` but before the new firmware validates, the next boot can detect the pending update and roll back.
+
+Lifecycle:
+1. **OTA complete** → Write validation record (`state=PENDING`, `boot_attempts=0`, `max_attempts=3`)
+2. **OTA complete** → Update `otadata` to boot new partition
+3. **Reboot** → `boot_validation_check()` runs early in startup, increments `boot_attempts`
+4. **Successful network activity** → `ota_mark_validated()` clears the record (`state=IDLE`)
+5. **If boot_attempts > max_attempts** → `rollback_to_previous()` rewrites `otadata` and reboots
+
+### Ed25519 Signature Verification
+
+The build system supports compile-time embedding of an Ed25519 public key:
+
+```bash
+# Build with signature verification enabled
+OTA_SIGNING_PUBKEY="<64 hex chars>" cargo +esp build ...
+```
+
+`build.rs` generates a `const OTA_SIGNING_PUBKEY: Option<[u8; 32]>` that is `include!`'d into `ota.rs`. When present, the receiver requires a valid Ed25519 signature over the firmware's SHA256 digest in the offer. When absent (dev builds), signature verification is skipped.
+
+### Receiver Implementation
+
+The OTA receiver (`peat-lite/src/ota.rs`) is a state machine:
+
+```
+Idle → WaitingForData → Receiving → Verifying → ReadyToReboot
+                ↓            ↓           ↓
+              Failed       Failed      Failed
+```
+
+Key design choices:
+- **Streaming SHA256**: hash is updated incrementally as each chunk arrives (no need to re-read from flash)
+- **No heap allocation for firmware data**: chunks are written directly to flash from the UDP receive buffer
+- **Duplicate chunk tolerance**: re-ACKs already-received chunks without error (handles retransmissions)
+- **Session ID prevents cross-talk**: each OTA session has a unique ID; stale packets from a previous session are rejected
+
+### Test Sender
+
+`scripts/ota-sender.py` is a Python test tool that implements the sender side:
+
+```bash
+# Auto-discover device and push firmware
+python3 scripts/ota-sender.py ota_firmware.bin
+
+# Target a specific device
+python3 scripts/ota-sender.py ota_firmware.bin --target 192.168.1.116 --version "0.1.0"
+```
+
+Features:
+- Device discovery via heartbeat listening
+- Stop-and-wait with configurable retries and timeout
+- Progress bar with transfer rate and ETA
+- Handles all OTA response types (Accept, Ack, Result, Abort)
+
+### Verified Test Results
+
+Tested 2026-02-22 on M5Stack Core2 (ESP32, rev v3.1) over WiFi:
+
+```
+Firmware:   580,960 bytes (peat-lite-wifi with m5stack-core2-wifi,ota features)
+Chunks:     1,297 × 448 bytes
+Transfer:   46.5 seconds at 12.2 KB/s
+SHA256:     Verified on-device (streaming hash)
+Signature:  Disabled (dev build, no OTA_SIGNING_PUBKEY)
+Partition:  ota_0 → ota_1 (A/B switch)
+Rollback:   Validation record written, boot attempt 1/3, then validated
+Result:     SUCCESS — device rebooted into new firmware and rejoined mesh
+```
+
+Device-side log (abridged):
+```
+[OTA] Offer received from 4F544153
+[OTA] Erasing 0x00310000..0x0039E000
+[OTA] Accepted offer: session=35065, size=580960, chunks=1297, signed=false
+[OTA] Progress: 5% (65/1297) ... 100% (1297/1297)
+[OTA] otadata updated: seq=4294967295, partition=ota_1
+[OTA] Update verified and committed! Ready to reboot.
+[OTA] SUCCESS! Rebooting in 2 seconds...
+[OTA] Boot validation: attempt 1/3
+Got IP: 192.168.1.116
+[OTA] Firmware validated! Clearing pending record.
+```
+
+### Crate Structure
+
+| Crate | OTA Contribution |
+|-------|-----------------|
+| `peat-lite-protocol` | Wire constants (`OTA_CHUNK_DATA_SIZE`, result/abort codes, `OTA_FLAG_SIGNED`) and `MessageType` variants (0x10-0x16) |
+| `peat-lite` | `ota` module (receiver state machine, flash operations, validation record, signature verification); `build.rs` (pubkey codegen); `wifi_main.rs` (OTA message dispatch) |
+| `scripts/ota-sender.py` | Test sender tool (Python, no Rust deps) |
+
+### Build Commands
+
+```bash
+# Check compiles (fast feedback)
+make check-ota SSID=MyNet WIFI_PWD=secret
+
+# Build release firmware with OTA
+make build SSID=MyNet WIFI_PWD=secret
+
+# Flash with OTA partition table and monitor
+make flash SSID=MyNet WIFI_PWD=secret PORT=/dev/ttyACM1
+
+# Generate OTA app image for over-the-air delivery
+make build-image SSID=MyNet WIFI_PWD=secret
+
+# Send OTA update to a running device
+python3 scripts/ota-sender.py peat-lite/ota_firmware.bin --target <device-ip>
+```
+
+## Implementation Phases
+
+### Phase 1: Foundation (Months 1-2)
+
+- Define `FirmwareManifest` and `FirmwareCapability` protobuf schemas in peat-schema
+- Add `FirmwareFormat` as artifact type to existing `DeploymentDirective`
+- Implement hardware compatibility matching logic
+- Add firmware status tracking to convergence monitoring
+
+**Success criteria:**
+- Can publish firmware manifest to Peat mesh
+- Devices advertise hardware capabilities
+- Compatibility matching prevents wrong firmware from being deployed
+
+### Phase 2: OTA Agent Reference Implementation (Months 2-4)
+
+- Implement `FirmwareOtaAgent` for embedded Linux (A/B partition)
+- Implement `PartitionManager` for common schemes (RAUC-style, swupdate-style)
+- Full OTA lifecycle: download → stage → activate → verify → commit/rollback
+- Safety constraint checking
+
+**Success criteria:**
+- Can update firmware on Raspberry Pi via Peat mesh
+- Automatic rollback on boot verification failure
+- Safety constraints enforced
+
+### Phase 3: Delta Updates and Fleet Management (Months 4-6)
+
+- Binary diff generation (bsdiff) and application (bspatch)
+- Fleet firmware dashboard aggregation through hierarchy
+- Multi-artifact bundle coordination (`PlatformUpdateBundle`)
+
+**Success criteria:**
+- Delta updates reduce bandwidth by >80% for incremental versions
+- Fleet-wide firmware version visibility at each echelon
+- Coordinated multi-artifact updates on drone platform
+
+### Phase 4: Extended Platform Support (Months 6-9)
+
+- STM32 bootloader integration (via companion processor pattern)
+- FPGA bitstream update support
+- BLE-based firmware delivery for close-range maintenance
+- Integration with existing OTA tools (SWUpdate, RAUC) as backends
+
+**Success criteria:**
+- Can update STM32-based autopilot firmware via Peat mesh
+- BLE-based firmware update for sensor payloads
+- SWUpdate/RAUC used as partition manager backend
+
+## Consequences
+
+### Positive
+
+**Unified Delivery Platform:**
+- Single coordination layer for firmware, models, containers, and config
+- Operators get one view of "is this platform fully updated?"
+- Same security/provenance model across all artifact types
+- Same convergence tracking regardless of artifact type
+
+**DIL-Native:**
+- Mesh distribution works over intermittent tactical links
+- Hierarchical caching reduces load on upstream links
+- Store-and-forward ensures updates reach all nodes eventually
+- Peer-assisted distribution when direct parent is unavailable
+
+**Extends UDS to Every Target:**
+- Zarf handles K8s workloads
+- Firmware OTA handles embedded platforms
+- AI model delivery handles GPU/NPU nodes
+- Peat-Lite handles sensor mesh
+- All coordinated through a single protocol
+
+**Safety:**
+- Hardware compatibility verification prevents wrong firmware deployment
+- Automatic rollback on boot verification failure
+- Safety constraint enforcement (battery, power, operational state)
+- Full audit trail of all firmware operations
+
+### Negative
+
+**Complexity:**
+- Another adapter type to maintain alongside Zarf, model delivery, Peat-Lite
+- Platform-specific PartitionManager implementations needed for each hardware target
+- Safety-critical code requires higher testing standards
+- Multi-artifact coordination adds state machine complexity
+
+**Hardware Diversity:**
+- Each board type needs hardware compatibility entries
+- Bootloader variations require testing across platforms
+- Flash memory characteristics vary (write cycles, erase block sizes)
+- Companion processor pattern adds deployment complexity
+
+### Mitigations
+
+**Complexity:**
+- Start with embedded Linux (Raspberry Pi) as reference platform
+- Use existing tools (RAUC, SWUpdate) as PartitionManager backends
+- Shared convergence tracking and fleet management across all artifact types
+- PlatformUpdateBundle is optional — single-artifact updates work standalone
+
+**Hardware Diversity:**
+- Maintain compatibility database as Peat collection (auto-synced)
+- Community-contributed PartitionManager implementations
+- Companion processor pattern abstracts MCU differences behind serial/SPI interface
+
+## Integration Points
+
+### With ADR-013 (Distributed Software Ops)
+- Extends capability-focused convergence to firmware state
+- Same differential propagation principles (content-addressed, chunked)
+- Same hierarchical distribution and peer-assisted spread
+- Firmware state feeds into operational capability assessment
+
+### With ADR-022 (Edge MLOps)
+- Shared `PlatformUpdateBundle` for coordinated firmware + model updates
+- Same convergence tracking dashboard
+- Model delivery depends on firmware compatibility (e.g., GPU driver version)
+
+### With ADR-025 (Blob Transfer)
+- Firmware images stored and transferred via `BlobStore`
+- Content-addressed deduplication across firmware versions
+- Resumable transfers over unreliable links
+- Progress tracking for large firmware images
+
+### With ADR-035 (Peat-Lite)
+- Peat-Lite nodes can receive firmware updates via gossip/BLE
+- ESP32 OTA is a special case of firmware update
+- Peat-Lite capability flags indicate OTA support
+
+### With ADR-045 (Zarf/UDS Integration)
+- Firmware OTA extends UDS delivery to non-K8s targets
+- Same metadata backplane (Peat) coordinates both Zarf and firmware deployments
+- Fleet view spans both K8s workloads and firmware targets
+
+### With ADR-006 (Security)
+- Firmware signature verification uses Peat PKI
+- Deployment authorization through Peat RBAC
+- Hardware root of trust for bootloader verification
+- Audit trail for all firmware operations
+
+## References
+
+- ADR-013: Distributed Software and AI Operations
+- ADR-022: Edge MLOps Architecture
+- ADR-025: Blob Transfer Abstraction Layer
+- ADR-026: Reference Implementation - Software Orchestration
+- ADR-035: Peat-Lite Embedded Sensor Nodes
+- ADR-045: Zarf/UDS Integration
+- [SWUpdate](https://sbabic.github.io/swupdate/) — Software Update for Embedded Linux
+- [RAUC](https://rauc.io/) — Safe and Secure OTA Updates for Embedded Linux
+- [Mender](https://mender.io/) — OTA Software Updates for IoT
+- [The Update Framework (TUF)](https://theupdateframework.io/) — Securing Software Updates
+- [bsdiff/bspatch](https://www.daemonology.net/bsdiff/) — Binary Diff/Patch
+- DO-178C — Software Considerations in Airborne Systems and Equipment Certification
+- IEC 61508 — Functional Safety of Electrical/Electronic/Programmable Electronic Safety-related Systems
+
+---
+
+**This ADR extends Peat's distribution capabilities to firmware targets, enabling unified software delivery across the full spectrum from cloud/K8s through embedded platforms, all coordinated through a single mesh protocol.**
+
+
+# ADR-048: Membership Certificates and Tactical Trust
+
+**Status**: Proposed
+**Date**: 2025-01-29
+**Authors**: Claude, Kit Plummer
+**Related**: ADR-006 (Security Architecture), ADR-044 (E2E Encryption), ADR-039 (peat-btle Mesh Transport)
+
+## Context
+
+ADR-006 describes a full PKI model with X509 certificates and external CA hierarchies. While appropriate for enterprise deployments, tactical field operations require a simpler, self-contained trust model that:
+
+- Works offline (no external CA connectivity)
+- Bootstraps quickly (QR code, NFC tap)
+- Has mesh-local authority (squad leader's device)
+- Includes callsign binding directly
+- Supports time-limited credentials with re-authentication
+
+### Current Problem
+
+Mesh encryption (ChaCha20-Poly1305 via peat-btle) proves a sender has the mesh key, but does NOT authenticate *which* mesh member sent a message. This enables spoofing:
+
+1. Attacker joins mesh (has mesh key)
+2. Attacker sends CannedMessage with `sourceNodeId` = victim's nodeId
+3. Receiver displays "CHECK IN from DINO" but DINO never sent it
+
+Additionally:
+- Callsigns are self-declared (no authority binding)
+- No enrollment process for new devices
+- No certificate expiration or re-authentication
+- No trust hierarchy (all mesh members are equal)
+
+## Decision
+
+### Tactical Trust Model
+
+Implement a lightweight, mesh-local trust hierarchy:
+
+```
+MeshGenesis (root of trust)
+    │
+    ├── mesh_seed (256-bit, derives encryption key)
+    ├── mesh_id (8 hex chars)
+    ├── auth_interval_hours (e.g., 24)
+    ├── grace_period_hours (e.g., 4)
+    │
+    └── creator_public_key (authority)
+            │
+            └── signs ──► MembershipCertificate
+                              ├── member_public_key
+                              ├── member_node_id (derived)
+                              ├── callsign (authority-assigned)
+                              ├── mesh_id
+                              ├── issued_at_ms
+                              ├── expires_at_ms
+                              ├── permissions
+                              └── issuer_signature
+```
+
+### MembershipCertificate Structure
+
+```rust
+pub struct MembershipCertificate {
+    /// Device's Ed25519 public key
+    pub member_public_key: [u8; 32],
+
+    /// Authority-assigned callsign (max 16 UTF-8 bytes)
+    pub callsign: String,
+
+    /// Mesh identifier (8 hex chars)
+    pub mesh_id: String,
+
+    /// Timestamp when issued (ms since Unix epoch)
+    pub issued_at_ms: u64,
+
+    /// Expiration timestamp (issued_at + mesh.auth_interval)
+    pub expires_at_ms: u64,
+
+    /// Permission flags
+    pub permissions: MemberPermissions,
+
+    /// Issuer's public key (for delegation chains)
+    pub issuer_public_key: [u8; 32],
+
+    /// Ed25519 signature over all above fields
+    pub issuer_signature: [u8; 64],
+}
+
+bitflags! {
+    pub struct MemberPermissions: u8 {
+        const RELAY      = 0b0000_0001;  // Can relay messages
+        const EMERGENCY  = 0b0000_0010;  // Can trigger emergencies
+        const ENROLL     = 0b0000_0100;  // Can enroll new members (delegation)
+        const ADMIN      = 0b1000_0000;  // Full authority
+    }
+}
+```
+
+Wire format: ~145 bytes (32 + 1 + callsign + 8 + 8 + 8 + 1 + 32 + 64)
+
+### Mesh-Level Auth Policy
+
+Extend MeshGenesis with authentication policy:
+
+```rust
+pub struct MeshGenesis {
+    // ... existing fields ...
+
+    /// Re-authentication interval (0 = no expiry)
+    pub auth_interval_hours: u16,
+
+    /// Grace period after expiration before hard cutoff
+    pub grace_period_hours: u16,
+}
+```
+
+**Recommended defaults**: 24-hour auth interval, 4-hour grace period.
+
+### Callsign Assignment
+
+Authority has two options:
+1. **Manual entry** - Type callsign directly
+2. **Randomize** - Generate NATO phonetic + 2-digit (e.g., ALPHA-01, ZULU-47)
+
+NATO + 2-digit provides 2,600 unique callsigns with familiar, radio-clear format.
+
+### Graceful Degradation
+
+**During grace period** (cert expired but within grace):
+- Device shows prominent "AUTH EXPIRED" warning
+- Device continues to operate (send/receive)
+- Other devices see this device flagged as "stale cert"
+- Authority can still re-issue certificate
+
+**After grace period**:
+- Hard cutoff - device cannot participate in mesh
+- Must re-enroll from scratch (or authority manually extends)
+
+### Message Authentication
+
+All messages include Ed25519 signature from sender:
+
+```
+[marker:1][payload:N][signature:64]
+```
+
+Receive flow:
+1. Decrypt with mesh key (proves mesh membership)
+2. Lookup `source_node_id` in certificate cache
+3. If unknown → reject message
+4. Verify signature using cached public key
+5. Display with verified callsign from certificate
+
+### Enrollment Flows
+
+#### ATAK Tablet (Authority)
+
+Creates mesh and issues certificates:
+
+```
+1. Create Mesh
+   - Enter mesh name
+   - Set auth_interval (default: 24h)
+   - Set grace_period (default: 4h)
+   - Genesis created, tablet becomes authority
+
+2. Enroll Device ("Add Device")
+   - Display QR: [mesh_id + enrollment_token]
+   - Wait for BLE connection from new device
+   - Receive device's IdentityAttestation
+   - Assign callsign (manual entry or randomize)
+   - Sign and send MembershipCertificate + MeshCredentials
+```
+
+#### WearTAK Watch (Enrolled Device)
+
+```
+1. Scan QR from authority (camera)
+2. Connect to authority via BLE
+3. Send IdentityAttestation + enrollment_token
+4. Receive MeshCredentials + MembershipCertificate
+5. Store credentials and begin operation
+```
+
+#### NPE/ESP32 (Pre-provisioned)
+
+```
+Option A: NFC tap from authority tablet
+Option B: USB/serial provisioning during staging
+Option C: Pre-loaded certificates (enterprise deployment)
+```
+
+### Re-Authentication Flow
+
+```
+Timeline:
+├── T-0: Certificate issued
+├── T-23h: Warning "Re-auth in 1 hour"
+├── T-24h: Expiration (grace period starts)
+├── T-28h: Hard cutoff (if grace = 4h)
+└── Re-auth succeeds: New cert issued, timer resets
+
+Protocol:
+1. Device connects to authority
+2. Sends current certificate + fresh IdentityAttestation
+3. Authority verifies device is still authorized
+4. Authority issues new certificate (same callsign, new expiration)
+5. Device stores new certificate
+```
+
+### Certificate Exchange During Discovery
+
+When two mesh nodes discover each other via BLE:
+
+1. Exchange IdentityAttestations (108 bytes each) - existing protocol
+2. Exchange MembershipCertificates (~145 bytes each) - new
+3. Each node verifies other's certificate against `genesis.creator_public_key`
+4. Store in peer registry: `node_id → (public_key, callsign, certificate)`
+
+Unknown or invalid certificates → reject peer, do not sync.
+
+## Consequences
+
+### Positive
+
+- **Offline operation**: No external CA needed, mesh-local authority
+- **Fast enrollment**: QR scan + BLE exchange, <30 seconds
+- **Spoofing prevention**: Messages cryptographically bound to sender identity
+- **Callsign integrity**: Authority controls who uses which callsign
+- **Automatic cleanup**: Expired certs drop compromised/lost devices
+- **Simple key management**: Ed25519 only, no X509 complexity
+
+### Negative
+
+- **Single point of authority**: If authority device is lost, no new enrollments
+  - Mitigation: Delegation via ENROLL permission flag
+- **Certificate size**: 145 bytes per peer, adds to discovery overhead
+  - Acceptable for BLE mesh (<10 peers typical)
+- **Breaking change**: New wire formats not backward compatible
+  - Mitigation: Version negotiation, legacy mode for testing
+
+### Neutral
+
+- Coexists with ADR-006 PKI model for enterprise deployments
+- peat-btle provides crypto primitives, Peat implements policy
+
+## Implementation
+
+### Layer Responsibilities
+
+| Layer | Responsibility |
+|-------|----------------|
+| **peat-btle** | Ed25519 sign/verify, IdentityAttestation, peer pubkey registry |
+| **peat-lite** | Signed wire formats (86-byte CannedMessage) |
+| **Peat** | MembershipCertificate, enrollment protocol, auth policy, UX |
+| **Apps** | Enrollment UI, QR display/scan, callsign assignment |
+
+### Related Issues
+
+- **peat-btle** `cac154cc`: Crypto primitives (sign/verify utilities)
+- **peat-lite** `2140b82a`: Signed CannedMessage wire format
+- **Peat** `23505348`: Membership certificates, enrollment, trust hierarchy
+
+## References
+
+- peat-btle `src/security/identity.rs`: DeviceIdentity, IdentityAttestation
+- peat-btle `src/security/genesis.rs`: MeshGenesis, MembershipPolicy
+- ADR-006: Security, Authentication, Authorization (PKI model)
+- ADR-044: E2E Encryption and Key Management (MLS, group keys)
+
+
+# ADR-049: peat-mesh Extraction (Open Source Sync Layer)
+
+**Status**: IMPLEMENTED (All 8 Phases Complete — PRs #622-#629)
+**Date**: 2025-01-31 (proposed) / 2026-02-12 (completed)
+**Authors**: Kit Plummer, Claude  
+**Organization**: Defense Unicorns (https://defenseunicorns.com)  
+**Priority**: URGENT - Blocking for Defense Unicorns transition  
+**Relates To**: ADR-011 (Automerge + Iroh), ADR-032 (Pluggable Transport), ADR-039 (peat-btle), ADR-041 (Multi-Transport Embedded)
+
+---
+
+## Executive Summary
+
+This ADR defines the extraction of **peat-mesh** - a standalone, open-source CRDT-based mesh synchronization library that serves as a direct alternative to Ditto. This crate provides the foundational sync infrastructure that Peat Protocol consumes, but contains **zero Peat-specific semantics**.
+
+**peat-mesh** is to Peat Protocol what SQLite is to an application - a general-purpose data layer that the application builds upon.
+
+### Strategic Importance
+
+1. **IP Clarity**: Clean separation between sync infrastructure (open source) and Peat Protocol (proprietary IP)
+2. **DU Transition**: Enables Defense Unicorns to receive Peat Protocol IP without Ditto dependency
+3. **Market Position**: Open source Ditto alternative creates competitive dynamics and community adoption
+4. **IETF Pathway**: Sync protocol can be standardized independently of Peat semantics
+
+---
+
+## Context
+
+### The Current State
+
+Today, Peat Protocol's sync capabilities are intertwined with protocol semantics:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                 Current: Tightly Coupled                         │
+│                                                                  │
+│  peat-protocol crate                                            │
+│  ├── Hierarchical aggregation logic                             │
+│  ├── Capability composition                                     │
+│  ├── Cell formation rules                                       │
+│  ├── Automerge CRDT operations  ←── tangled                     │
+│  ├── Iroh networking            ←── tangled                     │
+│  └── Peer discovery             ←── tangled                     │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### The Target State
+
+Clean separation where peat-mesh is a standalone, reusable sync layer:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Peat Protocol (Your IP)                       │
+│                                                                  │
+│  • Hierarchical Aggregation    • Capability Composition         │
+│  • Emergent Capability Synthesis                                │
+│  • Human-Machine Cell Formation                                 │
+│  • PlatformBeacon, CellState, Command schemas                   │
+│  • Cell leadership, aggregation rules                           │
+│                                                                  │
+│              Consumes peat-mesh via MeshProvider                │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              peat-mesh (Extracted - Open Source)                 │
+│              "Ditto Alternative"                                 │
+│                                                                  │
+│  • CRDT Documents (Automerge)     • Peer Discovery              │
+│  • P2P Networking (Iroh)          • Sync Protocol               │
+│  • Multi-Transport Support        • Offline-First               │
+│  • Collection/Document API        • Subscriptions/Queries       │
+│                                                                  │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │              Transport Layer                             │   │
+│  │   Iroh (QUIC)  │  peat-btle (BLE)  │  Future: LoRa     │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                  │
+│           NO Peat SEMANTICS - sync arbitrary documents          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Why This Matters
+
+| Stakeholder | Benefit |
+|-------------|---------|
+| **Defense Unicorns** | Receives Peat Protocol IP without Ditto licensing complexity |
+| **Open Source Community** | Gets a Ditto alternative for their own mesh sync needs |
+| **Peat Users** | Can choose sync backend (peat-mesh vs Ditto) based on requirements |
+| **IETF Standardization** | Sync protocol can be specified independently |
+| **Competitive Position** | Open standard beats proprietary lock-in (Anduril Lattice, etc.) |
+
+---
+
+## Decision
+
+### Extract peat-mesh as Standalone Crate
+
+Create `peat-mesh` as a separate repository/crate that provides:
+
+1. **CRDT-based document storage** (Automerge)
+2. **P2P mesh networking** (Iroh + optional transports)
+3. **Collection/Document API** for application developers
+4. **Subscription and query system**
+5. **Offline-first with automatic sync on reconnection**
+6. **Pluggable transport architecture**
+
+### Core API Surface
+
+```rust
+// peat-mesh/src/lib.rs
+
+/// Main entry point for mesh operations
+pub struct PeatMesh {
+    // Internal: Automerge docs, Iroh endpoint, peer manager
+}
+
+impl PeatMesh {
+    /// Create a new mesh instance
+    pub async fn new(config: MeshConfig) -> Result<Self, MeshError>;
+    
+    /// Start mesh networking (peer discovery, sync)
+    pub async fn start(&self) -> Result<(), MeshError>;
+    
+    /// Stop mesh networking gracefully
+    pub async fn stop(&self) -> Result<(), MeshError>;
+    
+    /// Get a collection handle
+    pub fn collection(&self, name: &str) -> Collection;
+    
+    /// Get mesh status
+    pub fn status(&self) -> MeshStatus;
+    
+    /// Get connected peers
+    pub fn peers(&self) -> Vec<PeerInfo>;
+    
+    /// Subscribe to mesh events
+    pub fn subscribe_events(&self) -> broadcast::Receiver<MeshEvent>;
+}
+
+/// Collection of documents (similar to Ditto collection)
+pub struct Collection {
+    name: String,
+    // Internal: reference to mesh
+}
+
+impl Collection {
+    /// Get a document by ID
+    pub async fn get(&self, id: &str) -> Result<Option<Document>, MeshError>;
+    
+    /// Upsert a document
+    pub async fn upsert(&self, id: &str, value: serde_json::Value) -> Result<(), MeshError>;
+    
+    /// Delete a document
+    pub async fn delete(&self, id: &str) -> Result<(), MeshError>;
+    
+    /// Query documents
+    pub async fn query(&self, query: Query) -> Result<Vec<Document>, MeshError>;
+    
+    /// Subscribe to document changes
+    pub fn subscribe(&self, filter: Option<Filter>) -> DocumentStream;
+    
+    /// Subscribe to a specific document
+    pub fn subscribe_document(&self, id: &str) -> SingleDocumentStream;
+}
+
+/// A synchronized document
+pub struct Document {
+    pub id: String,
+    pub value: serde_json::Value,
+    pub version: DocumentVersion,
+    pub last_modified: Timestamp,
+}
+
+/// Query for filtering documents
+pub enum Query {
+    All,
+    ById(String),
+    ByIds(Vec<String>),
+    Filter(FilterExpression),
+}
+
+/// Filter expression for queries and subscriptions
+pub enum FilterExpression {
+    Equals { field: String, value: serde_json::Value },
+    Contains { field: String, value: String },
+    GreaterThan { field: String, value: serde_json::Value },
+    LessThan { field: String, value: serde_json::Value },
+    And(Box<FilterExpression>, Box<FilterExpression>),
+    Or(Box<FilterExpression>, Box<FilterExpression>),
+}
+```
+
+### Configuration
+
+```rust
+/// Mesh configuration
+#[derive(Debug, Clone)]
+pub struct MeshConfig {
+    /// Unique node identifier (generated if not provided)
+    pub node_id: Option<NodeId>,
+    
+    /// Storage path for persistence (None = in-memory only)
+    pub storage_path: Option<PathBuf>,
+    
+    /// Transport configuration
+    pub transports: Vec<TransportConfig>,
+    
+    /// Peer discovery configuration
+    pub discovery: DiscoveryConfig,
+    
+    /// Sync configuration
+    pub sync: SyncConfig,
+}
+
+#[derive(Debug, Clone)]
+pub enum TransportConfig {
+    /// Iroh QUIC transport (default)
+    Iroh {
+        bind_port: Option<u16>,
+        relay_url: Option<String>,
+    },
+    /// Bluetooth Low Energy (requires feature)
+    #[cfg(feature = "ble")]
+    Ble {
+        advertise: bool,
+        scan: bool,
+        coded_phy: bool,
+    },
+    /// Custom transport (for future extension)
+    Custom(Box<dyn TransportFactory>),
+}
+
+#[derive(Debug, Clone)]
+pub struct DiscoveryConfig {
+    /// Enable mDNS discovery on local network
+    pub mdns: bool,
+    /// Bootstrap peers to connect to
+    pub bootstrap_peers: Vec<PeerAddr>,
+    /// DHT-based discovery
+    pub dht: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct SyncConfig {
+    /// Sync interval for periodic sync
+    pub sync_interval: Duration,
+    /// Enable real-time sync on changes
+    pub realtime: bool,
+    /// Conflict resolution strategy
+    pub conflict_resolution: ConflictResolution,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ConflictResolution {
+    /// CRDT automatic merge (default, recommended)
+    CrdtMerge,
+    /// Last-write-wins based on timestamp
+    LastWriteWins,
+    /// Custom resolver (application provides)
+    Custom,
+}
 ```
 
 ---
 
-## 2. CapabilityAdvertisement → CoT Event (PEAT → TAK)
+## Open Questions
 
-### PEAT Source Structure
+> **These questions must be resolved by the team before/during implementation.**
+
+### Strategic Questions
+
+#### Q1: API Surface Design
+
+**Should peat-mesh mirror Ditto's API patterns to ease migration, or clean-sheet design?**
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **Mirror Ditto** | Easy migration for Ditto users, familiar patterns | Inherits Ditto's design decisions (good and bad) |
+| **Clean-sheet** | Optimal Rust-native design, no legacy constraints | Learning curve, no migration path |
+| **Hybrid** | Rust-native core with Ditto-compatible wrapper | More code to maintain |
+
+*Recommendation*: Hybrid - Rust-native core API, with optional `ditto-compat` feature that provides familiar patterns.
+
+#### Q2: What Existing Code is Being Extracted?
+
+**Is this pulling from current peat-protocol internals, or formalizing the Automerge+Iroh work?**
+
+Current state assessment needed:
+- [ ] Audit `peat-protocol/src/sync/` - what's reusable?
+- [ ] Audit `peat-protocol/src/transport/` - what's reusable?
+- [ ] Identify Peat-specific code that must NOT be extracted
+- [ ] Identify generic sync code that SHOULD be extracted
+
+#### Q3: Transport Layer Ownership
+
+**Does peat-mesh own the transport layer (ADR-032), or consume transports?**
+
+| Option | Description |
+|--------|-------------|
+| **peat-mesh owns transports** | Transport abstraction lives in peat-mesh, Iroh and BLE are built-in |
+| **peat-mesh consumes transports** | Separate `peat-transport` crate, peat-mesh depends on it |
+| **Transports are plugins** | peat-mesh defines trait, transports are separate crates |
+
+*Recommendation*: peat-mesh owns the transport trait and includes Iroh by default. peat-btle is an optional feature/dependency. This keeps the "Ditto alternative" self-contained.
+
+#### Q4: Relationship to MeshProvider Trait (ADR-042)
+
+**How does peat-mesh relate to the MeshProvider trait defined yesterday?**
+
+Options:
+1. **peat-mesh implements MeshProvider** - The trait is defined in peat-protocol, peat-mesh provides an implementation
+2. **MeshProvider moves to peat-mesh** - The trait is part of peat-mesh's public API
+3. **MeshProvider is a wrapper** - peat-protocol defines MeshProvider, which wraps peat-mesh internally
+
+*Recommendation*: Option 1 - MeshProvider trait stays in peat-protocol (it's the Peat-specific interface), peat-mesh implements it. This allows other implementations (Ditto, mock) to also implement MeshProvider.
 
 ```rust
-pub struct CapabilityAdvertisement {
+// In peat-protocol
+pub trait MeshProvider { ... }
+
+// In peat-mesh
+impl MeshProvider for PeatMesh { ... }
+
+// In peat-mesh-ditto (if needed)
+impl MeshProvider for DittoMesh { ... }
+```
+
+#### Q5: Repository Structure
+
+**Separate repo or monorepo with peat-protocol?**
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **Separate repo** | Clear IP boundary, independent releases, community contributions | Coordination overhead, version sync |
+| **Monorepo** | Easier development, atomic changes | IP boundary less clear, harder for community |
+| **Cargo workspace** | Best of both - separate crates, shared tooling | Still need clear ownership boundaries |
+
+*Recommendation*: Separate repo (`github.com/defenseunicorns/peat-mesh`) for clean IP separation and community adoption. Peat Protocol depends on it as external crate.
+
+### Tactical Questions
+
+#### Q6: Minimum Viable Extraction
+
+**What's the smallest useful extraction for DU transition?**
+
+MVP scope proposal:
+- [ ] Collection/Document CRUD operations
+- [ ] Single transport (Iroh)
+- [ ] Basic peer discovery (bootstrap peers + mDNS)
+- [ ] Automerge CRDT sync
+- [ ] In-memory + file persistence
+
+Deferred to post-MVP:
+- [ ] BLE transport integration
+- [ ] Advanced queries
+- [ ] DHT discovery
+- [ ] Sync policies (QoS, bandwidth limits)
+
+#### Q7: Testing Strategy
+
+**How do we validate peat-mesh independently of Peat Protocol?**
+
+- [ ] Unit tests for Collection/Document API
+- [ ] Integration tests with multiple mesh instances
+- [ ] Sync correctness tests (concurrent writes, conflicts)
+- [ ] Network partition tests (offline/reconnect)
+- [ ] Performance benchmarks (latency, throughput, scale)
+
+#### Q8: Documentation and Examples
+
+**What does a "Ditto alternative" need to be credible?**
+
+- [ ] README with quick start
+- [ ] API documentation (rustdoc)
+- [ ] Migration guide from Ditto
+- [ ] Example applications (chat, shared state, etc.)
+- [ ] Performance comparison with Ditto
+
+---
+
+## Architecture
+
+### Crate Structure
+
+```
+peat-mesh/
+├── Cargo.toml
+├── README.md
+├── src/
+│   ├── lib.rs              # Public API: PeatMesh, Collection, Document
+│   ├── config.rs           # MeshConfig, TransportConfig, etc.
+│   ├── mesh.rs             # PeatMesh implementation
+│   ├── collection.rs       # Collection implementation
+│   ├── document.rs         # Document, CRDT operations
+│   ├── sync/
+│   │   ├── mod.rs
+│   │   ├── engine.rs       # Sync engine (Automerge)
+│   │   ├── protocol.rs     # Wire protocol for sync messages
+│   │   └── merge.rs        # Conflict resolution
+│   ├── transport/
+│   │   ├── mod.rs          # Transport trait
+│   │   ├── iroh.rs         # Iroh QUIC transport
+│   │   └── ble.rs          # BLE transport (feature-gated)
+│   ├── discovery/
+│   │   ├── mod.rs
+│   │   ├── mdns.rs         # mDNS local discovery
+│   │   ├── bootstrap.rs    # Bootstrap peer list
+│   │   └── dht.rs          # DHT discovery (future)
+│   ├── storage/
+│   │   ├── mod.rs          # Storage trait
+│   │   ├── memory.rs       # In-memory storage
+│   │   └── file.rs         # File-based persistence
+│   └── error.rs            # Error types
+├── examples/
+│   ├── simple_sync.rs      # Basic two-node sync
+│   ├── chat.rs             # Multi-node chat application
+│   └── shared_state.rs     # Shared state synchronization
+└── tests/
+    ├── sync_tests.rs
+    ├── conflict_tests.rs
+    └── network_tests.rs
+```
+
+### Dependencies
+
+```toml
+[dependencies]
+# CRDT
+automerge = "0.5"
+
+# Networking
+iroh = "0.35"
+iroh-net = "0.35"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Utilities
+thiserror = "1"
+tracing = "0.1"
+uuid = { version = "1", features = ["v4"] }
+
+[features]
+default = ["iroh"]
+iroh = []
+ble = ["peat-btle"]
+full = ["iroh", "ble"]
+```
+
+---
+
+## Implementation Plan
+
+### Phase 1: Core Extraction (THIS WEEK - DU Blocking)
+
+**Goal**: Minimal viable peat-mesh that Peat Protocol can depend on
+
+- [ ] Create `peat-mesh` repository
+- [ ] Define public API (PeatMesh, Collection, Document)
+- [ ] Extract/implement Automerge document operations
+- [ ] Extract/implement Iroh transport
+- [ ] Basic peer discovery (bootstrap peers)
+- [ ] In-memory storage
+- [ ] Unit tests for core operations
+- [ ] Integration test: two-node sync
+
+**Deliverable**: `peat-mesh` crate that compiles and syncs documents between two nodes
+
+### Phase 2: Peat Protocol Integration (Week 2)
+
+- [ ] Implement MeshProvider trait for PeatMesh
+- [ ] Refactor peat-protocol to use peat-mesh
+- [ ] Verify all existing Peat tests pass
+- [ ] Document migration from embedded sync to peat-mesh
+
+**Deliverable**: Peat Protocol uses peat-mesh, all tests green
+
+### Phase 3: Production Hardening (Week 3-4)
+
+- [ ] File-based persistence
+- [ ] mDNS discovery
+- [ ] Reconnection and sync recovery
+- [ ] Error handling and logging
+- [ ] Performance benchmarks
+- [ ] Documentation
+
+**Deliverable**: Production-ready peat-mesh
+
+### Phase 4: BLE Integration (Week 5-6)
+
+- [ ] Integrate peat-btle as optional transport
+- [ ] Multi-transport coordination
+- [ ] Transport selection logic
+- [ ] Mobile platform testing
+
+**Deliverable**: peat-mesh works over BLE
+
+### Phase 5: Community Release (Week 7-8)
+
+- [ ] Public repository setup
+- [ ] Apache 2.0 licensing
+- [ ] README and getting started guide
+- [ ] Example applications
+- [ ] Ditto migration guide
+- [ ] Announce to community
+
+**Deliverable**: Public open-source release
+
+---
+
+## Success Criteria
+
+### Functional
+
+- [ ] Two nodes can sync documents via Iroh
+- [ ] Offline changes merge correctly on reconnection
+- [ ] CRDT conflicts resolve deterministically
+- [ ] Peat Protocol works with peat-mesh backend
+- [ ] No Peat-specific code in peat-mesh
+
+### Performance
+
+- [ ] Sync latency < 100ms on local network
+- [ ] Supports 100+ documents per collection
+- [ ] Supports 50+ concurrent peers
+- [ ] Memory usage < 100MB for typical deployment
+
+### Quality
+
+- [ ] >80% test coverage
+- [ ] No unsafe code (or well-documented if required)
+- [ ] Comprehensive rustdoc
+- [ ] CI/CD pipeline with tests
+
+---
+
+## Consequences
+
+### Positive
+
+- **Clean IP separation** - Peat Protocol is clearly differentiated from sync infrastructure
+- **Open source adoption** - Community can use peat-mesh without Peat
+- **DU transition unblocked** - No Ditto dependency in delivered IP
+- **Competitive positioning** - Open standard beats proprietary
+- **Easier testing** - Can test sync layer independently
+
+### Negative
+
+- **Development effort** - Extraction takes time
+- **Two codebases** - Must maintain peat-mesh separately
+- **Version coordination** - Peat Protocol must track peat-mesh versions
+- **Community support** - Open source means issue triage, PRs, etc.
+
+### Risks
+
+- **Scope creep** - "Just one more feature" delays delivery
+- **API instability** - Changing peat-mesh API breaks Peat Protocol
+- **Performance regression** - Extraction might miss optimizations
+- **Incomplete extraction** - Peat-specific code accidentally included
+
+---
+
+## References
+
+- [Automerge](https://automerge.org/) - CRDT library
+- [Iroh](https://iroh.computer/) - P2P networking
+- [Ditto](https://ditto.live/) - Commercial mesh sync (competitive reference)
+- ADR-011: Automerge + Iroh Integration
+- ADR-032: Pluggable Transport Abstraction
+- ADR-039: peat-btle Mesh Transport
+- ADR-041: Multi-Transport Embedded Integration
+- ADR-042: Protocol/Mesh Layer Abstraction (MeshProvider trait)
+
+---
+
+## Decision Log
+
+| Date | Decision | Rationale |
+|------|----------|-----------|
+| 2025-01-31 | Extract peat-mesh as standalone crate | IP clarity for DU transition, open source positioning |
+| 2025-01-31 | Automerge + Iroh as foundation | Already validated in ADR-011, production-ready |
+| 2025-01-31 | Zero Peat semantics in peat-mesh | Clean separation, general-purpose utility |
+| 2026-02-11 | Phase 0: Break reverse deps (PR #622) | Remove all peat-protocol/peat-schema imports from peat-mesh |
+| 2026-02-11 | Phase 1: Generic trait surface (PR #623) | DocumentStore, SyncEngine, DiscoveryStrategy traits |
+| 2026-02-11 | Phase 2: Transport layer (PR #624) | Multi-transport manager, bypass, health, reconnection |
+| 2026-02-11 | Phase 3: Storage/persistence (PR #625) | Automerge, Iroh blobs, negentropy, query, TTL |
+| 2026-02-11 | Phase 4: QoS framework (PR #626) | 5-level priority, bandwidth, eviction, GC, audit |
+| 2026-02-11 | Phase 5: Security primitives (PR #627) | Ed25519, X25519, ChaCha20, HMAC-SHA256, callsigns |
+| 2026-02-12 | Phase 6: Service broker (PR #628) | Axum HTTP + WebSocket, feature-gated |
+| 2026-02-12 | Phase 7: PeatMesh facade (PR #629) | Unified entry point, builder, lifecycle, events |
+| TBD | API surface design | Clean-sheet Rust-native (not Ditto-compat) |
+| TBD | Repository structure | Currently monorepo workspace, separate repo planned |
+| TBD | Transport ownership | peat-mesh owns transport trait + Iroh default |
+
+---
+
+**Last Updated**: 2026-02-12
+**Status**: IMPLEMENTED — All 8 phases complete (PRs #622-#629)
+**Result**: 50,124 lines of standalone mesh code, 1,151 unit tests, zero peat-protocol/peat-schema dependencies
+**Next Action**: README, examples, crates.io publish, Collection convenience API
+
+
+# ADR-050: Peat SDK Integration (Optimal Path)
+
+**Status**: Proposed  
+**Date**: 2025-01-31  
+**Authors**: Kit Plummer, Claude  
+**Organization**: Defense Unicorns (https://defenseunicorns.com)  
+**Depends On**: ADR-049 (Schema Extraction)  
+**Relates To**: ADR-043 (Consumer Interface Adapters - Compatibility Path)
+
+---
+
+## Executive Summary
+
+This ADR defines the **Peat SDK** (`peat-sdk`) - the **optimal integration path** for systems that can incorporate Peat directly. Unlike the consumer interface adapters (ADR-043), SDK integration provides:
+
+- **Full CRDT synchronization** with eventual consistency guarantees
+- **Offline operation** with automatic reconnection and sync
+- **Hierarchical participation** as a first-class Peat node
+- **Minimal latency** (sync latency only, no adapter overhead)
+- **Native capability aggregation** and cell membership
+
+> **⚠️ GUIDANCE**: If you can modify your system's software, use the SDK. The consumer interface adapters (ADR-043) exist only for legacy systems that cannot be modified.
+
+---
+
+## Context
+
+### Why Direct Integration Matters
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         Peat Mesh                                        │
+│                                                                          │
+│    ┌──────────┐      ┌──────────┐      ┌──────────┐      ┌──────────┐  │
+│    │  Squad   │◄────►│  UAS-1   │◄────►│  UGV-2   │◄────►│  Human   │  │
+│    │  Leader  │      │(peat-sdk)│      │(peat-sdk)│      │(peat-sdk)│  │
+│    └──────────┘      └──────────┘      └──────────┘      └──────────┘  │
+│         ▲                                                               │
+│         │ All nodes are equal CRDT participants                         │
+│         │ • Sync directly with peers                                    │
+│         │ • Operate offline                                             │
+│         │ • Participate in hierarchy                                    │
+│         ▼                                                               │
+│    ┌──────────┐                                                         │
+│    │ Platoon  │                                                         │
+│    │ Leader   │                                                         │
+│    └──────────┘                                                         │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+vs.
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                   Consumer Interface Architecture                        │
+│                                                                          │
+│    ┌──────────┐      ┌──────────┐                                       │
+│    │  Peat    │◄────►│  Peat    │                                       │
+│    │  Node    │      │  Node    │◄───HTTP/WS───► Legacy System          │
+│    └──────────┘      └──────────┘                (not a real participant)│
+│                           │                                              │
+│                           │ Legacy system:                               │
+│                           │ • Cannot sync directly                       │
+│                           │ • No offline operation                       │
+│                           │ • Not in hierarchy                           │
+│                           │ • +50-200ms latency                          │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Comparison: SDK vs Consumer Interface Adapters
+
+| Capability | SDK (This ADR) | Consumer Adapters (ADR-043) |
+|------------|----------------|----------------------------|
+| **Latency** | Sync only (~10-50ms) | +50-200ms overhead |
+| **Offline Operation** | ✅ Full - queues changes, syncs on reconnect | ❌ None - requires adapter |
+| **CRDT Conflict Resolution** | ✅ Automatic, deterministic | ❌ Last-write-wins at adapter |
+| **Hierarchical Membership** | ✅ Full cell participation | ❌ Not a cell member |
+| **Capability Aggregation** | ✅ Contributes to cell capabilities | ❌ Not aggregated |
+| **Bandwidth Efficiency** | ✅ Delta sync only | ❌ Full message per request |
+| **Peer-to-Peer** | ✅ Direct sync with any peer | ❌ Must go through adapter |
+| **Multi-Transport** | ✅ Iroh, BLE, LoRa, etc. | ❌ HTTP/WS/TCP only |
+
+### Target Platforms
+
+The SDK targets systems where Peat can be embedded:
+
+| Platform | Language Binding | Use Case |
+|----------|------------------|----------|
+| Linux (x86_64, aarch64) | Rust native, Python, Go, C++ | Servers, edge compute, Jetson |
+| Android | Kotlin/Java via JNI | Tablets, ATAK plugins, phones |
+| iOS | Swift via UniFFI | iPhones, iPads |
+| Embedded Linux | Rust native, Go | Drones, robots, sensors |
+| ROS2 | Rust native + ROS2 bridge | Robotic platforms |
+| Windows | Rust native, C#, Python, Go | Desktop C2, WinTAK plugins |
+| WASM | Rust → WASM | Browser-based dashboards |
+| Kubernetes/Cloud Native | Go | Zarf/UDS integration, operators, controllers |
+
+---
+
+## Decision
+
+### SDK Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                            peat-sdk                                      │
+│                                                                          │
+│  ┌────────────────────────────────────────────────────────────────────┐ │
+│  │                     Language Bindings                               │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐      │ │
+│  │  │  Rust   │ │ Python  │ │   Go    │ │ Kotlin  │ │  Swift  │      │ │
+│  │  │ (native)│ │ (PyO3)  │ │ (cgo)   │ │  (JNI)  │ │(UniFFI) │      │ │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘      │ │
+│  └────────────────────────────────────────────────────────────────────┘ │
+│                                    │                                     │
+│                                    ▼                                     │
+│  ┌────────────────────────────────────────────────────────────────────┐ │
+│  │                     High-Level API                                  │ │
+│  │                                                                     │ │
+│  │  • PeatNode - main entry point                                     │ │
+│  │  • Platform - represent this platform's state                      │ │
+│  │  • Cell - cell membership and queries                              │ │
+│  │  • Capabilities - advertise and discover                           │ │
+│  │  • Commands - send and receive                                     │ │
+│  │  • Subscriptions - reactive state updates                          │ │
+│  └────────────────────────────────────────────────────────────────────┘ │
+│                                    │                                     │
+│                                    ▼                                     │
+│  ┌────────────────────────────────────────────────────────────────────┐ │
+│  │                     Core Components                                 │ │
+│  │                                                                     │ │
+│  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐    │ │
+│  │  │  peat-protocol  │  │   peat-schema   │  │  MeshProvider   │    │ │
+│  │  │                 │  │   (ADR-049)     │  │                 │    │ │
+│  │  └─────────────────┘  └─────────────────┘  └─────────────────┘    │ │
+│  └────────────────────────────────────────────────────────────────────┘ │
+│                                    │                                     │
+│                                    ▼                                     │
+│  ┌────────────────────────────────────────────────────────────────────┐ │
+│  │                     Transport Layer (ADR-032)                       │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐                  │ │
+│  │  │  Iroh   │ │peat-btle│ │  LoRa   │ │ Custom  │                  │ │
+│  │  │ (QUIC)  │ │  (BLE)  │ │         │ │         │                  │ │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────┘                  │ │
+│  └────────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### High-Level API Design
+
+#### Rust (Native)
+
+```rust
+// peat-sdk/src/lib.rs
+
+use peat_schema::peat::v1::*;
+use std::sync::Arc;
+
+/// Main entry point for Peat integration
+pub struct PeatNode {
+    platform: Platform,
+    config: PeatConfig,
+}
+
+impl PeatNode {
+    /// Create a new Peat node with the given configuration
+    pub async fn new(config: PeatConfig) -> Result<Self, PeatError> {
+        let platform = Platform::new(&config.platform_id);
+        Ok(Self { platform, config })
+    }
+    
+    /// Start the node and begin mesh participation
+    pub async fn start(&self) -> Result<(), PeatError> {
+        self.platform.start_beacon_broadcast().await?;
+        Ok(())
+    }
+    
+    /// Get this node's platform handle
+    pub fn platform(&self) -> &Platform {
+        &self.platform
+    }
+    
+    /// Query platforms in the mesh
+    pub async fn platforms(&self) -> PlatformQuery {
+        PlatformQuery::new()
+    }
+    
+    /// Query cells in the mesh
+    pub async fn cells(&self) -> CellQuery {
+        CellQuery::new()
+    }
+    
+    /// Subscribe to state changes
+    pub fn subscribe(&self) -> SubscriptionBuilder {
+        SubscriptionBuilder::new()
+    }
+    
+    /// Send a command to another platform or cell
+    pub async fn command(&self, cmd: Command) -> Result<CommandReceipt, PeatError> {
+        todo!()
+    }
+}
+
+/// Represents this platform in the mesh
+pub struct Platform {
+    id: NodeId,
+}
+
+impl Platform {
+    /// Update this platform's position
+    pub async fn set_position(&self, position: Position) -> Result<(), PeatError> {
+        Ok(())
+    }
+    
+    /// Update this platform's operational status
+    pub async fn set_operational(&self, operational: bool) -> Result<(), PeatError> {
+        Ok(())
+    }
+    
+    /// Advertise a capability
+    pub async fn advertise_capability(&self, cap: CapabilityAdvertisement) -> Result<(), PeatError> {
+        Ok(())
+    }
+    
+    /// Remove a capability advertisement
+    pub async fn remove_capability(&self, capability_id: &str) -> Result<(), PeatError> {
+        Ok(())
+    }
+    
+    /// Get this platform's current cell membership
+    pub async fn cell(&self) -> Option<CellId> {
+        None
+    }
+}
+
+/// Fluent query builder for platforms
+pub struct PlatformQuery {
+    spatial: Option<SpatialFilter>,
+    capability: Option<String>,
+    operational_only: bool,
+}
+
+impl PlatformQuery {
+    pub fn new() -> Self {
+        Self {
+            spatial: None,
+            capability: None,
+            operational_only: false,
+        }
+    }
+    
+    /// Filter to platforms within radius of a point
+    pub fn within_radius(mut self, center: Position, radius_meters: f64) -> Self {
+        self.spatial = Some(SpatialFilter::WithinRadius { center, radius_meters });
+        self
+    }
+    
+    /// Filter to platforms with a specific capability
+    pub fn with_capability(mut self, capability_type: &str) -> Self {
+        self.capability = Some(capability_type.to_string());
+        self
+    }
+    
+    /// Filter to operational platforms only
+    pub fn operational(mut self) -> Self {
+        self.operational_only = true;
+        self
+    }
+    
+    /// Execute the query and return results
+    pub async fn execute(&self) -> Result<Vec<PlatformBeacon>, PeatError> {
+        Ok(vec![])
+    }
+}
+
+pub enum SpatialFilter {
+    WithinRadius { center: Position, radius_meters: f64 },
+    WithinBounds { min: Position, max: Position },
+}
+```
+
+#### Python (PyO3)
+
+```python
+# peat_sdk/__init__.py
+
+import asyncio
+
+async def main():
+    # Create and start a Peat node
+    config = PeatConfig(
+        platform_id="uav-001",
+        mesh_backend="automerge",  # or "ditto"
+        transports=["iroh", "ble"],
+    )
+    
+    node = await PeatNode.create(config)
+    await node.start()
+    
+    # Update our position
+    await node.platform.set_position(Position(
+        latitude=37.7749,
+        longitude=-122.4194,
+        altitude_meters=100.0,
+    ))
+    
+    # Advertise a capability
+    await node.platform.advertise_capability(Capability(
+        capability_type="sensor/camera/rgb",
+        parameters={
+            "resolution": "4K",
+            "frame_rate": 30,
+        }
+    ))
+    
+    # Query nearby platforms
+    nearby = await node.platforms() \
+        .within_radius(node.platform.position, 5000) \
+        .with_capability("sensor/camera") \
+        .execute()
+    
+    for platform in nearby:
+        print(f"Found: {platform.id} at {platform.position}")
+    
+    # Subscribe to changes
+    async for update in node.platforms().subscribe():
+        print(f"Platform update: {update}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+#### Kotlin (Android/JNI)
+
+```kotlin
+// PeatSDK.kt
+
+package com.defenseunicorns.peat
+
+import kotlinx.coroutines.flow.Flow
+
+class PeatNode private constructor(
+    private val native: Long  // JNI pointer
+) {
+    companion object {
+        suspend fun create(config: PeatConfig): PeatNode {
+            return PeatNode(nativeCreate(config))
+        }
+        
+        private external fun nativeCreate(config: PeatConfig): Long
+    }
+    
+    val platform: Platform = Platform(this)
+    
+    suspend fun start() = nativeStart(native)
+    
+    fun platforms(): PlatformQuery = PlatformQuery(this)
+    
+    fun cells(): CellQuery = CellQuery(this)
+    
+    suspend fun command(cmd: Command): CommandReceipt = 
+        nativeSendCommand(native, cmd)
+    
+    private external fun nativeStart(ptr: Long)
+    private external fun nativeSendCommand(ptr: Long, cmd: Command): CommandReceipt
+}
+
+// Usage in Android Activity/ViewModel
+class DroneViewModel : ViewModel() {
+    private lateinit var peat: PeatNode
+    
+    fun initialize() {
+        viewModelScope.launch {
+            peat = PeatNode.create(PeatConfig(
+                platformId = "android-${Build.SERIAL}",
+                meshBackend = MeshBackend.AUTOMERGE,
+                transports = listOf(Transport.IROH, Transport.BLE),
+            ))
+            peat.start()
+            
+            // Observe nearby platforms
+            peat.platforms()
+                .withinRadius(currentPosition, 5000.0)
+                .subscribe()
+                .collect { platform ->
+                    _nearbyPlatforms.value += platform
+                }
+        }
+    }
+}
+```
+
+#### Go (cgo)
+
+```go
+// peat-sdk-go/peat.go
+
+package peat
+
+/*
+#cgo LDFLAGS: -lpeat_sdk
+#include "peat_sdk.h"
+*/
+import "C"
+import (
+    "context"
+    "encoding/json"
+    "unsafe"
+)
+
+// PeatNode represents a Peat mesh participant
+type PeatNode struct {
+    ptr unsafe.Pointer
+}
+
+// Config for creating a PeatNode
+type Config struct {
+    PlatformID   string      `json:"platform_id"`
+    MeshBackend  string      `json:"mesh_backend"` // "automerge" or "ditto"
+    Transports   []string    `json:"transports"`   // ["iroh", "ble"]
+    BeaconInterval int       `json:"beacon_interval_secs"`
+}
+
+// NewPeatNode creates a new Peat node
+func NewPeatNode(cfg Config) (*PeatNode, error) {
+    cfgJSON, _ := json.Marshal(cfg)
+    cConfig := C.CString(string(cfgJSON))
+    defer C.free(unsafe.Pointer(cConfig))
+    
+    ptr := C.peat_node_create(cConfig)
+    if ptr == nil {
+        return nil, fmt.Errorf("failed to create PeatNode")
+    }
+    
+    return &PeatNode{ptr: ptr}, nil
+}
+
+// Start begins mesh participation
+func (h *PeatNode) Start(ctx context.Context) error {
+    result := C.peat_node_start(h.ptr)
+    if result != 0 {
+        return fmt.Errorf("failed to start: %d", result)
+    }
+    return nil
+}
+
+// SetPosition updates this platform's position
+func (h *PeatNode) SetPosition(lat, lon, alt float64) error {
+    result := C.peat_platform_set_position(h.ptr, C.double(lat), C.double(lon), C.double(alt))
+    if result != 0 {
+        return fmt.Errorf("failed to set position: %d", result)
+    }
+    return nil
+}
+
+// Platform represents a discovered platform
+type Platform struct {
+    ID        string   `json:"id"`
+    Latitude  float64  `json:"latitude"`
+    Longitude float64  `json:"longitude"`
+    Altitude  float64  `json:"altitude"`
+    Operational bool   `json:"operational"`
+}
+
+// QueryPlatforms returns platforms matching the query
+func (h *PeatNode) QueryPlatforms(opts QueryOpts) ([]Platform, error) {
+    optsJSON, _ := json.Marshal(opts)
+    cOpts := C.CString(string(optsJSON))
+    defer C.free(unsafe.Pointer(cOpts))
+    
+    var resultLen C.int
+    resultPtr := C.peat_query_platforms(h.ptr, cOpts, &resultLen)
+    if resultPtr == nil {
+        return nil, fmt.Errorf("query failed")
+    }
+    defer C.free(unsafe.Pointer(resultPtr))
+    
+    resultJSON := C.GoStringN(resultPtr, resultLen)
+    var platforms []Platform
+    json.Unmarshal([]byte(resultJSON), &platforms)
+    
+    return platforms, nil
+}
+
+// SubscribePlatforms returns a channel of platform updates
+func (h *PeatNode) SubscribePlatforms(ctx context.Context) (<-chan Platform, error) {
+    ch := make(chan Platform, 100)
+    
+    go func() {
+        defer close(ch)
+        // Implementation uses C callback mechanism
+        // ...
+    }()
+    
+    return ch, nil
+}
+
+// Close shuts down the node
+func (h *PeatNode) Close() error {
+    C.peat_node_destroy(h.ptr)
+    h.ptr = nil
+    return nil
+}
+```
+
+```go
+// Example usage: Zarf/UDS operator integration
+package main
+
+import (
+    "context"
+    "log"
+    "os"
+    "os/signal"
+    
+    "github.com/defenseunicorns/peat-sdk-go"
+)
+
+func main() {
+    ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+    defer cancel()
+    
+    // Create Peat node for this operator instance
+    node, err := peat.NewPeatNode(peat.Config{
+        PlatformID:  os.Getenv("HOSTNAME"),
+        MeshBackend: "automerge",
+        Transports:  []string{"iroh"},
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer node.Close()
+    
+    if err := node.Start(ctx); err != nil {
+        log.Fatal(err)
+    }
+    
+    // Subscribe to platform updates
+    platforms, _ := node.SubscribePlatforms(ctx)
+    
+    for {
+        select {
+        case <-ctx.Done():
+            return
+        case p := <-platforms:
+            log.Printf("Platform update: %s at (%f, %f)", p.ID, p.Latitude, p.Longitude)
+            // Update Kubernetes resources, trigger reconciliation, etc.
+        }
+    }
+}
+```
+
+#### ROS2 Integration
+
+```rust
+// peat-ros2-bridge/src/lib.rs
+
+use peat_sdk::PeatNode;
+
+/// ROS2 bridge that publishes Peat state as ROS2 topics
+/// and subscribes to ROS2 topics to update Peat state
+pub struct PeatRos2Bridge {
+    peat: PeatNode,
+    // ROS2 node, publishers, subscribers...
+}
+
+impl PeatRos2Bridge {
+    pub async fn new(peat_config: PeatConfig) -> Result<Self> {
+        let peat = PeatNode::new(peat_config).await?;
+        Ok(Self { peat })
+    }
+    
+    pub async fn run(&mut self) -> Result<()> {
+        self.peat.start().await?;
+        
+        loop {
+            tokio::select! {
+                // ROS2 odometry → Peat position
+                // Peat platform updates → ROS2 topics
+            }
+        }
+    }
+}
+```
+
+---
+
+## Configuration
+
+```rust
+/// SDK configuration
+#[derive(Debug, Clone)]
+pub struct PeatConfig {
+    /// Unique identifier for this platform
     pub platform_id: String,
-    pub advertised_at: DateTime<Utc>,
-    pub models: Vec<ModelCapability>,
-    pub resources: Option<ResourceMetrics>,
+    
+    /// Human-readable name
+    pub platform_name: Option<String>,
+    
+    /// Mesh backend selection
+    pub mesh_backend: MeshBackend,
+    
+    /// Enabled transports (in priority order)
+    pub transports: Vec<TransportConfig>,
+    
+    /// Beacon broadcast interval
+    pub beacon_interval: Duration,
+    
+    /// Initial capabilities to advertise
+    pub initial_capabilities: Vec<CapabilityAdvertisement>,
+    
+    /// Hierarchy participation level
+    pub hierarchy_level: HierarchyLevel,
+    
+    /// Storage path for offline data
+    pub storage_path: Option<PathBuf>,
 }
 
-pub struct ModelCapability {
-    pub model_id: String,
-    pub model_version: String,
-    pub model_hash: String,
-    pub model_type: String,
-    pub performance: ModelPerformance,
-    pub operational_status: OperationalStatus,
+#[derive(Debug, Clone)]
+pub enum MeshBackend {
+    /// Open source Automerge + Iroh (recommended)
+    Automerge,
+    /// Commercial Ditto SDK
+    Ditto { app_id: String, token: String },
 }
 
-pub struct ModelPerformance {
-    pub precision: f64,
-    pub recall: f64,
-    pub fps: f64,
-    pub latency_ms: Option<f64>,
+#[derive(Debug, Clone)]
+pub enum TransportConfig {
+    /// QUIC-based P2P via Iroh
+    Iroh { 
+        bind_port: Option<u16>,
+        relay_url: Option<String>,
+    },
+    /// Bluetooth Low Energy mesh
+    Ble {
+        advertise: bool,
+        scan: bool,
+        coded_phy: bool,  // Long range mode
+    },
+    /// LoRa radio (requires hardware)
+    LoRa {
+        device: String,
+        frequency_mhz: f64,
+    },
 }
-
-pub enum OperationalStatus {
-    Ready, Active, Degraded, Offline, Loading,
-}
-```
-
-### CoT Target Structure
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<event version="2.0"
-       uid="{platform_id}"
-       type="a-f-G-U-C"
-       time="{advertised_at}"
-       start="{advertised_at}"
-       stale="{advertised_at + 60s}"
-       how="m-g">
-
-  <point lat="{platform_position.lat}"
-         lon="{platform_position.lon}"
-         hae="0.0"
-         ce="9999999.0"
-         le="9999999.0"/>
-
-  <detail>
-    <contact callsign="{platform_id}"/>
-
-    <remarks>AI Platform: {model_summary}</remarks>
-
-    <_peat_ version="1.0">
-      <status operational="{operational_status}" readiness="{readiness_score}"/>
-      {for model in models}
-      <capability type="{model.model_type}"
-                  model_id="{model.model_id}"
-                  model_version="{model.model_version}"
-                  precision="{model.performance.precision}"
-                  recall="{model.performance.recall}"
-                  fps="{model.performance.fps}"
-                  status="{model.operational_status}"/>
-      {end}
-      {if resources}
-      <resources gpu="{resources.gpu_utilization}"
-                 memory_used_mb="{resources.memory_used_mb}"
-                 memory_total_mb="{resources.memory_total_mb}"/>
-      {end}
-    </_peat_>
-
-    <__group name="{cell_id}" role="AI Platform"/>
-  </detail>
-</event>
-```
-
-### Field Mapping Table
-
-| PEAT Field | CoT Field | Transformation | Notes |
-|------------|-----------|----------------|-------|
-| `platform_id` | `event@uid` | Direct | Platform identifier |
-| `platform_id` | `contact@callsign` | Direct | TAK callsign |
-| - | `event@type` | Constant `a-f-G-U-C` | Friendly ground unit |
-| `advertised_at` | `event@time` | RFC 3339 | Advertisement timestamp |
-| `advertised_at` | `event@stale` | time + 60s | Longer stale for capabilities |
-| `models[*].operational_status` | `_peat_/status@operational` | Enum to string | Overall platform status |
-| `models[*]` | `_peat_/capability` | One element per model | Model capabilities |
-| `models[*].model_id` | `capability@model_id` | Direct | |
-| `models[*].model_version` | `capability@model_version` | Direct | |
-| `models[*].performance.precision` | `capability@precision` | Direct | |
-| `models[*].performance.recall` | `capability@recall` | Direct | |
-| `models[*].performance.fps` | `capability@fps` | Direct | |
-| `resources.gpu_utilization` | `resources@gpu` | Direct | |
-| `resources.memory_used_mb` | `resources@memory_used_mb` | Direct | |
-
-### Operational Status Mapping
-
-| PEAT Status | CoT Value | TAK Display Suggestion |
-|-------------|-----------|----------------------|
-| `Ready` | `READY` | Green indicator |
-| `Active` | `ACTIVE` | Blue/pulsing indicator |
-| `Degraded` | `DEGRADED` | Yellow/warning indicator |
-| `Offline` | `OFFLINE` | Red/grayed out |
-| `Loading` | `LOADING` | Gray/spinner |
-
----
-
-## 3. HandoffMessage → CoT Event (PEAT → TAK)
-
-### PEAT Source Structure
-
-```rust
-pub struct HandoffMessage {
-    pub handoff_id: Uuid,
-    pub handoff_type: HandoffType,
-    pub track_id: String,
-    pub source_team: String,
-    pub target_team: String,
-    pub track_state: TrackUpdate,
-    pub track_history: Vec<TrackUpdate>,
-    pub poi_description: Option<String>,
-    pub predicted_position: Option<Position>,
-    pub timestamp: DateTime<Utc>,
-}
-
-pub enum HandoffType {
-    PrepareHandoff,
-    ConfirmAcquisition,
-    ReleaseTrack,
-    HandoffFailed,
-}
-```
-
-### CoT Target Structure
-
-```xml
-<?xml version="2.0" encoding="UTF-8"?>
-<event version="2.0"
-       uid="{handoff_id}"
-       type="a-x-h-h"
-       time="{timestamp}"
-       start="{timestamp}"
-       stale="{timestamp + 60s}"
-       how="m-g">
-
-  <point lat="{track_state.position.lat}"
-         lon="{track_state.position.lon}"
-         hae="{track_state.position.hae | 0.0}"
-         ce="{track_state.position.cep_m | 9999999.0}"
-         le="9999999.0"/>
-
-  <detail>
-    <remarks>HANDOFF {handoff_type}: {track_id} from {source_team} to {target_team}</remarks>
-
-    <_peat_ version="1.0">
-      <handoff type="{handoff_type}"
-               track_id="{track_id}"
-               source="{source_team}"
-               target="{target_team}"/>
-      {if poi_description}
-      <poi_description>{poi_description}</poi_description>
-      {end}
-      {if predicted_position}
-      <predicted lat="{predicted_position.lat}"
-                 lon="{predicted_position.lon}"/>
-      {end}
-    </_peat_>
-
-    <!-- Link to source team -->
-    <link uid="{source_team}" type="a-f-G-U-C" relation="h-h" remarks="handoff-source"/>
-
-    <!-- Link to target team -->
-    <link uid="{target_team}" type="a-f-G-U-C" relation="h-h" remarks="handoff-target"/>
-
-    <!-- Link to track being handed off -->
-    <link uid="{track_id}" type="a-f-G-E-S" relation="p-p" remarks="track"/>
-  </detail>
-</event>
-```
-
-### Handoff Type Mapping
-
-| PEAT HandoffType | CoT Remarks Prefix | Semantics |
-|------------------|-------------------|-----------|
-| `PrepareHandoff` | `HANDOFF PREPARE` | Source initiating handoff |
-| `ConfirmAcquisition` | `HANDOFF CONFIRM` | Target confirms acquisition |
-| `ReleaseTrack` | `HANDOFF RELEASE` | Source releases responsibility |
-| `HandoffFailed` | `HANDOFF FAILED` | Handoff unsuccessful |
-
----
-
-## 4. CoT Event → TrackCommand (TAK → PEAT)
-
-### CoT Source Structure (Mission Tasking)
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<event version="2.0"
-       uid="{command_uid}"
-       type="t-x-m-c"
-       time="{timestamp}"
-       start="{timestamp}"
-       stale="{timestamp + 3600s}"
-       how="h-g-i-g-o">
-
-  <point lat="{target_lat}"
-         lon="{target_lon}"
-         hae="0.0"
-         ce="9999999.0"
-         le="9999999.0"/>
-
-  <detail>
-    <remarks>{target_description}</remarks>
-
-    <mission type="track"
-             name="Track POI"
-             priority="{priority}"/>
-
-    <_flow-tags_ priority="{priority}"/>
-
-    {if has_geofence}
-    <shape>
-      <polyline closed="true">
-        {for coord in boundary_coords}
-        <vertex lat="{coord.lat}" lon="{coord.lon}"/>
-        {end}
-      </polyline>
-    </shape>
-    {end}
-
-    <contact callsign="{source_authority}"/>
-  </detail>
-</event>
-```
-
-### PEAT Target Structure
-
-```rust
-pub struct TrackCommand {
-    pub command_id: Uuid,          // from event@uid
-    pub command_type: CommandType, // from mission@type
-    pub target_description: String, // from remarks
-    pub operational_boundary: Option<OperationalBoundary>, // from shape
-    pub priority: Priority,        // from _flow-tags_@priority
-    pub source_authority: String,  // from contact@callsign
-    pub timestamp: DateTime<Utc>,  // from event@time
-}
-```
-
-### Field Mapping Table (CoT → PEAT)
-
-| CoT Field | PEAT Field | Transformation | Notes |
-|-----------|------------|----------------|-------|
-| `event@uid` | `command_id` | Parse as UUID | May need to generate if not UUID |
-| `event@type` | `command_type` | Type mapping | See below |
-| `event@time` | `timestamp` | Parse RFC 3339 | |
-| `remarks` | `target_description` | Direct | |
-| `mission@priority` or `_flow-tags_@priority` | `priority` | Priority mapping | See below |
-| `contact@callsign` | `source_authority` | Direct | |
-| `shape/polyline/vertex` | `operational_boundary.coordinates` | Extract lat/lon pairs | |
-| - | `operational_boundary.boundary_type` | Infer from shape | Polygon if closed="true" |
-
-### CoT Type → CommandType Mapping
-
-| CoT Type | PEAT CommandType | Description |
-|----------|-----------------|-------------|
-| `t-x-m-c` | `TrackTarget` | Mission tasking - track |
-| `t-x-m-c-c` | `CancelTrack` | Mission tasking - cancel |
-| `t-x-m-c-u` | `UpdateParameters` | Mission tasking - update |
-| `t-x-m-c-a` | `AcknowledgeHandoff` | Mission tasking - acknowledge |
-
-### Priority Mapping (CoT → PEAT)
-
-| CoT Priority | PEAT Priority |
-|--------------|---------------|
-| `flash` | `Critical` |
-| `immediate` | `High` |
-| `priority` | `High` |
-| `routine` | `Normal` |
-| `deferred` | `Low` |
-| `bulk` | `Bulk` |
-
----
-
-## 5. CoT Event → OperationalBoundary (TAK → PEAT)
-
-### CoT Source Structure (Drawing/Geofence)
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<event version="2.0"
-       uid="{geofence_uid}"
-       type="u-d-r"
-       time="{timestamp}"
-       start="{timestamp}"
-       stale="{timestamp + 86400s}"
-       how="h-e">
-
-  <point lat="{centroid_lat}"
-         lon="{centroid_lon}"
-         hae="0.0"
-         ce="9999999.0"
-         le="9999999.0"/>
-
-  <detail>
-    <remarks>Operational Area: {area_name}</remarks>
-
-    <shape>
-      <polyline closed="true">
-        <vertex lat="33.77" lon="-84.40"/>
-        <vertex lat="33.77" lon="-84.39"/>
-        <vertex lat="33.78" lon="-84.39"/>
-        <vertex lat="33.78" lon="-84.40"/>
-      </polyline>
-    </shape>
-
-    <link uid="{parent_mission}" type="t-x-m" relation="p-p"/>
-  </detail>
-</event>
-```
-
-### PEAT Target Structure
-
-```rust
-pub struct OperationalBoundary {
-    pub boundary_type: BoundaryType,
-    pub coordinates: Vec<Vec<f64>>,  // [[lon, lat], ...]
-}
-
-pub enum BoundaryType {
-    Polygon,
-    Circle,
-    Rectangle,
-}
-```
-
-### Field Mapping Table
-
-| CoT Field | PEAT Field | Transformation |
-|-----------|------------|----------------|
-| `shape/polyline@closed="true"` | `boundary_type` | `Polygon` |
-| `shape/ellipse` | `boundary_type` | `Circle` |
-| `shape/polyline/vertex` | `coordinates` | `[[lon, lat], ...]` |
-| `shape/ellipse@major` | `coordinates` | `[[center_lon, center_lat], [radius]]` |
-
----
-
-## 6. FormationCapabilitySummary → CoT Event (PEAT → TAK)
-
-### PEAT Source Structure
-
-```rust
-// From coordinator.rs (conceptual - aggregated at formation level)
-pub struct FormationCapabilitySummary {
-    pub formation_id: String,
-    pub team_count: usize,
-    pub platform_count: usize,
-    pub camera_count: usize,
-    pub tracker_versions: Vec<String>,
-    pub coverage_sectors: Vec<String>,
-    pub capability_confidence: HashMap<String, f64>,
-    pub readiness_score: f64,
-}
-```
-
-### CoT Target Structure
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<event version="2.0"
-       uid="{formation_id}"
-       type="a-f-G-U-C"
-       time="{timestamp}"
-       start="{timestamp}"
-       stale="{timestamp + 60s}"
-       how="m-g">
-
-  <point lat="{formation_centroid.lat}"
-         lon="{formation_centroid.lon}"
-         hae="0.0"
-         ce="9999999.0"
-         le="9999999.0"/>
-
-  <detail>
-    <contact callsign="{formation_id}"/>
-
-    <remarks>Formation: {team_count} teams, {platform_count} platforms, {readiness_pct}% ready</remarks>
-
-    <_peat_ version="1.0">
-      <formation teams="{team_count}"
-                 platforms="{platform_count}"
-                 cameras="{camera_count}"
-                 readiness="{readiness_score}"/>
-      <trackers>
-        {for version in tracker_versions}
-        <version>{version}</version>
-        {end}
-      </trackers>
-      <coverage>
-        {for sector in coverage_sectors}
-        <sector>{sector}</sector>
-        {end}
-      </coverage>
-      <capabilities>
-        {for (cap, confidence) in capability_confidence}
-        <capability type="{cap}" confidence="{confidence}"/>
-        {end}
-      </capabilities>
-    </_peat_>
-
-    <!-- Links to subordinate teams -->
-    {for team in teams}
-    <link uid="{team.id}" type="a-f-G-U-C" relation="p-p"/>
-    {end}
-  </detail>
-</event>
 ```
 
 ---
 
-## 7. Encoding/Decoding Implementation Notes
+## Implementation Plan
 
-### Timestamp Handling
+### Phase 1: Core Rust SDK (Week 1-3)
 
-```rust
-// PEAT → CoT
-fn encode_timestamp(dt: DateTime<Utc>) -> String {
-    dt.format("%Y-%m-%dT%H:%M:%SZ").to_string()
-}
+- [ ] Create `peat-sdk` crate
+- [ ] Implement PeatNode, Platform, PlatformQuery
+- [ ] Implement subscription system
+- [ ] Unit tests with MockMeshProvider
+- [ ] Integration tests with real mesh
 
-// CoT → PEAT
-fn decode_timestamp(s: &str) -> Result<DateTime<Utc>, ParseError> {
-    DateTime::parse_from_rfc3339(s)
-        .map(|dt| dt.with_timezone(&Utc))
-}
-```
+**Deliverable**: Rust SDK functional with Automerge backend
 
-### Stale Time Calculation
+### Phase 2: Python Bindings (Week 4-5)
 
-```rust
-const DEFAULT_TRACK_STALE_SECS: i64 = 30;
-const DEFAULT_CAPABILITY_STALE_SECS: i64 = 60;
-const DEFAULT_HANDOFF_STALE_SECS: i64 = 60;
-const DEFAULT_COMMAND_STALE_SECS: i64 = 3600;
+- [ ] PyO3 bindings for core types
+- [ ] Async support via pyo3-asyncio
+- [ ] Python package structure (peat_sdk)
+- [ ] PyPI publication pipeline
+- [ ] Python examples and documentation
 
-fn calculate_stale(timestamp: DateTime<Utc>, message_type: MessageType) -> DateTime<Utc> {
-    let duration = match message_type {
-        MessageType::TrackUpdate => DEFAULT_TRACK_STALE_SECS,
-        MessageType::CapabilityAdvertisement => DEFAULT_CAPABILITY_STALE_SECS,
-        MessageType::HandoffMessage => DEFAULT_HANDOFF_STALE_SECS,
-        MessageType::TrackCommand => DEFAULT_COMMAND_STALE_SECS,
-    };
-    timestamp + chrono::Duration::seconds(duration)
-}
-```
+**Deliverable**: `pip install peat-sdk` works
 
-### XML Encoding
+### Phase 3: Go Bindings (Week 6-7)
 
-Recommend using `quick-xml` crate for XML encoding/decoding:
+- [ ] C header generation from Rust (cbindgen)
+- [ ] Go package with cgo bindings
+- [ ] Idiomatic Go API (channels for subscriptions, context for cancellation)
+- [ ] Go module publication
+- [ ] Zarf/UDS integration example
+- [ ] Kubernetes operator example
 
-```rust
-use quick_xml::{Writer, events::{Event, BytesStart, BytesEnd, BytesText}};
+**Deliverable**: `go get github.com/defenseunicorns/peat-sdk-go` works
 
-fn encode_track_to_cot(track: &TrackUpdate) -> Result<String, EncodingError> {
-    let mut writer = Writer::new(Cursor::new(Vec::new()));
+### Phase 4: Mobile Bindings (Week 8-10)
 
-    // Event element
-    let mut event = BytesStart::borrowed(b"event", "event".len());
-    event.push_attribute(("version", "2.0"));
-    event.push_attribute(("uid", track.track_id.as_str()));
-    event.push_attribute(("type", classify_to_cot_type(&track.classification)));
-    // ... etc
-}
-```
+- [ ] Kotlin/JNI bindings for Android
+- [ ] Swift/UniFFI bindings for iOS
+- [ ] Android AAR packaging
+- [ ] iOS framework packaging
+- [ ] Mobile-specific documentation
 
-### Validation Rules
+**Deliverable**: Android and iOS SDK packages available
 
-1. **UID uniqueness**: CoT UIDs must be unique per message type
-2. **Stale time**: Must be > time, recommend minimum 5 seconds
-3. **Position bounds**: lat ∈ [-90, 90], lon ∈ [-180, 180]
-4. **CE/LE values**: Use 9999999.0 for unknown (CoT convention)
-5. **Type format**: Must follow MIL-STD-2525 atom format
+### Phase 5: ROS2 Bridge (Week 11-12)
+
+- [ ] peat-ros2-bridge crate
+- [ ] Standard message conversions
+- [ ] Launch file templates
+- [ ] ROS2 Humble/Iron compatibility
+- [ ] Integration with common robot platforms
+
+**Deliverable**: ROS2 robots can join Peat mesh
+
+### Phase 6: Documentation & Examples (Week 13-14)
+
+- [ ] Integration guide for each platform
+- [ ] Example applications (drone, robot, mobile, operator)
+- [ ] API reference documentation
+- [ ] Performance tuning guide
+- [ ] Troubleshooting guide
+
+**Deliverable**: Complete developer documentation
 
 ---
 
-## 8. Error Handling
+## Success Criteria
 
-### Encoding Errors
+1. **Rust Integration**: < 50 lines of code to join mesh and broadcast position
+2. **Python Integration**: `pip install peat-sdk` + 10 lines to basic functionality
+3. **Go Integration**: `go get` + idiomatic Go API with channels and context
+4. **Android Integration**: AAR dependency + Kotlin coroutines API
+5. **iOS Integration**: Swift Package Manager + async/await API
+6. **ROS2 Integration**: Single launch file to bridge robot to Peat
+7. **Latency**: < 50ms position sync between SDK nodes (network permitting)
+8. **Offline**: Survives 10-minute network partition, syncs on reconnect
+9. **Documentation**: New developer productive in < 1 hour per language
 
-| Error | Handling |
-|-------|----------|
-| Missing required field | Return `EncodingError::MissingField(field_name)` |
-| Invalid position | Return `EncodingError::InvalidPosition` |
-| Unknown classification | Use `a-u-G` (unknown ground) and log warning |
+---
 
-### Decoding Errors
+## Consequences
 
-| Error | Handling |
-|-------|----------|
-| Malformed XML | Return `DecodingError::MalformedXml(details)` |
-| Unknown CoT type | Log and skip, or map to generic PEAT message |
-| Missing required element | Return `DecodingError::MissingElement(name)` |
-| Invalid timestamp | Return `DecodingError::InvalidTimestamp` |
+### Positive
+
+- **Optimal performance** - no adapter overhead
+- **Full CRDT benefits** - offline, conflict resolution, eventual consistency
+- **First-class citizen** - SDK nodes are full mesh participants
+- **Multi-language** - Rust, Python, Go, Kotlin, Swift, C++
+- **Cloud-native ready** - Go bindings enable Kubernetes operators, Zarf/UDS integration
+- **Multi-transport** - same SDK works over Iroh, BLE, LoRa
+
+### Negative
+
+- **Integration effort** - requires modifying target system
+- **Binary size** - SDK adds ~5-15MB depending on features
+- **Platform support** - may not work on very constrained devices (use peat-btle Lite)
+- **Learning curve** - developers must understand CRDT concepts
+- **cgo overhead** - Go bindings have FFI overhead vs native Go
+
+### Risks
+
+- **Binding maintenance** - must keep language bindings in sync
+- **Platform fragmentation** - different capabilities per platform
+- **Version compatibility** - SDK version must match mesh protocol version
+
+---
+
+## Alternatives Considered
+
+### 1. Consumer Adapters Only (No SDK)
+
+**Pros**: Single integration point, simpler
+**Cons**: Loses all CRDT benefits, adds latency, no offline
+**Decision**: Rejected - defeats the purpose of Peat's architecture
+
+### 2. WASM-Only Cross-Platform
+
+**Pros**: True write-once-run-anywhere
+**Cons**: No native performance, limited system access, no BLE/LoRa
+**Decision**: Rejected for native platforms, but WASM supported for browsers
+
+### 3. REST Client Library (Not Full SDK)
+
+**Pros**: Simpler implementation
+**Cons**: Still goes through adapters, not a real mesh participant
+**Decision**: Rejected - this is just the adapter path with nicer syntax
+
+### 4. Pure Go Implementation (No cgo)
+
+**Pros**: No FFI overhead, pure Go toolchain
+**Cons**: Duplicate implementation, must reimplement Automerge/Iroh in Go
+**Decision**: Rejected - maintain single Rust implementation, bind via cgo
 
 ---
 
 ## References
 
-- [CoT XML Schema](http://cot.mitre.org)
-- [MIL-STD-2525D](https://www.jcs.mil/Portals/36/Documents/Doctrine/Other_Pubs/ms_2525d.pdf)
-- [TAK Protocol Documentation](https://tak.gov)
-- [peat-m1-poc/src/messages.rs](../src/messages.rs)
-- [TAK Integration Requirements](./TAK_INTEGRATION_REQUIREMENTS.md)
+- [PyO3 - Rust bindings for Python](https://pyo3.rs/)
+- [UniFFI - Rust bindings for mobile](https://mozilla.github.io/uniffi-rs/)
+- [JNI - Java Native Interface](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/)
+- [cgo - Go C interop](https://pkg.go.dev/cmd/cgo)
+- [cbindgen - C header generation from Rust](https://github.com/mozilla/cbindgen)
+- [r2r - Rust ROS2 client](https://github.com/sequenceplanner/r2r)
+- ADR-043: Consumer Interface Adapters (Compatibility Path)
+- ADR-045: Zarf/UDS Integration
+- ADR-049: peat-mesh Extraction
 
 ---
 
-# TAK Integration Requirements for PEAT Protocol
+## Decision Log
 
-**Document Type**: Requirements & Recommendations for ADR-020
-**Date**: 2025-11-26
-**Source**: peat-m1-poc implementation experience
-**Target**: PEAT Core Team (cap repository)
+| Date | Decision | Rationale |
+|------|----------|-----------|
+| 2025-01-31 | SDK is optimal path, adapters are compatibility | Full CRDT benefits require direct participation |
+| 2025-01-31 | Rust core with language bindings | Performance + safety + cross-platform |
+| 2025-01-31 | PyO3 for Python | Best Rust-Python interop, async support |
+| 2025-01-31 | UniFFI for mobile | Mozilla-backed, supports both iOS and Android |
+| 2025-01-31 | ROS2 as dedicated bridge | Robotics is key use case, deserves first-class support |
+
+
+# ADR-051: Peat-SBD Satellite Transport Crate
+
+**Status**: Proposed
+**Date**: 2025-02-10
+**Authors**: Kit Plummer, Claude
+**Organization**: Defense Unicorns (https://defenseunicorns.com)
+**Relates To**: ADR-032 (Pluggable Transport Abstraction), ADR-035 (Peat-Lite Embedded Nodes), ADR-037 (Resource-Constrained Device Optimization), ADR-039 (Peat-BTLE Mesh Transport), ADR-041 (Multi-Transport Embedded Integration)
+
+---
 
 ## Executive Summary
 
-This document captures requirements and recommendations derived from implementing the M1 vignette (object tracking across distributed human-machine-AI teams). These findings should inform ADR-020 implementation and potentially spawn new ADRs.
+This ADR defines the architecture for `peat-sbd`, a Rust crate providing Iridium Short Burst Data (SBD) satellite transport for Peat Protocol. The crate enables global, infrastructure-independent message exchange via the Iridium satellite constellation, targeting beyond-line-of-sight (BLOS) scenarios where no terrestrial network exists. It implements the ADR-032 `Transport` trait as an external transport extension, following the same pattern established by `peat-btle`.
 
 ---
 
-## 1. Schema Layer Requirements (cap-schema)
+## Context
 
-### 1.1 PEAT Custom Detail Extension Schema
+### The Satellite Communication Gap
 
-**Requirement**: Define a standardized `<_peat_>` CoT detail extension for preserving PEAT-specific semantics in CoT messages.
+Peat's current transport options—QUIC/Iroh (IP networks) and peat-btle (BLE mesh)—share a common limitation: they require terrestrial infrastructure or proximity between peers. Tactical edge operations frequently occur in environments where neither is available:
 
-**Rationale**: PEAT messages contain rich context (model versions, confidence scores, cell membership) that TAK operators need but CoT doesn't natively support.
+| Scenario | Gap | Peat Use Case |
+|----------|-----|---------------|
+| Maritime patrol | No cellular, no WiFi | Ship-to-shore PLI and status |
+| Remote overwatch | Beyond radio range of C2 | Forward observer position reports |
+| Disaster response | Infrastructure destroyed | Field team coordination with HQ |
+| Long-range ISR | UAS beyond BLOS | Telemetry relay from autonomous platforms |
+| Expeditionary ops | Austere, denied environments | Emergency PACE fallback |
 
-**Proposed Schema**:
+### Why Iridium SBD?
 
-```xml
-<_peat_ version="1.0" xmlns:peat="urn:peat:cot:1.0">
-  <!-- Source attribution -->
-  <source platform="Alpha-2" model="Alpha-3" model_version="1.3.0"/>
+Iridium SBD is uniquely suited as a Peat transport for several reasons:
 
-  <!-- Track confidence -->
-  <confidence value="0.89" threshold="0.70"/>
+| Property | Iridium SBD | Starlink | Inmarsat BGAN |
+|----------|-------------|----------|---------------|
+| **Coverage** | True global (pole-to-pole) | ~±57° latitude | ±76° latitude |
+| **Terminal size** | Pager-sized (9603: 32×30×12mm) | Pizza box | Laptop-sized |
+| **Power draw** | ~1.5W transmit, ~0.5W standby | ~100W | ~15W |
+| **Latency** | 5-20s (store-and-forward) | 20-40ms (real-time) | 600ms |
+| **Message size** | MO: 1,960 bytes / MT: 1,890 bytes | Streaming | Streaming |
+| **Cost per message** | ~$0.04-0.13/message (SBD plans) | $120+/mo flat | ~$5/MB |
+| **Antenna** | Omnidirectional stub | Motorized phased array | Directional |
+| **Integration** | AT commands over serial | Ethernet/WiFi | Ethernet |
 
-  <!-- Hierarchy membership -->
-  <hierarchy>
-    <cell id="Alpha-Team" role="tracker"/>
-    <formation id="Formation-1"/>
-    <zone id="Zone-A"/>
-  </hierarchy>
+SBD's small message size, low power, tiny form factor, and true global coverage make it ideal as a **contingency/emergency transport** in the PACE model—not a primary data pipe, but a lifeline when everything else fails.
 
-  <!-- Custom attributes (pass-through from TrackUpdate.attributes) -->
-  <attributes>
-    <attr key="jacket_color" type="string">blue</attr>
-    <attr key="has_backpack" type="boolean">true</attr>
-    <attr key="estimated_age" type="string">adult</attr>
-  </attributes>
+### Why a Dedicated Crate?
 
-  <!-- Operational status (for capability advertisements) -->
-  <status operational="ACTIVE" readiness="0.91"/>
-</_peat_>
+Following the same rationale as `peat-btle` (ADR-039) and the pluggable transport architecture (ADR-032), SBD has fundamentally different semantics than stream-based transports:
+
+1. **Store-and-Forward**: Messages are queued at the Iridium gateway, not delivered in real-time
+2. **Asymmetric Addressing**: Mobile-Originated (MO) goes to a gateway; Mobile-Terminated (MT) requires IMEI-based routing
+3. **AT Command Interface**: Serial/UART communication with the modem, not sockets
+4. **No Peer Discovery**: Peers don't discover each other over SBD—routing requires pre-configured IMEI mappings or gateway relay
+5. **Extreme Size Constraints**: 1,960 bytes MO / 1,890 bytes MT maximum
+6. **High Latency**: 5-20 seconds per message, not milliseconds
+7. **Cost Sensitivity**: Each message incurs airtime charges; chatty protocols are expensive
+
+### External Crate Pattern
+
+Like `peat-btle`, `peat-sbd` will be developed as an external crate hosted on Radicle, following the established pattern:
+
 ```
+peat (main repo)
+├── peat-protocol/    ← Transport trait definitions (ADR-032)
+├── peat-ffi/         ← FFI bindings with SBD config
+└── ...
 
-**Action Items**:
-- [ ] Add `_peat_` XSD schema to cap-schema
-- [ ] Document extension in CoT compatibility guide
-- [ ] Register namespace with TAK ecosystem maintainers (if applicable)
+peat-btle (external) ← BLE mesh transport
+    └── rad:z458mp9Um3AYNQQFMdHaNEUtmiohq
 
-### 1.2 MIL-STD-2525 Symbol Type Mappings
-
-**Requirement**: Define canonical CoT type codes for PEAT entity classes.
-
-**Proposed Mappings**:
-
-| PEAT Entity | CoT Type | MIL-STD-2525 Description |
-|-------------|----------|--------------------------|
-| Tracked Person (POI) | `a-f-G-E-S` | Friendly Ground Equipment - Sensor |
-| Tracked Vehicle | `a-f-G-E-V` | Friendly Ground Equipment - Vehicle |
-| Unknown Track | `a-u-G` | Unknown Ground |
-| Hostile Track | `a-h-G` | Hostile Ground |
-| PEAT Platform (UGV) | `a-f-G-U-C` | Friendly Ground Unit - Combat |
-| PEAT Platform (UAV) | `a-f-A-M-F-Q` | Friendly Air - Military Fixed Wing - UAV |
-| PEAT Operator | `a-f-G-U-C-I` | Friendly Ground Unit - Infantry |
-| PEAT Cell/Team | `a-f-G-U-C` + links | Friendly Ground Unit with subordinates |
-| Formation | `a-f-G-U-C` + links | Higher echelon unit |
-| Geofence/ROZ | `u-d-r` | Drawing - Route/Area |
-| Mission Tasking | `t-x-m` | Tasking - Mission |
-
-**Action Items**:
-- [ ] Add `CotTypeMapper` trait to cap-schema
-- [ ] Implement default mappings with override capability
-- [ ] Support affiliation inference from track context
-
-### 1.3 Hierarchy Encoding in CoT Links
-
-**Requirement**: Standardize how PEAT's hierarchical relationships map to CoT `<link>` elements.
-
-**Proposed Convention**:
-
-```xml
-<!-- Platform belongs to cell -->
-<link uid="Alpha-Team" type="a-f-G-U-C" relation="p-p" remarks="parent-cell"/>
-
-<!-- Cell belongs to formation -->
-<link uid="Formation-1" type="a-f-G-U-C" relation="p-p" remarks="parent-formation"/>
-
-<!-- Track handoff relationship -->
-<link uid="Bravo-Team" type="a-f-G-U-C" relation="h-h" remarks="handoff-target"/>
+peat-sbd (external)  ← SBD satellite transport [NEW]
+    └── rad:zXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ```
-
-**Relation Types**:
-| Relation | Meaning |
-|----------|---------|
-| `p-p` | Parent (hierarchical ownership) |
-| `h-h` | Handoff (track transfer) |
-| `s-s` | Sibling (same echelon) |
-| `o-o` | Observing (sensor relationship) |
-
-**Action Items**:
-- [ ] Document relation type conventions
-- [ ] Add `HierarchyEncoder` to cap-schema CoT module
 
 ---
 
-## 2. Transport Layer Requirements (cap-transport)
+## Decision Drivers
 
-### 2.1 TAK Transport Adapter Interface
+### Requirements
 
-**Requirement**: Add `TakTransport` as a first-class transport adapter alongside HTTP.
+1. **Global Coverage**: Operate anywhere on Earth with sky visibility
+2. **Low Power**: Suitable for battery-powered field devices (< 2W transmit)
+3. **Small Form Factor**: Integrate with man-portable and UAS platforms
+4. **Peat Transport Trait**: Implement ADR-032 `Transport` trait for TransportManager integration
+5. **Message Efficiency**: Maximize Peat data per SBD message given 1,960-byte limit
+6. **Reliability**: Handle message queuing, retry, and confirmation
+7. **Security**: Application-layer encryption over SBD (per ADR-006)
+8. **Dual-Mode Operation**: Standalone (embedded gateway) or transport plugin (full Peat node)
 
-**Proposed Trait**:
+### Constraints
+
+1. **Message Size**: Hard limit of 1,960 bytes MO / 1,890 bytes MT
+2. **Latency**: 5-20 second delivery, not suitable for real-time
+3. **Cost**: Per-message billing; protocol must minimize message count
+4. **Serial Interface**: AT command protocol over UART/RS-232
+5. **Modem Hardware**: Requires Iridium 9602, 9603, RockBLOCK, or compatible transceiver
+6. **Network Registration**: IMEI must be provisioned on Iridium network with SBD service
+7. **No Broadcast**: SBD is point-to-point (MO→Gateway, Gateway→MT); no mesh/broadcast capability
+8. **Regulatory**: Iridium L-band transmitters require appropriate licensing in some jurisdictions
+
+---
+
+## Decision
+
+### Architecture
+
+`peat-sbd` implements the ADR-032 `Transport` trait with SBD-specific adaptations for store-and-forward satellite communication.
+
+### Crate Structure
+
+```
+peat-sbd/
+├── src/
+│   ├── lib.rs              # Public API, re-exports
+│   ├── transport.rs         # Transport trait implementation (ADR-032)
+│   ├── config.rs            # SBD configuration (serial port, IMEI, gateway)
+│   ├── modem/
+│   │   ├── mod.rs           # Modem abstraction trait
+│   │   ├── at_commands.rs   # AT command protocol (+SBDWB, +SBDI, etc.)
+│   │   ├── iridium_9603.rs  # 9603/9602 modem driver
+│   │   └── mock.rs          # Mock modem for testing
+│   ├── message/
+│   │   ├── mod.rs           # Message framing and types
+│   │   ├── encoding.rs      # Compact binary encoding (Peat → SBD payload)
+│   │   ├── fragmentation.rs # Multi-message fragmentation for >1960 byte payloads
+│   │   └── compression.rs   # Optional payload compression (LZ4/zstd)
+│   ├── gateway/
+│   │   ├── mod.rs           # Gateway relay abstraction
+│   │   ├── directip.rs      # DirectIP socket gateway client
+│   │   ├── email.rs         # Email-based gateway (SMTP/IMAP)
+│   │   └── relay.rs         # Peat relay server (SBD ↔ Peat mesh bridge)
+│   ├── routing/
+│   │   ├── mod.rs           # Peer-to-IMEI routing
+│   │   └── imei_map.rs      # NodeId ↔ IMEI mapping table
+│   ├── queue/
+│   │   ├── mod.rs           # Outbound message queue
+│   │   └── priority.rs      # Priority-based queue with cost awareness
+│   ├── power/
+│   │   ├── mod.rs           # Power management
+│   │   └── schedule.rs      # Scheduled transmission windows
+│   └── platform/
+│       ├── mod.rs           # Platform abstraction
+│       ├── linux.rs         # Linux serial (termios)
+│       ├── android.rs       # Android serial via USB OTG / JNI
+│       └── embedded.rs      # no_std embedded serial (ESP32, STM32)
+├── tests/
+│   ├── modem_tests.rs
+│   ├── encoding_tests.rs
+│   ├── fragmentation_tests.rs
+│   └── integration_tests.rs
+├── examples/
+│   ├── send_position.rs     # Send a PLI report via SBD
+│   ├── gateway_relay.rs     # Run a gateway relay server
+│   └── scheduled_sync.rs    # Scheduled batch sync
+├── Cargo.toml
+└── README.md
+```
+
+### Core Types
 
 ```rust
+/// SBD transport configuration
+#[derive(Debug, Clone)]
+pub struct SbdConfig {
+    /// Serial port path (e.g., "/dev/ttyUSB0", "COM3")
+    pub serial_port: String,
+
+    /// Serial baud rate (default: 19200 for 9603)
+    pub baud_rate: u32,
+
+    /// Modem IMEI (auto-detected if None)
+    pub imei: Option<String>,
+
+    /// Gateway configuration
+    pub gateway: GatewayConfig,
+
+    /// Power management profile
+    pub power_profile: PowerProfile,
+
+    /// Maximum messages per hour (cost control)
+    pub max_messages_per_hour: Option<u16>,
+
+    /// Enable compression (reduces message count at CPU cost)
+    pub compression: bool,
+
+    /// Transmission schedule (None = send immediately)
+    pub tx_schedule: Option<TransmitSchedule>,
+
+    /// Peer IMEI routing table
+    pub peer_imei_map: HashMap<String, String>, // NodeId hex → IMEI
+}
+
+/// Gateway configuration for MT message delivery
+#[derive(Debug, Clone)]
+pub enum GatewayConfig {
+    /// DirectIP socket connection to Iridium gateway
+    DirectIp {
+        host: String,
+        port: u16,
+    },
+    /// Email-based gateway (legacy)
+    Email {
+        smtp_server: String,
+        imap_server: String,
+        credentials: String, // Reference to credential store, not inline
+    },
+    /// Peat relay server (bridges SBD ↔ Peat mesh)
+    PeatRelay {
+        relay_url: String,
+    },
+    /// No gateway (MO-only, fire-and-forget)
+    None,
+}
+
+/// Power management profile for satellite modem
+#[derive(Debug, Clone, Copy)]
+pub enum PowerProfile {
+    /// Modem always on, fastest response (highest power)
+    AlwaysOn,
+    /// Modem powered on for scheduled windows
+    Scheduled {
+        /// Transmit window interval in seconds
+        interval_secs: u32,
+        /// Window duration in seconds
+        window_secs: u32,
+    },
+    /// Modem powered on only when messages queued
+    OnDemand {
+        /// Minimum interval between power-on cycles (seconds)
+        min_interval_secs: u32,
+    },
+    /// Modem off, manual trigger only
+    Manual,
+}
+
+/// Transmit schedule for batched operations
+#[derive(Debug, Clone)]
+pub struct TransmitSchedule {
+    /// Interval between transmission windows (seconds)
+    pub interval_secs: u32,
+    /// Maximum messages per window
+    pub max_per_window: u8,
+    /// Priority threshold—only messages at or above this priority
+    /// are sent outside scheduled windows
+    pub immediate_priority: MessagePriority,
+}
+```
+
+### Transport Trait Implementation
+
+```rust
+pub struct PeatSbdTransport {
+    config: SbdConfig,
+    modem: Arc<Mutex<dyn SbdModem>>,
+    outbound_queue: Arc<Mutex<PriorityQueue<SbdMessage>>>,
+    capabilities: TransportCapabilities,
+    signal_strength: AtomicU8,
+    available: AtomicBool,
+    stats: Arc<SbdStats>,
+}
+
 #[async_trait]
-pub trait TakTransport: Send + Sync {
-    /// Connect to TAK server or mesh
-    async fn connect(&mut self) -> Result<(), TakError>;
+impl Transport for PeatSbdTransport {
+    fn capabilities(&self) -> &TransportCapabilities {
+        &self.capabilities
+    }
 
-    /// Disconnect gracefully
-    async fn disconnect(&mut self) -> Result<(), TakError>;
+    fn is_available(&self) -> bool {
+        self.available.load(Ordering::Relaxed)
+    }
 
-    /// Send CoT event to TAK
-    async fn send_cot(&self, event: &CotEvent) -> Result<(), TakError>;
+    fn signal_quality(&self) -> Option<u8> {
+        // Map Iridium 0-5 RSSI to 0-100 scale
+        let rssi = self.signal_strength.load(Ordering::Relaxed);
+        Some(rssi * 20) // 0→0, 1→20, 2→40, 3→60, 4→80, 5→100
+    }
 
-    /// Subscribe to incoming CoT events
-    async fn subscribe(&self, filter: CotFilter) -> Result<CotEventStream, TakError>;
+    fn can_reach(&self, peer_id: &NodeId) -> bool {
+        // Can reach if we have an IMEI mapping for this peer
+        // OR if gateway relay is configured (any peer reachable via mesh bridge)
+        let peer_hex = hex::encode(peer_id);
+        self.config.peer_imei_map.contains_key(&peer_hex)
+            || matches!(self.config.gateway, GatewayConfig::PeatRelay { .. })
+    }
+}
 
-    /// Check connection health
-    fn is_connected(&self) -> bool;
+impl PeatSbdTransport {
+    pub fn new(config: SbdConfig) -> Result<Self, SbdError> {
+        let capabilities = TransportCapabilities {
+            transport_type: TransportType::Satellite,
+            max_bandwidth_bps: 33,          // ~1960 bytes / 60 sec realistic throughput
+            typical_latency_ms: 10_000,     // 10 seconds typical
+            max_range_meters: 0,            // 0 = unlimited/global
+            bidirectional: true,
+            reliable: true,                 // Store-and-forward with ACK
+            battery_impact: 40,             // Moderate—transmit burst is high but brief
+            supports_broadcast: false,      // Point-to-point only
+            requires_pairing: false,        // No pairing, but needs IMEI routing
+            max_message_size: 1_960,        // MO SBD limit
+        };
 
-    /// Get connection metrics
-    fn metrics(&self) -> TakMetrics;
+        Ok(Self {
+            config,
+            modem: Arc::new(Mutex::new(Iridium9603Modem::new(/* ... */)?)),
+            outbound_queue: Arc::new(Mutex::new(PriorityQueue::new())),
+            capabilities,
+            signal_strength: AtomicU8::new(0),
+            available: AtomicBool::new(false),
+            stats: Arc::new(SbdStats::default()),
+        })
+    }
+
+    /// Queue a message for transmission
+    pub async fn queue_message(
+        &self,
+        payload: &[u8],
+        destination: SbdDestination,
+        priority: MessagePriority,
+    ) -> Result<SbdMessageId, SbdError> {
+        // Check cost budget
+        if let Some(max) = self.config.max_messages_per_hour {
+            if self.stats.messages_this_hour() >= max as u64 {
+                return Err(SbdError::BudgetExceeded);
+            }
+        }
+
+        // Compress if enabled and beneficial
+        let payload = if self.config.compression {
+            compress_if_smaller(payload)?
+        } else {
+            payload.to_vec()
+        };
+
+        // Fragment if necessary
+        let fragments = if payload.len() > MAX_SBD_PAYLOAD {
+            fragment_message(&payload, MAX_SBD_PAYLOAD)?
+        } else {
+            vec![SbdFragment::single(payload)]
+        };
+
+        let msg_id = SbdMessageId::new();
+        let mut queue = self.outbound_queue.lock().await;
+        for fragment in fragments {
+            queue.push(SbdMessage {
+                id: msg_id,
+                fragment,
+                destination: destination.clone(),
+                priority,
+                queued_at: Instant::now(),
+            });
+        }
+
+        // If priority >= immediate threshold, trigger transmission
+        if let Some(ref schedule) = self.config.tx_schedule {
+            if priority >= schedule.immediate_priority {
+                self.trigger_transmit().await?;
+            }
+        } else {
+            self.trigger_transmit().await?;
+        }
+
+        Ok(msg_id)
+    }
+
+    /// Initiate SBD session (send MO, check for MT)
+    async fn trigger_transmit(&self) -> Result<(), SbdError> {
+        let mut modem = self.modem.lock().await;
+
+        // Check signal strength
+        let rssi = modem.signal_strength().await?;
+        self.signal_strength.store(rssi, Ordering::Relaxed);
+
+        if rssi == 0 {
+            return Err(SbdError::NoSignal);
+        }
+
+        // Dequeue highest priority message
+        let mut queue = self.outbound_queue.lock().await;
+        if let Some(msg) = queue.pop() {
+            // Write to modem buffer
+            modem.write_binary(&msg.fragment.data).await?;
+
+            // Initiate SBD session (+SBDI / +SBDIX)
+            let result = modem.initiate_session().await?;
+
+            if result.mo_status.is_success() {
+                self.stats.record_sent();
+                // Check for MT message
+                if result.mt_queued > 0 {
+                    let mt_data = modem.read_binary().await?;
+                    self.handle_incoming(mt_data).await?;
+                }
+            } else {
+                // Re-queue on failure
+                queue.push(msg);
+                return Err(SbdError::TransmitFailed(result.mo_status));
+            }
+        }
+
+        Ok(())
+    }
 }
 ```
 
-**Configuration**:
+### Compact Message Encoding
+
+Given the 1,960-byte constraint, efficient encoding is critical. Peat messages must be packed tightly:
 
 ```rust
-pub struct TakTransportConfig {
-    /// TAK server address (for server mode)
-    pub server_address: Option<SocketAddr>,
-
-    /// Multicast group (for mesh SA mode)
-    pub multicast_group: Option<IpAddr>,
-
-    /// Client certificate for authentication
-    pub client_cert: Option<PathBuf>,
-    pub client_key: Option<PathBuf>,
-    pub ca_cert: Option<PathBuf>,
-
-    /// Protocol version
-    pub protocol: TakProtocol,
-
-    /// Reconnection policy
-    pub reconnect_policy: ReconnectPolicy,
-
-    /// Message queue size for buffering
-    pub queue_size: usize,
+/// Compact Peat-over-SBD message format
+///
+/// Header (8 bytes):
+///   [0]     Version + flags (1 byte)
+///   [1]     Message type (1 byte)
+///   [2-3]   Sequence number (2 bytes, big-endian)
+///   [4-5]   Payload length (2 bytes, big-endian)
+///   [6-7]   CRC-16 of payload (2 bytes)
+///
+/// Payload (up to 1,952 bytes):
+///   Encoded Peat data (protobuf, CBOR, or raw)
+///
+/// Total: max 1,960 bytes
+///
+pub struct SbdFrame {
+    pub version: u8,         // Protocol version (upper 4 bits) + flags (lower 4)
+    pub msg_type: SbdMessageType,
+    pub sequence: u16,
+    pub payload: Vec<u8>,    // Max 1,952 bytes
 }
 
-pub enum TakProtocol {
-    /// CoT XML over TCP
-    XmlTcp,
-    /// CoT XML over TCP with TLS
-    XmlTcpSsl,
-    /// TAK Protocol v1 (Protobuf)
-    ProtobufV1,
-    /// Mesh SA UDP multicast
-    MeshSa,
+#[repr(u8)]
+pub enum SbdMessageType {
+    /// Position Location Information (PLI)
+    /// Compact: lat(4) + lon(4) + alt(2) + heading(2) + speed(2) + time(4) = 18 bytes
+    Pli = 0x01,
+
+    /// Status report (battery, health, mission state)
+    Status = 0x02,
+
+    /// Text message (compressed UTF-8)
+    TextMessage = 0x03,
+
+    /// CRDT delta sync (for peat-lite state)
+    CrdtDelta = 0x04,
+
+    /// Fragmented message (part of larger payload)
+    Fragment = 0x05,
+
+    /// Acknowledgment
+    Ack = 0x06,
+
+    /// Command (from C2 via gateway)
+    Command = 0x07,
+
+    /// Heartbeat / keepalive
+    Heartbeat = 0x08,
+}
+
+impl SbdFrame {
+    /// Encode a PLI report in minimal bytes
+    pub fn encode_pli(lat: f64, lon: f64, alt: f32, heading: u16, speed: u16) -> Self {
+        let mut payload = Vec::with_capacity(18);
+        payload.extend_from_slice(&(lat as f32).to_be_bytes());  // 4 bytes (sufficient for ~1m precision)
+        payload.extend_from_slice(&(lon as f32).to_be_bytes());  // 4 bytes
+        payload.extend_from_slice(&(alt as i16).to_be_bytes());  // 2 bytes (meters, ±32km)
+        payload.extend_from_slice(&heading.to_be_bytes());       // 2 bytes (degrees × 10)
+        payload.extend_from_slice(&speed.to_be_bytes());         // 2 bytes (cm/s)
+        payload.extend_from_slice(
+            &(SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs() as u32)
+                .to_be_bytes(),
+        ); // 4 bytes (epoch seconds, wraps 2106)
+
+        Self {
+            version: 0x10, // v1, no flags
+            msg_type: SbdMessageType::Pli,
+            sequence: 0,
+            payload,
+        }
+    }
+
+    /// Total frame size including header
+    pub fn wire_size(&self) -> usize {
+        8 + self.payload.len()
+    }
 }
 ```
 
-**Action Items**:
-- [ ] Add `TakTransport` trait to cap-transport
-- [ ] Evaluate `cottak` crate as dependency vs. custom implementation
-- [ ] Implement TAK Server TCP/SSL client
-- [ ] Implement Mesh SA UDP multicast support
+### Message Fragmentation
 
-### 2.2 Message Queuing for DIL Environments
-
-**Requirement**: Buffer outgoing CoT messages when TAK connection is unavailable.
-
-**Rationale**: M1 vignette operates in contested/DIL environments where TAK server connectivity may be intermittent.
-
-**Proposed Behavior**:
-1. Queue messages when disconnected (up to configurable limit)
-2. Replay queued messages on reconnection (with staleness filtering)
-3. Prioritize by PEAT priority level (P1 messages first)
-4. Drop stale messages (past CoT `stale` time)
-
-**Action Items**:
-- [ ] Add `MessageQueue` to TakTransport
-- [ ] Implement priority-aware queue draining
-- [ ] Add metrics for queue depth and dropped messages
-
----
-
-## 3. Protocol Layer Requirements (cap-protocol)
-
-### 3.1 Aggregation Policy Configuration
-
-**Requirement**: Make hierarchical filtering policies configurable per-deployment.
-
-**Current ADR-020 Policies**:
-- `FullFidelity` - All platforms visible (O(n) bandwidth)
-- `SquadLeaderOnly` - Only cell leaders visible
-- `HierarchicalFiltering` - Echelon-appropriate detail
-
-**Additional Policies Needed**:
+For payloads exceeding the SBD limit (e.g., CRDT deltas, images):
 
 ```rust
-pub enum AggregationPolicy {
-    // ... existing policies ...
+/// Fragment header (4 bytes, fits within SbdFrame payload)
+///
+///   [0-1]   Fragment group ID (2 bytes)
+///   [2]     Fragment index (1 byte, 0-indexed)
+///   [3]     Total fragments (1 byte)
+///
+/// Effective payload per fragment: 1,952 - 4 = 1,948 bytes
+/// Maximum reassembled payload: 255 × 1,948 = 496,740 bytes
+///
+pub struct FragmentHeader {
+    pub group_id: u16,
+    pub index: u8,
+    pub total: u8,
+}
 
-    /// Track-focused: Only active tracks visible, not platforms
-    TracksOnly,
+pub fn fragment_message(data: &[u8], max_fragment_payload: usize) -> Result<Vec<SbdFragment>, SbdError> {
+    let effective_payload = max_fragment_payload - FRAGMENT_HEADER_SIZE;
+    let total_fragments = (data.len() + effective_payload - 1) / effective_payload;
 
-    /// Capability-focused: Formation capabilities, not positions
-    CapabilitySummaryOnly,
+    if total_fragments > 255 {
+        return Err(SbdError::PayloadTooLarge);
+    }
 
-    /// Time-windowed: Aggregate updates over N seconds
-    TimeWindowed { window_secs: u32 },
+    let group_id = rand::random::<u16>();
+    let mut fragments = Vec::with_capacity(total_fragments);
 
-    /// Bandwidth-adaptive: Adjust based on link quality
-    BandwidthAdaptive { target_kbps: u32 },
+    for (i, chunk) in data.chunks(effective_payload).enumerate() {
+        let header = FragmentHeader {
+            group_id,
+            index: i as u8,
+            total: total_fragments as u8,
+        };
+
+        let mut fragment_data = Vec::with_capacity(FRAGMENT_HEADER_SIZE + chunk.len());
+        fragment_data.extend_from_slice(&header.to_bytes());
+        fragment_data.extend_from_slice(chunk);
+
+        fragments.push(SbdFragment { data: fragment_data });
+    }
+
+    Ok(fragments)
 }
 ```
 
-**Action Items**:
-- [ ] Expand `AggregationPolicy` enum
-- [ ] Add runtime policy switching
-- [ ] Implement bandwidth monitoring for adaptive mode
+### Gateway Relay Architecture
 
-### 3.2 Priority to CoT Flow-Tags Mapping
+The key architectural decision is how SBD messages flow between isolated SBD-equipped nodes and the broader Peat mesh:
 
-**Requirement**: Map PEAT QoS priorities (ADR-019) to CoT `_flow-tags_` for TAK-side prioritization.
-
-**Proposed Mapping**:
-
-| PEAT Priority | CoT Flow-Tag | TAK Behavior |
-|---------------|--------------|--------------|
-| P1 (Critical) | `priority=flash` | Immediate delivery |
-| P2 (High) | `priority=immediate` | High priority |
-| P3 (Normal) | `priority=routine` | Normal delivery |
-| P4 (Low) | `priority=deferred` | Best effort |
-| P5 (Bulk) | `priority=bulk` | Background |
-
-**Action Items**:
-- [ ] Add flow-tag encoding to CoT encoder
-- [ ] Verify TAK server honors flow-tags
-- [ ] Document priority semantics for operators
-
-### 3.3 Operational Status Representation
-
-**Requirement**: Define how `OperationalStatus` maps to CoT for capability visibility.
-
-**Proposed Approach**:
-
-```xml
-<!-- Platform capability advertisement -->
-<event uid="Alpha-3" type="a-f-G-U-C" ...>
-  <point lat="33.7749" lon="-84.3958" .../>
-  <detail>
-    <_peat_>
-      <status operational="ACTIVE" readiness="0.91"/>
-      <capability type="OBJECT_TRACKING"
-                  model_version="1.3.0"
-                  precision="0.94"
-                  status="ACTIVE"/>
-    </_peat_>
-    <remarks>AI Platform: object_tracker v1.3.0 (Active, 91% ready)</remarks>
-  </detail>
-</event>
+```
+                        Iridium Constellation
+                              ▲    ▲
+                             /      \
+                            /        \
+┌──────────────────┐      /          \      ┌──────────────────┐
+│  Field Device A  │     /            \     │  Field Device B  │
+│  ┌─────────────┐ │    /              \    │ ┌─────────────┐  │
+│  │ Peat Node   │ │   ▼                ▼   │ │ Peat Node   │  │
+│  │ peat-sbd    │◄──► Iridium    Iridium ◄──►│ peat-sbd    │  │
+│  │ (MO/MT)     │ │   Gateway    Gateway   │ │ (MO/MT)     │  │
+│  └─────────────┘ │      │            │    │ └─────────────┘  │
+└──────────────────┘      │            │    └──────────────────┘
+                          ▼            ▼
+                    ┌────────────────────────┐
+                    │   Peat SBD Relay       │
+                    │   (DirectIP server)    │
+                    │                        │
+                    │   MO → Peat mesh pub   │
+                    │   Peat mesh sub → MT   │
+                    │                        │
+                    │   Peer IMEI registry   │
+                    │   Message routing      │
+                    │   Fragment reassembly  │
+                    └───────────┬────────────┘
+                                │
+                    ┌───────────▼────────────┐
+                    │   Peat Mesh            │
+                    │   (QUIC/Iroh)          │
+                    │   Full CRDT sync       │
+                    └────────────────────────┘
 ```
 
-**Status Values**:
-| PEAT Status | CoT Representation | TAK Display |
-|-------------|-------------------|-------------|
-| `Ready` | `operational="READY"` | Green indicator |
-| `Active` | `operational="ACTIVE"` | Blue/active indicator |
-| `Degraded` | `operational="DEGRADED"` | Yellow/warning |
-| `Offline` | `operational="OFFLINE"` | Red/offline |
-| `Loading` | `operational="LOADING"` | Gray/transitioning |
+**Peat SBD Relay** is a server-side component that:
+1. Receives MO messages from the Iridium gateway via DirectIP
+2. Decodes Peat-over-SBD frames
+3. Publishes decoded data into the Peat mesh (as a full Peat node)
+4. Subscribes to Peat mesh data destined for SBD-connected peers
+5. Encodes Peat data into SBD frames
+6. Sends MT messages to field devices via the Iridium gateway
 
-**Action Items**:
-- [ ] Add status encoding to capability CoT events
-- [ ] Consider TAK plugin for custom status rendering
+### Dual-Mode Operation
 
----
+Following `peat-btle`'s pattern:
 
-## 4. Security Requirements
-
-### 4.1 Command Authentication
-
-**Requirement**: Cryptographically verify commands received from TAK before execution.
-
-**Rationale**: CoT mission tasking (`t-x-m`) received via TAK could be spoofed. PEAT must verify command authority.
-
-**Proposed Approach**:
-1. TAK client certificate identity maps to PEAT authority level
-2. Commands require valid certificate from authorized source
-3. Maintain allowlist of authorized TAK users/certificates
-4. Log all command sources for audit
-
-**Action Items**:
-- [ ] Integrate with ADR-006 authority model
-- [ ] Add certificate-to-authority mapping configuration
-- [ ] Implement command audit logging
-
-### 4.2 Track Data Classification
-
-**Requirement**: Support marking tracks with classification levels that persist through CoT translation.
-
-**Proposed Extension**:
-
-```xml
-<_peat_>
-  <classification level="UNCLASSIFIED" caveat="FOUO"/>
-</_peat_>
+```
+┌─────────────────────────────────┐
+│   Full Peat (ATAK, CLI, etc.)   │
+│   TransportManager (PACE policy)│ ← peat-sbd is one transport option
+└──────────┬──────────────────────┘
+           │
+┌──────────▼──────────────────────┐
+│      peat-sbd crate             │
+│ (Standalone OR transport plugin)│ ← Same protocol, dual modes
+└──────────┬──────────────────────┘
+           │
+┌──────────▼──────────────────────┐
+│  Embedded tracker               │
+│  (ESP32 + Iridium 9603)         │ ← Standalone peat-sbd
+│  Can't run full Peat            │
+└─────────────────────────────────┘
 ```
 
-**Action Items**:
-- [ ] Add classification field to TrackUpdate (if not present)
-- [ ] Encode in CoT `_peat_` extension
-- [ ] Validate TAK transport supports classification handling
+**Mode 1 - Standalone**: Embedded devices (ESP32 + Iridium 9603, asset trackers) use peat-sbd directly to send compact PLI/status reports via satellite.
 
----
+**Mode 2 - Transport Plugin**: Full Peat nodes wrap peat-sbd via `PeatSbdTransport` in `TransportManager`, using it as a contingency/emergency PACE transport.
 
-## 5. Open Questions for ADR-020
+### PACE Integration
 
-These questions from ADR-020 warrant resolution based on M1 POC experience:
+SBD naturally fits as a contingency or emergency transport:
 
-### Q5: Should PEAT AI models distribute via TAK data packages?
+```yaml
+transports:
+  - id: "sbd-primary"
+    type: satellite
+    interface: /dev/ttyUSB0
+    description: "Iridium SBD (9603)"
+    config:
+      baud_rate: 19200
+      max_messages_per_hour: 60
+      power_profile: on_demand
+      compression: true
 
-**Recommendation**: No, keep model distribution on PEAT's content-addressed blob transport.
-
-**Rationale**:
-- TAK data packages have size limits (~50MB typical)
-- PEAT's Iroh-based blob transport provides hash verification, resumable transfers
-- Model updates are P5 (bulk) priority - shouldn't compete with tactical data on TAK
-- Keep separation of concerns: TAK for SA, PEAT for autonomy coordination
-
-**Action**: Add explicit statement to ADR-020 that model distribution remains PEAT-internal.
-
-### Q7: Should PEAT cells appear as TAK "groups"?
-
-**Recommendation**: Yes, map PEAT cells to TAK contact groups.
-
-**Rationale**:
-- Natural fit for operators managing multiple teams
-- Enables group messaging to cells
-- Supports TAK's existing group management UI
-
-**Implementation**:
-```xml
-<detail>
-  <__group name="Alpha-Team" role="Team Member"/>
-  <contact callsign="Alpha-Team"/>
-</detail>
+transport_policy:
+  name: "expeditionary"
+  primary: ["iroh-wlan0"]
+  alternate: ["iroh-starlink"]
+  contingency: ["ble-mesh", "lora-primary"]
+  emergency: ["sbd-primary"]
 ```
 
-**Action**: Add TAK group mapping to bridge implementation.
+### Cost-Aware Transport Selection
 
-### Additional Question: How to handle track correlation across teams?
+SBD's per-message billing requires cost-awareness in the TransportManager:
 
-**Context**: In M1 vignette, Alpha and Bravo teams may independently detect the same POI. Should bridge correlate before sending to TAK?
+```rust
+/// Extended capabilities for cost-aware transports
+pub struct CostCapabilities {
+    /// Cost model for this transport
+    pub cost_model: CostModel,
+    /// Current budget remaining (messages or bytes)
+    pub budget_remaining: Option<u64>,
+}
 
-**Options**:
-1. **Bridge correlates**: Single track UID in TAK, sources noted in `_peat_`
-2. **TAK correlates**: Multiple tracks with same description, operator correlates
-3. **Formation correlates**: Coordinator correlates before bridge, single track to TAK
+pub enum CostModel {
+    /// No per-use cost (IP, BLE, WiFi)
+    Flat,
+    /// Per-message cost (SBD)
+    PerMessage {
+        cost_cents: u32,
+        budget_messages: Option<u64>,
+    },
+    /// Per-byte cost (satellite streaming)
+    PerByte {
+        cost_cents_per_kb: u32,
+        budget_bytes: Option<u64>,
+    },
+}
+```
 
-**Recommendation**: Option 3 (Formation correlates). This aligns with PEAT's hierarchical aggregation philosophy.
-
----
-
-## 6. Proposed New ADRs
-
-Based on M1 POC findings, recommend creating:
-
-### ADR-0XX: CoT Custom Detail Extension Schema
-
-**Scope**: Define the `_peat_` XML namespace and schema for embedding PEAT metadata in CoT messages.
-
-**Why Separate ADR**: This is a contract with external systems (TAK ecosystem) and warrants dedicated documentation and versioning.
-
-### ADR-0XX: TAK Transport Adapter
-
-**Scope**: Define the `TakTransport` trait, configuration model, and implementation requirements.
-
-**Why Separate ADR**: Transport adapters are significant architectural components. HTTP and TAK have different enough semantics to warrant separate treatment.
-
-### ADR-0XX: Track Correlation and Deduplication
-
-**Scope**: Define how PEAT correlates tracks from multiple sources before external publication.
-
-**Why Separate ADR**: Affects both internal PEAT behavior and external representations in TAK.
+This allows the TransportManager to prefer free transports and only fall through to SBD when no alternatives exist, or when message priority justifies the cost.
 
 ---
 
-## 7. Implementation Priority
+## peat-ffi Integration
 
-Based on M1 vignette requirements:
+Extend `TransportConfigFFI` (per ADR-050) to support SBD:
 
-### Phase 1 (MVP for M1)
-1. CoT encoder for `TrackUpdate` → CoT Event
-2. CoT encoder for `CapabilityAdvertisement` → CoT Event
-3. Basic TAK Server TCP connection
-4. `_peat_` detail extension (minimal)
+```rust
+pub struct TransportConfigFFI {
+    pub enable_ble: bool,
+    pub ble_mesh_id: Option<String>,
+    pub ble_power_profile: Option<String>,
+    pub transport_preference: Option<Vec<String>>,
 
-### Phase 2 (Full M1)
-1. CoT decoder for `t-x-m` → `TrackCommand`
-2. CoT decoder for `u-d-r` → `OperationalBoundary`
-3. Handoff message encoding with links
-4. TAK SSL/certificate authentication
-
-### Phase 3 (Production)
-1. Mesh SA UDP multicast
-2. Bandwidth-adaptive aggregation
-3. Message queuing for DIL
-4. Full status/capability representation
+    // SBD satellite transport
+    pub enable_sbd: bool,
+    pub sbd_serial_port: Option<String>,
+    pub sbd_baud_rate: Option<u32>,
+    pub sbd_max_messages_per_hour: Option<u16>,
+    pub sbd_power_profile: Option<String>,
+    pub sbd_gateway_url: Option<String>,
+}
+```
 
 ---
 
-## 8. Testing Requirements
+## Modem Abstraction
 
-### Integration Test Environment
+```rust
+/// Abstraction over SBD-capable modems
+#[async_trait]
+pub trait SbdModem: Send + Sync {
+    /// Check if modem is responding
+    async fn ping(&mut self) -> Result<(), SbdError>;
 
-1. **FreeTakServer** - Open-source TAK server for development
-2. **ATAK emulator** - Android emulator with ATAK for UI testing
-3. **Network simulation** - Inject latency/loss for DIL testing
+    /// Get modem IMEI
+    async fn imei(&mut self) -> Result<String, SbdError>;
 
-### Test Cases
+    /// Get current signal strength (0-5)
+    async fn signal_strength(&mut self) -> Result<u8, SbdError>;
 
-| Test | Description | Success Criteria |
-|------|-------------|------------------|
-| TC-01 | TrackUpdate → CoT → ATAK | Track visible on ATAK map within 2s |
-| TC-02 | ATAK mission task → TrackCommand | Command received by PEAT team |
-| TC-03 | Capability advertisement | Platform capabilities visible in ATAK |
-| TC-04 | Track handoff | Handoff link visible, track transfers |
-| TC-05 | DIL resilience | Messages queue, replay on reconnect |
-| TC-06 | Certificate auth | Unauthorized commands rejected |
+    /// Write binary data to MO buffer
+    async fn write_binary(&mut self, data: &[u8]) -> Result<(), SbdError>;
+
+    /// Read binary data from MT buffer
+    async fn read_binary(&mut self) -> Result<Vec<u8>, SbdError>;
+
+    /// Initiate SBD session (transmit MO, receive MT)
+    async fn initiate_session(&mut self) -> Result<SbdSessionResult, SbdError>;
+
+    /// Clear message buffers
+    async fn clear_buffers(&mut self, which: BufferTarget) -> Result<(), SbdError>;
+
+    /// Power on/off the modem
+    async fn set_power(&mut self, on: bool) -> Result<(), SbdError>;
+
+    /// Register for ring alert notifications (MT message waiting)
+    async fn enable_ring_alert(&mut self, enable: bool) -> Result<(), SbdError>;
+}
+
+/// Result of an SBD session (+SBDIX response)
+pub struct SbdSessionResult {
+    /// MO status (0 = success, 1 = success but too large, 2+ = failure)
+    pub mo_status: MoStatus,
+    /// MO sequence number assigned by gateway
+    pub mo_msn: u16,
+    /// MT status (0 = no message, 1 = message received, 2 = error)
+    pub mt_status: MtStatus,
+    /// MT sequence number
+    pub mt_msn: u16,
+    /// MT message length in bytes
+    pub mt_length: u16,
+    /// Number of MT messages queued at gateway
+    pub mt_queued: u8,
+}
+```
+
+---
+
+## Implementation Plan
+
+### Phase 1: Core Modem Driver
+
+- [ ] Define `SbdModem` trait
+- [ ] Implement AT command parser (+SBDWB, +SBDRB, +SBDI/+SBDIX, +CSQ, +CGSN)
+- [ ] Implement `Iridium9603Modem` for 9602/9603 transceivers
+- [ ] Implement `MockModem` for testing
+- [ ] Serial port abstraction (Linux termios, cross-platform via `serialport` crate)
+- [ ] Unit tests with mock modem
+
+### Phase 2: Message Encoding & Framing
+
+- [ ] Define `SbdFrame` compact message format
+- [ ] Implement `SbdMessageType` encoders (PLI, Status, TextMessage, CrdtDelta)
+- [ ] Implement fragmentation / reassembly
+- [ ] Implement optional LZ4 compression
+- [ ] CRC-16 validation
+- [ ] Round-trip encoding tests
+
+### Phase 3: Transport Trait & Queue
+
+- [ ] Implement `PeatSbdTransport` (ADR-032 `Transport` trait)
+- [ ] Priority-based outbound message queue
+- [ ] Cost budgeting and rate limiting
+- [ ] Power management (scheduled windows, on-demand)
+- [ ] Signal monitoring and availability reporting
+- [ ] Integration tests with mock modem
+
+### Phase 4: Gateway Relay
+
+- [ ] DirectIP server for MO message reception
+- [ ] DirectIP client for MT message sending
+- [ ] Peat mesh bridge (full Peat node that relays SBD ↔ mesh)
+- [ ] Peer IMEI registry and routing table
+- [ ] Fragment reassembly at gateway
+- [ ] End-to-end integration tests
+
+### Phase 5: Platform Support
+
+- [ ] Linux serial driver (primary target)
+- [ ] Android USB OTG serial via JNI
+- [ ] `no_std` embedded driver for ESP32 + Iridium 9603
+- [ ] Cross-compile verification (aarch64, armv7)
+
+---
+
+## Success Criteria
+
+### Functional Requirements
+
+- [ ] Send MO SBD message via Iridium 9603 modem
+- [ ] Receive MT SBD message from gateway
+- [ ] Round-trip message through gateway relay into Peat mesh
+- [ ] Fragment and reassemble messages exceeding 1,960 bytes
+- [ ] Compress payloads to maximize data per message
+- [ ] Implement ADR-032 `Transport` trait for TransportManager
+- [ ] Cost budgeting prevents exceeding configured message limits
+
+### Performance Requirements
+
+- [ ] PLI report in ≤ 26 bytes (18 payload + 8 header)
+- [ ] Message encoding/decoding < 1ms
+- [ ] Queue management < 100μs per operation
+- [ ] Modem session initiation < 30s (including satellite acquisition)
+
+### Testing
+
+- [ ] Unit tests with mock modem (no hardware required)
+- [ ] Integration tests with mock gateway (DirectIP server)
+- [ ] Hardware-in-the-loop tests with Iridium 9603 + RockBLOCK developer kit
+- [ ] End-to-end test: field device → SBD → gateway → Peat mesh → response → SBD → field device
+
+---
+
+## Consequences
+
+### Positive
+
+- **True global reach**: Peat nodes can communicate from anywhere with sky visibility
+- **PACE completeness**: Provides a genuine emergency transport when all terrestrial options fail
+- **Low power**: Iridium 9603 draws ~1.5W transmit, suitable for battery-powered platforms
+- **Small form factor**: 9603 module is 32×30×12mm, embeddable in almost anything
+- **Proven infrastructure**: Iridium constellation has been operational since 1998 with 99.9% uptime
+- **Dual-mode flexibility**: Same crate works standalone on embedded or as transport plugin on full Peat
+
+### Negative
+
+- **High latency**: 5-20s per message rules out real-time applications
+- **Tiny payloads**: 1,960-byte limit requires careful encoding and fragmentation
+- **Per-message cost**: ~$0.04-0.13 per message requires cost-aware protocol design
+- **No broadcast**: Point-to-point only; mesh-wide sync requires gateway relay infrastructure
+- **Hardware dependency**: Requires Iridium modem and active airtime subscription
+- **Gateway complexity**: Full bidirectional operation requires a relay server with Iridium DirectIP
+
+### Risks
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|-----------|--------|------------|
+| Iridium network outage | Low | High | Retry queue with exponential backoff; SBD is store-and-forward by nature |
+| Cost overrun from chatty sync | Medium | Medium | Hard budget limits, priority filtering, scheduled windows |
+| Signal acquisition failure (indoor, dense foliage) | Medium | Medium | Queue messages, retry on schedule; require sky visibility |
+| Modem hardware failure | Low | High | Graceful degradation—node continues on other transports |
+| Fragment loss (partial reassembly) | Medium | Low | Fragment timeout + retransmit; group-level ACK |
+
+---
+
+## Alternatives Considered
+
+### Option 1: Starlink as Primary Satellite Transport
+**Pros**: High bandwidth (50-200 Mbps), low latency (20-40ms), IP-native (just another Iroh interface)
+**Cons**: Large terminal, high power (~100W), limited coverage (no polar), expensive
+**Decision**: Starlink is better served as an IP transport via Iroh (ADR-032 QUIC), not a dedicated crate. SBD serves a fundamentally different niche (low-power, tiny terminal, global).
+
+### Option 2: Integrate SBD into peat-protocol Directly
+**Pros**: Simpler dependency graph, no external crate
+**Cons**: Adds serial/modem code to core protocol crate, platform-specific dependencies pollute core, harder to test independently
+**Decision**: External crate follows established pattern (peat-btle) and keeps core clean.
+
+### Option 3: Use Existing Rust SBD Libraries
+**Pros**: Faster initial development
+**Cons**: No mature Rust SBD library exists with the features needed (power management, fragmentation, gateway relay); would still need significant custom code
+**Decision**: Build from scratch with clear modem abstraction to support future hardware.
+
+### Option 4: Iridium Certus Instead of SBD
+**Pros**: Higher bandwidth (up to 704 kbps), IP-based
+**Cons**: Certus terminals are larger, more expensive, higher power; overkill for the emergency/contingency use case
+**Decision**: SBD's simplicity and tiny form factor better serve the PACE emergency role. Certus could be a future extension using the same crate structure.
 
 ---
 
 ## References
 
-- [ADR-020: TAK-CoT Integration](../../../cap/docs/adr/020-TAK-CoT-Integration.md)
-- [M1 Vignette Use Case](./PEAT-Vignette-M1/VIGNETTE_USE_CASE.md)
-- [CoT Schema Mapping](./COT_SCHEMA_MAPPING.md) (companion document)
-- [cottak crate](https://docs.rs/cottak/latest/cottak/)
-- [CoT Developer's Guide](https://tutorials.techrad.co.za/wp-content/uploads/2021/06/The-Developers-Guide-to-Cursor-on-Target-1.pdf)
+1. [Iridium Short Burst Data Service](https://www.iridium.com/services/iridium-sbd/) - Official SBD service page
+2. [Iridium SBD Developers Guide v3.0](https://www.ydoc.biz/download/IRDM_IridiumSBDService.pdf) - Protocol specification
+3. [Iridium 9603 Transceiver](https://www.iridium.com/products/iridium-9603/) - Primary target hardware
+4. [RockBLOCK Developer Kit](https://www.groundcontrol.com/products/iridium/rockblock/) - Development hardware
+5. ADR-032: Pluggable Transport Abstraction
+6. ADR-039: Peat-BTLE Mesh Transport Crate
+7. ADR-041: Multi-Transport Embedded Integration
+8. [peat-btle on Radicle](https://app.radicle.xyz/nodes/rosa.radicle.xyz/rad%3Az458mp9Um3AYNQQFMdHaNEUtmiohq) - External transport crate pattern
 
 ---
 
-# Rust Embedded Database Comparison: redb vs fjall
+## Decision Log
+
+| Date | Decision | Rationale |
+|------|----------|-----------|
+| 2025-02-10 | Proposed ADR-051 | Need BLOS transport for expeditionary and maritime PACE scenarios |
+| 2025-02-10 | Chose Iridium SBD over Certus | SBD's low power, tiny terminal, and store-and-forward model fit emergency/contingency PACE role |
+| 2025-02-10 | External crate pattern | Follows peat-btle precedent; keeps modem/serial code out of core |
+
+---
+
+**Next Steps:**
+1. Review and approve ADR
+2. Create `peat-sbd` Radicle repository
+3. Phase 1: Modem driver with mock testing
+4. Acquire RockBLOCK developer kit for hardware-in-the-loop testing
+5. Phase 4: Gateway relay for bidirectional SBD ↔ Peat mesh bridging
+
+**Radicle:**
+- Create `rad:z...` for peat-sbd (pending approval)
+
+
+# ADR-052: Peat-LoRa Long-Range Radio Transport
+
+**Status**: Proposed
+**Date**: 2026-02-25
+**Authors**: Kit Plummer, Claude
+**Organization**: Defense Unicorns (https://defenseunicorns.com)
+**Relates To**: ADR-032 (Pluggable Transport Abstraction), ADR-035 (Peat-Lite Embedded Nodes), ADR-039 (Peat-BTLE Mesh Transport), ADR-041 (Multi-Transport Embedded Integration), ADR-051 (Peat-SBD Satellite Transport)
+
+---
 
 ## Executive Summary
 
-For PEAT Protocol's Automerge + Iroh implementation, **redb is the recommended choice**, primarily because Iroh already uses redb for its storage layer. This provides:
-- Proven integration patterns with CRDT-sync use cases
-- Battle-tested async/sync bridging patterns documented by Iroh team
-- Ecosystem alignment with your primary networking dependency
-
-However, fjall offers compelling advantages for write-heavy scenarios and should remain on the radar for specialized use cases.
+This ADR defines the architecture for `peat-lora`, a Rust crate providing long-range LoRa radio transport for Peat Protocol. The crate fills the 7-87 km range gap between BLE mesh (100-400m) and SBD satellite (global), targeting remote sensor relay, forward observer links, and cross-ridge communication where IP infrastructure is unavailable. A single crate provides two feature-gated link backends: `mlrs-serial` for Linux/desktop nodes communicating via mLRS hardware over UART/USB, and `lora-phy` for embedded nodes (ESP32 + SX1262) driving LoRa chipsets directly. Both backends share the same over-the-air frame format and implement the ADR-032 `Transport` trait as an external transport extension, following the pattern established by `peat-btle` and `peat-sbd`.
 
 ---
 
-## Developer & Commercial Assessment
+## Context
 
-### redb
+### The Long-Range Gap
 
-| Aspect | Details |
-|--------|---------|
-| **Primary Author** | Christopher Berner (cberner) |
-| **Background** | BioAI at OpenAI, previously robotics lead. UC Berkeley education. San Francisco based. |
-| **Commercial Aspiration** | Hobby/Open Source - no commercial entity behind it |
-| **License** | MIT OR Apache-2.0 |
-| **Development Style** | Solo maintainer with community contributions |
+Peat's current transport options cover short-range and global communication, but leave a critical gap in between:
 
-**Notable**: Christopher appears to be a senior ML/robotics engineer at OpenAI. redb is a side project, but maintained to production quality.
+| Transport | Range | Bandwidth | Latency | Power | Use Case |
+|-----------|-------|-----------|---------|-------|----------|
+| QUIC/Iroh | Unlimited (IP) | 1-100 Mbps | 1-50ms | Low | Primary mesh |
+| peat-btle | 100-400m (Coded PHY) | 2 Mbps | 10-100ms | Very Low | Device mesh |
+| **??? (Gap)** | **7-87 km** | **1.5-9.1 kB/s** | **50-500ms** | **Low** | **Long-range relay** |
+| peat-sbd | Global | ~33 B/s | 5-20s | ~1.5W TX | Emergency PACE |
 
-### fjall
+Tactical edge operations regularly need communication across distances that BLE cannot reach but where satellite is overkill or too slow:
 
-| Aspect | Details |
-|--------|---------|
-| **Primary Author** | Marvin (marvin-j97) |
-| **Background** | Software developer & entrepreneur in Hannover, Germany. CTO/Co-founder of Zoop (comicbook platform) |
-| **Commercial Aspiration** | Has GitHub Sponsors enabled; Sponsored by Orbitinghail (SQLSync) |
-| **License** | MIT OR Apache-2.0 |
-| **Development Style** | Very active solo developer with high commit velocity |
+| Scenario | Gap | Peat Use Case |
+|----------|-----|---------------|
+| Cross-ridge relay | 5-15 km, no line-of-sight to IP | Forward observer ↔ command post PLI |
+| Remote sensor network | 10-50 km, no infrastructure | Environmental / seismic sensor data relay |
+| Maritime ship-to-shore | 20-80 km coastal | Small craft ↔ shore station coordination |
+| Wildfire perimeter | 10-30 km across terrain | Firefighter position tracking |
+| Rural disaster response | 15-50 km, infrastructure destroyed | Field team status relay to HQ |
 
-**Notable**: Marvin is younger and more actively focused on fjall as a primary project. The SQLSync sponsorship suggests enterprise interest.
+### Why mLRS + Direct LoRa?
 
----
+mLRS (Mavlink LoRa System) is an open-source LoRa firmware that provides transparent bidirectional serial passthrough over long-range LoRa radio links. It turns commodity LoRa hardware (SX1276, SX1262, STM32-based modules) into a serial cable replacement with ranges of 7-87 km depending on frequency band and conditions.
 
-## Repository Health
+| Property | mLRS Serial Bridge | Direct LoRa (lora-phy) | LoRaWAN |
+|----------|--------------------|------------------------|---------|
+| **Topology** | Point-to-point (transparent) | Point-to-point (custom) | Star (gateway-centric) |
+| **Payload** | Up to 252 bytes/frame | Up to 255 bytes/frame | 51-222 bytes |
+| **Direction** | Full duplex (serial) | Half duplex (radio) | Uplink-dominant |
+| **Latency** | 10-50ms (serial) | 50-500ms (radio timing) | 1-5s (class A) |
+| **Configuration** | mLRS firmware handles radio | App controls radio directly | Requires LoRaWAN gateway |
+| **Infrastructure** | None (peer-to-peer) | None (peer-to-peer) | Requires gateway + network server |
+| **Range** | 7-87 km (mLRS optimized) | 5-50 km (depends on params) | 2-15 km typical |
 
-### redb
+mLRS is the fastest path to long-range capability—connect mLRS modules to UART/USB, push Peat frames through the serial link. Direct LoRa via `lora-phy` enables embedded nodes (ESP32 + SX1262) to participate without separate mLRS hardware.
 
-| Metric | Value |
-|--------|-------|
-| **Stars** | 4,100 |
-| **Forks** | 190 |
-| **Watchers** | 27 |
-| **Open Issues** | 10 |
-| **Open PRs** | 0 |
-| **Contributors** | 34 |
-| **Commits** | 1,400 |
-| **Releases** | 59 |
-| **Used By** | 1,300+ projects |
-| **Latest Release** | v3.1.0 (September 2025) |
-| **File Format** | Stable since v1.0, upgrade path provided |
+### Why a Single Crate with Feature Flags?
 
-**Assessment**: Mature, stable project with wide adoption. Low issue count indicates stability. Used by significant projects including Iroh.
-
-### fjall
-
-| Metric | Value |
-|--------|-------|
-| **Stars** | 1,400 |
-| **Forks** | 53 |
-| **Watchers** | 11 |
-| **Open Issues** | 19 |
-| **Open PRs** | 2 |
-| **Contributors** | 13 |
-| **Commits** | 1,818 |
-| **Releases** | 80 |
-| **Used By** | 112 projects |
-| **Latest Release** | v2.11.2 (July 2025) |
-| **File Format** | Stable since v2.0, v3.0 in development |
-
-**Assessment**: Rapidly evolving project with very high commit velocity. More releases suggest faster iteration but potentially more breaking changes. Smaller but growing adoption.
-
----
-
-## Performance Benchmarks
-
-*Data from redb's official benchmarks on Ryzen 9950X3D with Samsung 9100 PRO NVMe*
-
-| Operation | redb | fjall | RocksDB | lmdb | sled |
-|-----------|------|-------|---------|------|------|
-| **Bulk load** | 17,063ms | 18,619ms | 13,969ms | **9,232ms** | 24,971ms |
-| **Individual writes** | **920ms** | 3,488ms | 2,432ms | 1,598ms | 2,701ms |
-| **Batch writes** | 1,595ms | **353ms** | 451ms | 942ms | 853ms |
-| **len()** | **0ms** | 1,181ms | 749ms | **0ms** | 1,573ms |
-| **Random reads** | 1,138ms | 2,177ms | 2,911ms | **637ms** | 1,601ms |
-| **Random range reads** | 1,174ms | 2,564ms | 2,734ms | **565ms** | 1,992ms |
-| **16-thread reads** | 652ms | 963ms | 1,478ms | **216ms** | 690ms |
-| **Removals** | 23,297ms | **6,004ms** | 6,900ms | 10,435ms | 11,088ms |
-| **Uncompacted size** | 4.00 GiB | 1.00 GiB | **893 MiB** | 2.61 GiB | 2.13 GiB |
-| **Compacted size** | 1.69 GiB | 1.00 GiB | **455 MiB** | 1.26 GiB | N/A |
-
-### Key Performance Takeaways
-
-**redb wins at:**
-- Individual writes (3.8x faster than fjall)
-- Random reads (1.9x faster)
-- Range reads (2.2x faster)
-- Constant-time len() operation
-- Multi-threaded read scaling
-
-**fjall wins at:**
-- Batch writes (4.5x faster than redb)
-- Removals/deletions (3.9x faster)
-- Storage efficiency (built-in LZ4 compression)
-- Write amplification (LSM advantage)
-
----
-
-## Architecture Comparison
-
-### redb - B+Tree Design
+Both link backends share the same over-the-air frame format, the same `Transport` trait implementation, and the same gateway bridge logic. Splitting into two crates would duplicate the frame codec, fragmentation logic, and transport layer:
 
 ```
-┌─────────────────────────────────────┐
-│  Copy-on-Write B+Trees              │
-├─────────────────────────────────────┤
-│  • LMDB-inspired architecture       │
-│  • MVCC with serializable isolation │
-│  • Single-file database             │
-│  • Memory-mapped I/O                │
-│  • Zero-copy reads                  │
-└─────────────────────────────────────┘
+peat-lora/
+├── src/
+│   ├── frame.rs         # Shared frame format (both backends)
+│   ├── transport.rs     # Shared Transport trait impl
+│   ├── link/
+│   │   ├── mod.rs       # LoRaLink trait
+│   │   ├── mlrs.rs      # feature = "mlrs-serial"
+│   │   └── direct.rs    # feature = "lora-phy"
 ```
 
-**Characteristics:**
-- Read-optimized (B-tree random access)
-- Excellent point lookups
-- Predictable latency
-- Higher write amplification
-- Simpler crash recovery
+Feature flags keep the dependency footprint minimal: `mlrs-serial` pulls in `tokio-serial` (Linux only), while `lora-phy` pulls in `embedded-hal` + `lora-phy` (no_std compatible).
 
-### fjall - LSM-Tree Design
+### External Crate Pattern
+
+Like `peat-btle` and `peat-sbd`, `peat-lora` will be developed as an external crate, following the established pattern:
 
 ```
-┌─────────────────────────────────────┐
-│  Log-Structured Merge Tree (LSM)    │
-├─────────────────────────────────────┤
-│  • RocksDB-inspired architecture    │
-│  • Column families (partitions)     │
-│  • Multiple files per database      │
-│  • Background compaction            │
-│  • Built-in compression (LZ4)       │
-└─────────────────────────────────────┘
-```
+peat (main repo)
+├── peat-protocol/    ← Transport trait definitions (ADR-032)
+├── peat-ffi/         ← FFI bindings with LoRa config
+└── ...
 
-**Characteristics:**
-- Write-optimized (sequential writes)
-- Excellent batch throughput
-- Lower write amplification
-- Better compression ratios
-- Background maintenance overhead
+peat-btle (external) ← BLE mesh transport
+    └── rad:z458mp9Um3AYNQQFMdHaNEUtmiohq
+
+peat-sbd (external)  ← SBD satellite transport
+    └── rad:zXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+peat-lora (external) ← LoRa long-range transport [NEW]
+    └── rad:zXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+```
 
 ---
 
-## Feature Comparison
+## Decision Drivers
 
-| Feature | redb | fjall |
-|---------|------|-------|
-| **100% Safe Rust** | ✅ | ✅ |
-| **ACID Transactions** | ✅ | ✅ |
-| **MVCC** | ✅ | ✅ |
-| **Concurrent Readers** | ✅ | ✅ |
-| **Single Writer** | ✅ | ✅ (+ OCC option) |
-| **Compression** | ❌ | ✅ LZ4/zlib |
-| **Column Families** | Tables | Partitions (keyspaces) |
-| **Cross-partition Atomics** | ✅ | ✅ |
-| **Savepoints/Rollback** | ✅ | ✅ |
-| **Blob Separation** | ❌ | ✅ |
-| **Custom Storage Backend** | ✅ | ❌ |
-| **Multi-process Access** | ✅ (ReadOnly) | ❌ |
-| **File Format Stability** | Stable | Stable (2.x) |
-| **Key Size Limit** | 3.75 GiB | 64 KB |
-| **Value Size Limit** | 3.75 GiB | 4 GB |
+### Requirements
+
+1. **Long-Range**: 7-87 km depending on frequency band and terrain
+2. **Low Power**: Suitable for battery-powered field devices (< 1W transmit)
+3. **No Infrastructure**: Peer-to-peer links, no gateways or network servers required
+4. **Peat Transport Trait**: Implement ADR-032 `Transport` trait for TransportManager integration
+5. **Dual Link Backends**: mLRS serial bridge (Linux) and direct LoRa radio (embedded)
+6. **Shared Frame Format**: Identical over-the-air encoding regardless of link backend
+7. **Gateway Bridge**: Linux nodes bridge LoRa ↔ IP mesh per ADR-041
+8. **Regulatory Compliance**: Duty cycle limits for EU 868 MHz, FCC rules for US 915 MHz
+
+### Constraints
+
+1. **Bandwidth**: 1.5-9.1 kB/s depending on band and spreading factor; not suitable for bulk data
+2. **Half Duplex**: LoRa radio is half-duplex; only one direction at a time
+3. **Payload Size**: 252 bytes max per mLRS frame; fragmentation needed for larger messages
+4. **Point-to-Point**: Not a mesh protocol; each link is one-to-one
+5. **Frequency Bands**: Must respect regional regulations (868 MHz EU, 915 MHz US, 433 MHz global, 2.4 GHz ISM)
+6. **Duty Cycle**: EU 868 MHz band has 1% duty cycle limit (36 seconds per hour at some sub-bands)
+7. **Hardware Diversity**: mLRS supports SX1276, SX1262, STM32-based modules; direct LoRa targets SX1262
 
 ---
 
-## PEAT-Specific Considerations
+## Decision
 
-### Iroh Integration (Critical Factor)
+### Architecture
 
-**redb is used by Iroh** for:
-- `iroh-docs` persistent storage
-- `iroh-blobs` inline small blob storage
-- Document sync state
+`peat-lora` implements the ADR-032 `Transport` trait with a link abstraction layer that supports both mLRS serial bridge and direct LoRa radio backends.
 
-The Iroh team has documented their async/sync bridging patterns:
-```rust
-// Pattern from Iroh: Handler thread with message passing
-// for bridging async Tokio tasks with sync redb operations
+### Crate Structure
+
+```
+peat-lora/
+├── src/
+│   ├── lib.rs              # Public API, re-exports, feature gates
+│   ├── transport.rs         # Transport trait implementation (ADR-032)
+│   ├── config.rs            # LoRa configuration (serial port, radio params, peer map)
+│   ├── frame.rs             # Over-the-air frame format (shared by both backends)
+│   ├── fragment.rs          # Fragmentation / reassembly for >252 byte messages
+│   ├── link/
+│   │   ├── mod.rs           # LoRaLink trait abstraction
+│   │   ├── mlrs.rs          # mLRS serial bridge (feature = "mlrs-serial")
+│   │   └── direct.rs        # Direct SX1262 radio (feature = "lora-phy")
+│   ├── discovery.rs         # Peer discovery (pre-configured or beacon)
+│   ├── duty_cycle.rs        # Regional duty cycle tracking and enforcement
+│   ├── encryption.rs        # App-layer ChaCha20-Poly1305 encryption
+│   └── platform/
+│       ├── mod.rs           # Platform abstraction
+│       ├── linux.rs         # Linux serial (tokio-serial)
+│       └── embedded.rs      # no_std embedded SPI (ESP32 + SX1262)
+├── tests/
+│   ├── frame_tests.rs
+│   ├── fragment_tests.rs
+│   ├── transport_tests.rs
+│   └── integration_tests.rs
+├── examples/
+│   ├── mlrs_bridge.rs       # mLRS serial bridge relay
+│   ├── send_position.rs     # Send PLI over LoRa
+│   └── direct_radio.rs      # Direct SX1262 radio link
+├── Cargo.toml
+└── README.md
 ```
 
-This means proven patterns exist for the exact use case PEAT needs.
+### Link Abstraction
 
-### CRDT Workload Analysis
-
-For PEAT's Automerge document sync:
-
-| Workload Pattern | Better Choice | Reasoning |
-|-----------------|---------------|-----------|
-| **Many small updates** | redb | Better individual write perf |
-| **Large batch syncs** | fjall | 4.5x faster batch writes |
-| **Point reads (get state)** | redb | 1.9x faster random reads |
-| **Range scans (history)** | redb | 2.2x faster range reads |
-| **Concurrent readers** | redb | Better multi-thread scaling |
-| **Storage constrained** | fjall | Built-in compression |
-| **High deletion rate** | fjall | 3.9x faster removals |
-
-### Edge Device Considerations
-
-| Factor | redb | fjall |
-|--------|------|-------|
-| **Memory footprint** | Lower | Higher (compaction buffers) |
-| **CPU overhead** | Lower | Higher (compression, compaction) |
-| **Flash wear** | Higher WAF | Lower WAF |
-| **Predictable latency** | Better | Compaction spikes |
-| **Build simplicity** | Simpler | More complex |
-
----
-
-## Risk Assessment
-
-### redb Risks
-- **Single maintainer**: Christopher's OpenAI work could deprioritize redb
-- **Slower iteration**: Stable but less frequent updates
-- **No compression**: Larger storage footprint
-
-### fjall Risks
-- **Younger project**: Less battle-tested at scale
-- **Faster-moving target**: More breaking changes
-- **Solo developer risk**: Marvin could pivot to other projects
-- **Less production validation**: 112 vs 1,300+ dependents
-
----
-
-## Recommendation for PEAT
-
-### Primary: redb
-
-1. **Iroh alignment** - Already proven in the CRDT sync context
-2. **Stability** - Mature, stable API and file format
-3. **Read performance** - Better for typical C2 query patterns
-4. **Predictable latency** - No compaction surprises
-5. **Simpler architecture** - Easier to reason about
-
-### When to Consider fjall
-
-- If PEAT workload becomes heavily write-dominated
-- If storage efficiency becomes critical constraint
-- If batch sync operations dominate over individual updates
-- If deletion-heavy patterns emerge (TTL expiration)
-
-### Integration Path
+The `LoRaLink` trait abstracts over the physical radio layer, allowing the transport and frame logic to be backend-agnostic:
 
 ```rust
-// Recommended: Follow Iroh's pattern
-// Use redb with handler thread for sync operations
+/// Abstraction over LoRa link backends
+#[async_trait]
+pub trait LoRaLink: Send + Sync {
+    /// Send a frame over the LoRa link
+    async fn send(&self, frame: &LoRaFrame) -> Result<(), LoRaError>;
 
-use redb::{Database, TableDefinition};
-use tokio::sync::mpsc;
+    /// Receive the next frame from the LoRa link
+    async fn recv(&self) -> Result<LoRaFrame, LoRaError>;
 
-// PEAT storage actor pattern (similar to Iroh)
-struct StorageActor {
-    db: Database,
-    rx: mpsc::Receiver<StorageCommand>,
+    /// Check if the link is currently connected/available
+    fn is_available(&self) -> bool;
+
+    /// Get current RSSI (received signal strength) if available
+    fn rssi(&self) -> Option<i16>;
+
+    /// Get current SNR (signal-to-noise ratio) if available
+    fn snr(&self) -> Option<f32>;
+}
+```
+
+**mLRS serial backend** (`feature = "mlrs-serial"`):
+- Opens a UART/USB serial port to the mLRS module via `tokio-serial`
+- Wraps `LoRaFrame` bytes in the serial stream
+- mLRS firmware handles radio parameters, frequency hopping, and link management
+- Linux/desktop only (requires `tokio` runtime)
+
+**Direct LoRa backend** (`feature = "lora-phy"`):
+- Drives an SX1262 LoRa transceiver via SPI using the `lora-phy` crate
+- Application controls spreading factor, bandwidth, coding rate, and TX power
+- `no_std` compatible for embedded targets (ESP32, STM32)
+- Requires `embedded-hal` SPI + GPIO traits
+
+### Over-the-Air Frame Format
+
+Both backends use the same frame format on the wire. The frame wraps a peat-lite protocol payload (ADR-035) with a minimal header:
+
+```rust
+/// LoRa over-the-air frame format
+///
+/// Header (3 bytes):
+///   [0]     Marker byte (0xEC — "peat")
+///   [1]     Flags (1 byte)
+///             bit 0:   fragmented (1 = fragment, 0 = complete)
+///             bit 1:   encrypted (1 = app-layer encryption)
+///             bit 2:   compressed (1 = payload compressed)
+///             bit 3:   ack-requested (1 = sender wants ACK)
+///             bits 4-7: reserved
+///   [2]     Payload length (1 byte, max 252)
+///
+/// Payload (up to 249 bytes unfragmented, or per-fragment):
+///   peat-lite protocol header (16 bytes, ADR-035) + CRDT data
+///
+/// Total: max 252 bytes (matching mLRS serial frame limit)
+///
+pub struct LoRaFrame {
+    pub flags: FrameFlags,
+    pub payload: Vec<u8>,    // Max 249 bytes (252 - 3 header)
+}
+
+bitflags! {
+    pub struct FrameFlags: u8 {
+        const FRAGMENTED    = 0b0000_0001;
+        const ENCRYPTED     = 0b0000_0010;
+        const COMPRESSED    = 0b0000_0100;
+        const ACK_REQUESTED = 0b0000_1000;
+    }
+}
+
+pub const LORA_FRAME_MARKER: u8 = 0xEC;
+pub const LORA_HEADER_SIZE: usize = 3;
+pub const LORA_MAX_FRAME_SIZE: usize = 252;
+pub const LORA_MAX_PAYLOAD_SIZE: usize = LORA_MAX_FRAME_SIZE - LORA_HEADER_SIZE; // 249
+
+impl LoRaFrame {
+    pub fn encode(&self) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(LORA_HEADER_SIZE + self.payload.len());
+        buf.push(LORA_FRAME_MARKER);
+        buf.push(self.flags.bits());
+        buf.push(self.payload.len() as u8);
+        buf.extend_from_slice(&self.payload);
+        buf
+    }
+
+    pub fn decode(data: &[u8]) -> Result<Self, LoRaError> {
+        if data.len() < LORA_HEADER_SIZE {
+            return Err(LoRaError::FrameTooShort);
+        }
+        if data[0] != LORA_FRAME_MARKER {
+            return Err(LoRaError::InvalidMarker);
+        }
+        let flags = FrameFlags::from_bits_truncate(data[1]);
+        let length = data[2] as usize;
+        if data.len() < LORA_HEADER_SIZE + length {
+            return Err(LoRaError::IncompletePayload);
+        }
+        Ok(Self {
+            flags,
+            payload: data[LORA_HEADER_SIZE..LORA_HEADER_SIZE + length].to_vec(),
+        })
+    }
+}
+```
+
+### Fragmentation
+
+Messages exceeding 249 bytes (the payload limit after the 3-byte header) are fragmented:
+
+```rust
+/// Fragment header (3 bytes, prepended to fragment payload)
+///
+///   [0]     Fragment group ID (1 byte, wrapping counter)
+///   [1]     Fragment index (1 byte, 0-indexed)
+///   [2]     Total fragments (1 byte)
+///
+/// Effective payload per fragment: 249 - 3 = 246 bytes
+/// Maximum reassembled payload: 255 x 246 = 62,730 bytes
+///
+pub struct FragmentHeader {
+    pub group_id: u8,
+    pub index: u8,
+    pub total: u8,
+}
+
+pub const FRAGMENT_HEADER_SIZE: usize = 3;
+pub const FRAGMENT_MAX_PAYLOAD: usize = LORA_MAX_PAYLOAD_SIZE - FRAGMENT_HEADER_SIZE; // 246
+```
+
+At LoRa data rates (1.5-9.1 kB/s), fragmentation should be kept to a minimum. Most Peat messages (PLI, status, CRDT deltas) fit in a single frame. Fragmentation is available for larger payloads but not the common case.
+
+### Core Types
+
+```rust
+/// LoRa transport configuration
+#[derive(Debug, Clone)]
+pub struct LoRaConfig {
+    /// Link backend selection
+    pub link: LinkConfig,
+
+    /// Radio band configuration
+    pub band: BandConfig,
+
+    /// Pre-configured peer node IDs (for mLRS point-to-point)
+    pub peers: Vec<PeerEntry>,
+
+    /// Enable beacon-based discovery (direct LoRa only)
+    pub beacon_discovery: bool,
+
+    /// Beacon interval in seconds (default: 30)
+    pub beacon_interval_secs: u32,
+
+    /// Enable app-layer encryption (ChaCha20-Poly1305)
+    pub encryption: bool,
+
+    /// Pre-shared key for app-layer encryption (32 bytes)
+    pub psk: Option<[u8; 32]>,
+
+    /// Duty cycle enforcement (required for EU 868 MHz)
+    pub duty_cycle: Option<DutyCycleConfig>,
+}
+
+/// Link backend configuration
+#[derive(Debug, Clone)]
+pub enum LinkConfig {
+    /// mLRS serial bridge (feature = "mlrs-serial")
+    MlrsSerial {
+        /// Serial port path (e.g., "/dev/ttyUSB0")
+        port: String,
+        /// Baud rate (mLRS default: 115200)
+        baud_rate: u32,
+    },
+    /// Direct LoRa radio (feature = "lora-phy")
+    DirectRadio {
+        /// SPI bus configuration
+        spi_bus: String,
+        /// Chip select GPIO pin
+        cs_pin: u8,
+        /// Reset GPIO pin
+        reset_pin: u8,
+        /// DIO1 interrupt GPIO pin
+        dio1_pin: u8,
+        /// Transmit power in dBm (default: 22 for SX1262)
+        tx_power_dbm: i8,
+        /// Spreading factor (7-12, default: 10)
+        spreading_factor: u8,
+        /// Bandwidth in Hz (125000, 250000, 500000)
+        bandwidth_hz: u32,
+        /// Coding rate (5-8, represents 4/5 to 4/8)
+        coding_rate: u8,
+    },
+}
+
+/// Frequency band configuration
+#[derive(Debug, Clone)]
+pub struct BandConfig {
+    /// Center frequency in Hz
+    pub frequency_hz: u32,
+    /// Regulatory region
+    pub region: Region,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Region {
+    /// EU 868 MHz (863-870 MHz, 1% duty cycle on some sub-bands)
+    Eu868,
+    /// US 915 MHz (902-928 MHz, no duty cycle, FCC Part 15)
+    Us915,
+    /// Global 433 MHz (433.05-434.79 MHz, 10mW ERP EU, varies by country)
+    Global433,
+    /// Global 2.4 GHz ISM (2400-2483.5 MHz, no duty cycle)
+    Ism2400,
+}
+
+/// Pre-configured peer entry
+#[derive(Debug, Clone)]
+pub struct PeerEntry {
+    /// Peat node ID (hex string)
+    pub node_id: String,
+    /// Human-readable label
+    pub label: Option<String>,
+}
+```
+
+### Transport Trait Implementation
+
+```rust
+pub struct PeatLoRaTransport {
+    config: LoRaConfig,
+    link: Arc<dyn LoRaLink>,
+    capabilities: TransportCapabilities,
+    available: AtomicBool,
+    duty_cycle: Option<DutyCycleTracker>,
+    fragment_assembler: Mutex<FragmentAssembler>,
+}
+
+#[async_trait]
+impl Transport for PeatLoRaTransport {
+    fn capabilities(&self) -> &TransportCapabilities {
+        &self.capabilities
+    }
+
+    fn is_available(&self) -> bool {
+        self.available.load(Ordering::Relaxed) && self.link.is_available()
+    }
+
+    fn signal_quality(&self) -> Option<u8> {
+        // Map RSSI to 0-100 scale
+        // SX1262 typical: -120 dBm (worst) to -30 dBm (best)
+        self.link.rssi().map(|rssi| {
+            let clamped = rssi.clamp(-120, -30);
+            ((clamped + 120) as u8 * 100 / 90).min(100)
+        })
+    }
+
+    fn can_reach(&self, peer_id: &NodeId) -> bool {
+        let peer_hex = hex::encode(peer_id);
+        self.config.peers.iter().any(|p| p.node_id == peer_hex)
+    }
+}
+
+impl PeatLoRaTransport {
+    pub fn new(config: LoRaConfig) -> Result<Self, LoRaError> {
+        let (data_rate, range, latency) = match config.band.region {
+            Region::Ism2400 => (9_100, 7_000, 50),      // 9.1 kB/s, 7 km, 50ms
+            Region::Us915   => (3_000, 30_000, 200),     // 3.0 kB/s, 30 km, 200ms
+            Region::Eu868   => (1_500, 50_000, 500),     // 1.5 kB/s, 50 km, 500ms
+            Region::Global433 => (1_500, 87_000, 500),   // 1.5 kB/s, 87 km, 500ms
+        };
+
+        let capabilities = TransportCapabilities {
+            transport_type: TransportType::LoRa,
+            max_bandwidth_bps: data_rate,
+            typical_latency_ms: latency,
+            max_range_meters: range,
+            bidirectional: true,
+            reliable: false,     // No built-in ACK at radio layer
+            battery_impact: 15,  // Low — sub-1W transmit power
+            supports_broadcast: false,  // Point-to-point
+            requires_pairing: false,
+            max_message_size: LORA_MAX_PAYLOAD_SIZE as u32,
+        };
+
+        // Build the link backend based on config
+        #[cfg(feature = "mlrs-serial")]
+        let link: Arc<dyn LoRaLink> = match &config.link {
+            LinkConfig::MlrsSerial { port, baud_rate } => {
+                Arc::new(MlrsSerialLink::open(port, *baud_rate)?)
+            }
+            _ => return Err(LoRaError::UnsupportedBackend),
+        };
+
+        #[cfg(feature = "lora-phy")]
+        let link: Arc<dyn LoRaLink> = match &config.link {
+            LinkConfig::DirectRadio { .. } => {
+                Arc::new(DirectLoRaLink::new(&config)?)
+            }
+            _ => return Err(LoRaError::UnsupportedBackend),
+        };
+
+        let duty_cycle = config.duty_cycle.as_ref().map(|dc| {
+            DutyCycleTracker::new(dc.clone())
+        });
+
+        Ok(Self {
+            config,
+            link,
+            capabilities,
+            available: AtomicBool::new(true),
+            duty_cycle,
+            fragment_assembler: Mutex::new(FragmentAssembler::new()),
+        })
+    }
+
+    /// Send a Peat message over LoRa
+    pub async fn send_message(&self, payload: &[u8]) -> Result<(), LoRaError> {
+        // Check duty cycle budget
+        if let Some(ref tracker) = self.duty_cycle {
+            if !tracker.can_transmit(payload.len()) {
+                return Err(LoRaError::DutyCycleExceeded);
+            }
+        }
+
+        // Encrypt if configured
+        let payload = if self.config.encryption {
+            encrypt_payload(payload, self.config.psk.as_ref().unwrap())?
+        } else {
+            payload.to_vec()
+        };
+
+        // Fragment if necessary
+        if payload.len() > LORA_MAX_PAYLOAD_SIZE {
+            let fragments = fragment_message(&payload)?;
+            for frag in fragments {
+                let frame = LoRaFrame {
+                    flags: FrameFlags::FRAGMENTED
+                        | if self.config.encryption { FrameFlags::ENCRYPTED } else { FrameFlags::empty() },
+                    payload: frag,
+                };
+                self.link.send(&frame).await?;
+                // Record airtime for duty cycle
+                if let Some(ref tracker) = self.duty_cycle {
+                    tracker.record_transmission(frame.encode().len());
+                }
+            }
+        } else {
+            let frame = LoRaFrame {
+                flags: if self.config.encryption { FrameFlags::ENCRYPTED } else { FrameFlags::empty() },
+                payload,
+            };
+            self.link.send(&frame).await?;
+            if let Some(ref tracker) = self.duty_cycle {
+                tracker.record_transmission(frame.encode().len());
+            }
+        }
+
+        Ok(())
+    }
+}
+```
+
+### Data Rate and Range by Band
+
+LoRa performance varies significantly by frequency band. These figures assume mLRS-optimized settings:
+
+| Band | Frequency | Data Rate | Typical Range | Max Range (LOS) | Duty Cycle | Notes |
+|------|-----------|-----------|---------------|------------------|------------|-------|
+| 2.4 GHz ISM | 2400-2483 MHz | 9.1 kB/s | 3-7 km | 7 km | None | Globally license-free, smallest antennas |
+| 915 MHz US | 902-928 MHz | 3.0 kB/s | 10-30 km | 40 km | None (FCC Part 15) | US/Canada/Australia |
+| 868 MHz EU | 863-870 MHz | 1.5 kB/s | 15-50 km | 60 km | 1% (some sub-bands) | Europe, must enforce duty cycle |
+| 433 MHz | 433-434 MHz | 1.5 kB/s | 20-50 km | 87 km | Varies | Longest range, largest antennas, lowest data rate |
+
+### Topology: Point-to-Point with Gateway Bridge
+
+LoRa links in Peat are point-to-point, not mesh. A Linux gateway node bridges LoRa traffic into the IP mesh, following the ADR-041 multi-transport gateway pattern:
+
+```
+                LoRa Radio Link (7-87 km)
+                    ◄──────────────►
+
+┌──────────────────┐                    ┌──────────────────┐
+│  Remote Sensor   │                    │  Gateway Node    │
+│  (ESP32+SX1262)  │   LoRa frames     │  (Linux+mLRS)    │
+│  ┌─────────────┐ │◄─────────────────►│ ┌─────────────┐  │
+│  │ peat-lite   │ │                    │ │ peat-lora    │  │
+│  │ peat-lora   │ │                    │ │ (mlrs-serial)│  │
+│  │ (lora-phy)  │ │                    │ └──────┬───────┘  │
+│  └─────────────┘ │                    │        │          │
+└──────────────────┘                    │ ┌──────▼───────┐  │
+                                        │ │ Peat Node    │  │
+                                        │ │ (QUIC/Iroh)  │  │
+                                        │ └──────┬───────┘  │
+                                        └────────┼──────────┘
+                                                 │
+                                        ┌────────▼──────────┐
+                                        │   Peat IP Mesh    │
+                                        │   (Full CRDT sync)│
+                                        └───────────────────┘
+```
+
+Multiple remote nodes can each have a dedicated LoRa link to the gateway (separate mLRS channel or time-slotted), but each individual link is point-to-point.
+
+### Discovery
+
+**mLRS serial mode**: Peers are pre-configured. The mLRS link is established at the radio firmware level (binding); Peat sees a connected serial port. The `peers` list in `LoRaConfig` maps Peat node IDs to known LoRa endpoints.
+
+**Direct LoRa mode**: Optional beacon-based discovery. Nodes periodically transmit a beacon frame containing their Peat node ID and capabilities. Receiving nodes add discovered peers to their local peer table.
+
+```rust
+/// Beacon frame payload (fits in a single LoRa frame)
+///
+///   [0-15]   Node ID (16 bytes)
+///   [16]     Capabilities bitfield (NodeCapabilities from peat-lite)
+///   [17-18]  Beacon sequence number (2 bytes, big-endian)
+///   [19]     TX power (dBm, signed)
+///
+/// Total: 20 bytes
+///
+pub struct BeaconPayload {
+    pub node_id: [u8; 16],
+    pub capabilities: u8,
+    pub sequence: u16,
+    pub tx_power_dbm: i8,
+}
+```
+
+### Encryption
+
+Two layers of encryption protect LoRa traffic:
+
+1. **Link-layer (mLRS only)**: mLRS firmware provides AES encryption of the radio link. This protects against casual eavesdropping but uses a shared key configured in mLRS firmware.
+
+2. **Application-layer (both backends)**: Peat app-layer ChaCha20-Poly1305 encryption using a pre-shared key (PSK). This protects the Peat payload end-to-end, even if the link layer is compromised or absent (direct LoRa mode).
+
+```rust
+/// Encrypt payload with ChaCha20-Poly1305
+/// Prepends 12-byte nonce to ciphertext
+/// Output: [nonce (12 bytes)] [ciphertext] [tag (16 bytes)]
+pub fn encrypt_payload(plaintext: &[u8], psk: &[u8; 32]) -> Result<Vec<u8>, LoRaError> {
+    use chacha20poly1305::{ChaCha20Poly1305, KeyInit, AeadInPlace};
+    use chacha20poly1305::aead::OsRng;
+
+    let cipher = ChaCha20Poly1305::new(psk.into());
+    let nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng);
+
+    let mut buffer = plaintext.to_vec();
+    cipher.encrypt_in_place(&nonce, b"", &mut buffer)
+        .map_err(|_| LoRaError::EncryptionFailed)?;
+
+    let mut output = Vec::with_capacity(12 + buffer.len());
+    output.extend_from_slice(&nonce);
+    output.extend_from_slice(&buffer);
+    Ok(output)
+}
+```
+
+Note: The 12-byte nonce + 16-byte AEAD tag adds 28 bytes of overhead per frame. With a 249-byte payload limit, this leaves 221 bytes for the peat-lite protocol header + CRDT data when encryption is enabled.
+
+### Duty Cycle Compliance
+
+EU 868 MHz band requires strict duty cycle enforcement. The `DutyCycleTracker` monitors cumulative airtime and blocks transmission when the limit is reached:
+
+```rust
+/// Duty cycle tracker for regulatory compliance
+pub struct DutyCycleTracker {
+    /// Maximum duty cycle as fraction (e.g., 0.01 for 1%)
+    max_duty_cycle: f32,
+    /// Sliding window duration (typically 1 hour)
+    window_secs: u64,
+    /// Accumulated airtime in the current window (microseconds)
+    airtime_us: AtomicU64,
+    /// Window start timestamp
+    window_start: Instant,
+}
+
+impl DutyCycleTracker {
+    pub fn can_transmit(&self, payload_bytes: usize) -> bool {
+        let estimated_airtime_us = self.estimate_airtime_us(payload_bytes);
+        let current = self.airtime_us.load(Ordering::Relaxed);
+        let window_us = self.window_secs * 1_000_000;
+        let max_airtime_us = (window_us as f32 * self.max_duty_cycle) as u64;
+        current + estimated_airtime_us < max_airtime_us
+    }
+}
+```
+
+### MAVLink and UAS Integration
+
+mLRS — "MAVLink LoRa System" — was originally designed for MAVLink telemetry, the standard protocol for drone autopilot communication (ArduPilot, PX4). This heritage creates a natural synergy with Peat's UAS integration architecture (see CAP Protocol Technology Deep Dive, ROS-CAP Bridge):
+
+**Shared radio link**: mLRS supports multiple serial channels on a single LoRa link. A companion computer on a UAS can multiplex Peat sync frames and MAVLink telemetry over the same mLRS radio, eliminating the need for separate data links:
+
+```
+┌──────────────────────────────────┐
+│  UAS (Drone)                     │
+│  ┌────────────┐ ┌──────────────┐ │
+│  │ Autopilot  │ │ Companion    │ │
+│  │ (PX4/Ardu) │ │ (Jetson/Pi)  │ │
+│  │ MAVLink    │ │ Peat + ROS   │ │
+│  └─────┬──────┘ └──────┬───────┘ │
+│        │  UART1         │  UART2  │
+│  ┌─────▼────────────────▼──────┐ │
+│  │    mLRS TX Module           │ │
+│  │    (dual serial → LoRa)     │ │
+│  └─────────────┬───────────────┘ │
+└────────────────┼─────────────────┘
+                 │  LoRa (7-87 km)
+┌────────────────┼─────────────────┐
+│  ┌─────────────▼───────────────┐ │
+│  │    mLRS RX Module           │ │
+│  │    (LoRa → dual serial)     │ │
+│  └─────┬────────────────┬──────┘ │
+│        │  UART1         │  UART2  │
+│  ┌─────▼──────┐ ┌──────▼───────┐ │
+│  │ GCS        │ │ Peat Gateway │ │
+│  │ (QGroundC) │ │ (peat-lora)  │ │
+│  └────────────┘ └──────────────┘ │
+│  Ground Station                   │
+└───────────────────────────────────┘
+```
+
+**Design implications**:
+- `peat-lora` treats the mLRS serial port as a transparent byte pipe — it is unaware of MAVLink traffic on other serial channels
+- Frame marker byte `0xEC` ensures Peat frames are distinguishable from MAVLink frames (`0xFD` for MAVLink v2) if sharing a single serial channel
+- Future work: optional MAVLink passthrough mode where `peat-lora` can forward MAVLink position data into Peat CRDTs, bridging UAS telemetry directly into the Peat mesh without a separate ROS-CAP bridge
+
+### PACE Integration
+
+LoRa fills the gap between BLE (short-range) and SBD (global) in the PACE transport hierarchy:
+
+```yaml
+transports:
+  - id: "lora-primary"
+    type: lora
+    description: "LoRa 915 MHz via mLRS"
+    config:
+      link: mlrs-serial
+      port: /dev/ttyUSB0
+      baud_rate: 115200
+      band: us915
+      frequency_hz: 915000000
+      encryption: true
+      psk_ref: "lora-psk-alpha"
+
+transport_policy:
+  name: "expeditionary"
+  primary: ["iroh-wlan0"]
+  alternate: ["ble-mesh"]
+  contingency: ["lora-primary"]
+  emergency: ["sbd-primary"]
+```
+
+LoRa is a natural **alternate or contingency** transport:
+- **Alternate**: When IP infrastructure is unavailable but peers are within 7-87 km
+- **Contingency**: When BLE range (400m) is insufficient but SBD latency (5-20s) is unacceptable
+
+For remote sensor deployments, LoRa may serve as the **primary** transport when sensors are deployed beyond BLE range with no IP connectivity.
+
+### peat-ffi Integration
+
+Extend `TransportConfigFFI` (per ADR-050) to support LoRa:
+
+```rust
+pub struct TransportConfigFFI {
+    pub enable_ble: bool,
+    pub ble_mesh_id: Option<String>,
+    // ... existing fields ...
+
+    // LoRa transport
+    pub enable_lora: bool,
+    pub lora_serial_port: Option<String>,
+    pub lora_baud_rate: Option<u32>,
+    pub lora_band: Option<String>,          // "us915", "eu868", "433", "2400"
+    pub lora_frequency_hz: Option<u32>,
+    pub lora_encryption: Option<bool>,
+    pub lora_psk_hex: Option<String>,       // 64-char hex string (32 bytes)
+    pub lora_peers: Option<Vec<String>>,    // Node ID hex strings
 }
 ```
 
 ---
 
-## References
+## Implementation Plan
 
-- redb GitHub: https://github.com/cberner/redb
-- fjall GitHub: https://github.com/fjall-rs/fjall
-- Iroh async challenges: https://www.iroh.computer/blog/async-rust-challenges-in-iroh
-- fjall-rs blog: https://fjall-rs.github.io/
-- Benchmark source: https://github.com/cberner/redb/blob/master/crates/redb-bench/
+### Phase 1: Frame Format + Core Types (No Hardware)
+
+- [ ] Define `LoRaFrame` over-the-air frame format
+- [ ] Define `FrameFlags` bitflags
+- [ ] Implement frame encode/decode with validation
+- [ ] Define `FragmentHeader` and fragmentation/reassembly logic
+- [ ] Define `LoRaConfig`, `LinkConfig`, `BandConfig`, `Region` types
+- [ ] Define `LoRaLink` trait abstraction
+- [ ] Define `LoRaError` error types
+- [ ] Unit tests: frame round-trip, fragmentation edge cases, config validation
+
+### Phase 2: mLRS Serial Link (Linux)
+
+- [ ] Implement `MlrsSerialLink` (feature = "mlrs-serial")
+- [ ] Serial port open/configure via `tokio-serial`
+- [ ] Frame delimiting over serial stream (marker byte sync)
+- [ ] Read/write loop with timeout handling
+- [ ] RSSI extraction from mLRS telemetry (if available)
+- [ ] Integration tests with mock serial port
+- [ ] Hardware-in-the-loop test with mLRS modules
+
+### Phase 3: Transport Trait + Gateway Bridge
+
+- [ ] Implement `PeatLoRaTransport` (ADR-032 `Transport` trait)
+- [ ] Pre-configured peer routing
+- [ ] Signal quality mapping (RSSI → 0-100)
+- [ ] Gateway bridge: LoRa frames ↔ Peat mesh messages (ADR-041 pattern)
+- [ ] Integration tests with mock link
+
+### Phase 4: Direct LoRa Radio (Embedded)
+
+- [ ] Implement `DirectLoRaLink` (feature = "lora-phy")
+- [ ] SX1262 driver via `lora-phy` crate + `embedded-hal` SPI
+- [ ] Radio configuration (spreading factor, bandwidth, coding rate, TX power)
+- [ ] Beacon-based peer discovery
+- [ ] ESP32 + SX1262 hardware-in-the-loop test
+- [ ] Cross-compile verification (xtensa-esp32, aarch64)
+
+### Phase 5: Encryption + Duty Cycle Compliance
+
+- [ ] ChaCha20-Poly1305 app-layer encryption
+- [ ] PSK configuration and key management
+- [ ] `DutyCycleTracker` for EU 868 MHz compliance
+- [ ] Regional duty cycle configuration presets
+- [ ] Encryption round-trip tests
+- [ ] Duty cycle enforcement tests
+
+### Phase 6: Adaptive Range Modes
+
+- [ ] Configurable radio presets (high-rate/short-range vs low-rate/long-range)
+- [ ] Runtime spreading factor adjustment based on link quality
+- [ ] RSSI/SNR-based adaptive TX power
+- [ ] Band-hopping support for mLRS
 
 ---
+
+## Success Criteria
+
+### Functional Requirements
+
+- [ ] Send/receive Peat messages via mLRS serial bridge (Linux)
+- [ ] Send/receive Peat messages via direct SX1262 radio (ESP32)
+- [ ] Fragment and reassemble messages exceeding 249 bytes
+- [ ] Gateway bridge relays LoRa traffic into Peat IP mesh
+- [ ] Pre-configured peer discovery works for mLRS mode
+- [ ] Beacon-based discovery works for direct LoRa mode
+- [ ] App-layer encryption protects payload end-to-end
+- [ ] Duty cycle enforcement prevents regulatory violations on EU 868 MHz
+- [ ] Implement ADR-032 `Transport` trait for TransportManager integration
+
+### Performance Requirements
+
+- [ ] Frame encode/decode < 100 us
+- [ ] Fragmentation/reassembly < 500 us for max-size messages
+- [ ] mLRS serial link latency < 50ms (serial overhead only)
+- [ ] Direct LoRa link latency within expected range for configured spreading factor
+- [ ] Encryption overhead < 1ms per frame
+
+### Testing
+
+- [ ] Unit tests with mock link (no hardware required)
+- [ ] Integration tests with mock serial port
+- [ ] Hardware-in-the-loop tests with mLRS modules (915 MHz)
+- [ ] Hardware-in-the-loop tests with ESP32 + SX1262
+- [ ] End-to-end test: remote sensor → LoRa → gateway → Peat mesh → response → LoRa → sensor
+- [ ] Range test at 915 MHz: verify > 10 km line-of-sight
+
+---
+
+## Consequences
+
+### Positive
+
+- **Range gap filled**: 7-87 km coverage bridges BLE and satellite
+- **Low power**: Sub-1W transmit, suitable for battery-powered remote sensors
+- **No infrastructure**: Pure peer-to-peer, no gateways or network servers required
+- **Dual backend flexibility**: mLRS for quick deployment (plug in modules), direct LoRa for embedded integration
+- **Shared frame format**: Both backends interoperate on the air
+- **PACE completeness**: LoRa as alternate/contingency between BLE (alternate) and SBD (emergency)
+- **Open-source stack**: mLRS is open-source; no vendor lock-in
+
+### Negative
+
+- **Low bandwidth**: 1.5-9.1 kB/s limits to small messages (PLI, status, compact CRDTs)
+- **Point-to-point only**: Not a mesh; each link requires a dedicated radio pair (mLRS) or time-slotting
+- **Half duplex**: Only one direction at a time; protocol must manage TX/RX switching
+- **Hardware dependency**: Requires LoRa radio modules (SX1262, mLRS-compatible boards)
+- **Regulatory complexity**: Different bands have different rules per region; must track duty cycle
+- **Two feature flags**: Slightly more complex crate than single-backend transports
+
+### Risks
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|-----------|--------|------------|
+| mLRS serial protocol changes | Low | Medium | Pin to specific mLRS version; serial passthrough is stable |
+| Radio interference in contested spectrum | Medium | Medium | Frequency hopping (mLRS built-in); adaptive spreading factor |
+| Duty cycle limits reduce effective throughput | Medium (EU only) | Low | Prioritize critical messages; queue non-urgent; use 2.4 GHz for higher throughput |
+| SX1262 driver instability on ESP32 | Medium | Medium | `lora-phy` crate is actively maintained; fallback to mLRS serial |
+| Range below theoretical maximum | High | Low | Use conservative range estimates; test in target terrain |
+| Fragment loss on unreliable link | Medium | Medium | Fragment-level retry with configurable timeout; group-level ACK |
+
+---
+
+## Alternatives Considered
+
+### Option 1: Separate Crates (peat-lora-mlrs + peat-lora-direct)
+**Pros**: Cleaner dependency separation, each crate is simpler
+**Cons**: Duplicates frame format, fragmentation, transport trait implementation; two crates to version and publish
+**Decision**: Single crate with feature flags avoids duplication and ensures frame format consistency.
+
+### Option 2: LoRaWAN (The Things Network / Helium)
+**Pros**: Established ecosystem, public network coverage in urban areas
+**Cons**: Uplink-dominant design (poor for bidirectional Peat sync), 51-byte payload limit (SF12), requires LoRaWAN gateways (infrastructure dependency), class A latency of 1-5 seconds, not suitable for peer-to-peer tactical use
+**Decision**: LoRaWAN's gateway-centric architecture and tiny payloads are fundamentally misaligned with Peat's peer-to-peer model. Raw LoRa (via mLRS or direct) provides the full 252-byte frame and true peer-to-peer operation.
+
+### Option 3: Meshtastic
+**Pros**: Popular open-source LoRa mesh, large community, built-in mesh routing
+**Cons**: Opinionated protocol (protobuf-based, own message types), not a transparent bridge, mesh routing adds latency and complexity, would require adapting Peat protocol to Meshtastic's message format rather than using native peat-lite framing
+**Decision**: mLRS's transparent serial passthrough lets Peat use its own frame format directly. Meshtastic's mesh layer would conflict with Peat's own routing and sync logic.
+
+### Option 4: Integrate into peat-btle
+**Pros**: Reuse existing external transport infrastructure
+**Cons**: BLE and LoRa are fundamentally different radios with different APIs, ranges, data rates, and regulatory requirements; would bloat peat-btle with unrelated radio code; different dependency trees (BlueZ/CoreBluetooth vs tokio-serial/lora-phy)
+**Decision**: Separate crate follows the established pattern of one transport per crate.
+
+---
+
+## References
+
+1. [mLRS — Mavlink LoRa System](https://github.com/olliw42/mLRS) - Open-source LoRa firmware for transparent serial bridge
+2. [lora-phy Rust crate](https://crates.io/crates/lora-phy) - Rust driver for Semtech SX1261/SX1262 LoRa transceivers
+3. [Semtech SX1262 Datasheet](https://www.semtech.com/products/wireless-rf/lora-connect/sx1262) - Target LoRa transceiver
+4. [LoRa Alliance — LoRa Technology Overview](https://lora-alliance.org/about-lorawan/) - LoRa modulation background
+5. ADR-032: Pluggable Transport Abstraction
+6. ADR-035: Peat-Lite Embedded Nodes (peat-lite protocol)
+7. ADR-039: Peat-BTLE Mesh Transport Crate
+8. ADR-041: Multi-Transport Embedded Integration
+9. ADR-051: Peat-SBD Satellite Transport
+10. [MAVLink Protocol](https://mavlink.io/en/) - Standard UAS telemetry protocol (mLRS's native payload)
+11. [peat-btle on Radicle](https://app.radicle.xyz/nodes/rosa.radicle.xyz/rad%3Az458mp9Um3AYNQQFMdHaNEUtmiohq) - External transport crate pattern
+12. CAP Protocol Technology Deep Dive (ROS-CAP Bridge, MAVLink/mavros integration)
+
+---
+
+## Decision Log
+
+| Date | Decision | Rationale |
+|------|----------|-----------|
+| 2026-02-25 | Proposed ADR-052 | Need long-range transport (7-87 km) to fill gap between BLE (400m) and SBD (global) |
+| 2026-02-25 | Single crate with feature flags | Avoids duplicating frame format and transport logic across two crates |
+| 2026-02-25 | mLRS as primary serial bridge | Open-source, transparent serial passthrough, proven 87 km range, no protocol adaptation needed |
+| 2026-02-25 | Direct LoRa via lora-phy for embedded | Enables ESP32+SX1262 nodes without separate mLRS hardware |
+| 2026-02-25 | Point-to-point topology (not mesh) | LoRa is half-duplex; mesh adds latency and complexity; gateway bridge to IP mesh is cleaner (ADR-041) |
+| 2026-02-25 | ChaCha20-Poly1305 app-layer encryption | Consistent with Peat security model; supplements mLRS link-layer AES |
+
+---
+
+**Next Steps:**
+1. Review and approve ADR
+2. Create `peat-lora` Radicle repository
+3. Phase 1: Frame format + core types (pure Rust, no hardware)
+4. Acquire mLRS-compatible modules (SX1262-based) for hardware-in-the-loop testing
+5. Phase 2: mLRS serial link integration on Linux
+6. Phase 4: ESP32 + SX1262 direct radio integration
+
+**Radicle:**
+- Create `rad:z...` for peat-lora (pending approval)
+
+
+# ADR-053: Voice and Audio Messages in the Peat CRDT Landscape
+
+**Status**: Proposed
+**Date**: 2026-02-26
+**Authors**: Kit Plummer, Claude
+**Organization**: Defense Unicorns (https://defenseunicorns.com)
+**Relates To**: ADR-021 (Document-Oriented Architecture), ADR-025 (Blob Transfer Protocol), ADR-032 (Pluggable Transport Abstraction), ADR-035 (Peat-Lite Embedded Nodes), ADR-037 (Resource-Constrained Device Optimization), ADR-039 (Peat-BTLE Mesh Transport), ADR-044 (Encryption), ADR-051 (Peat-SBD Satellite Transport), ADR-052 (Peat-LoRa Transport)
+
+---
+
+## Executive Summary
+
+This ADR defines the concept and requirements for voice and audio messages as a first-class data type in Peat. Inspired by the [TerminalPhone](https://gitlab.com/here_forawhile/terminalphone) project — a Bash script providing anonymous encrypted push-to-talk (PTT) voice over Tor hidden services — this document captures how discrete audio clips fit naturally into Peat's CRDT-based synchronization model. A voice message is an immutable binary blob with metadata, exactly like a PLI report or sensor reading: record it, encode it, publish it as a CRDT document referencing a BlobStore entry, and let the mesh sync it. This is not real-time streaming voice — it is the record-then-send PTT model, where each audio clip is a discrete, self-contained artifact that syncs across transports at whatever bandwidth is available.
+
+---
+
+## Context
+
+### The Voice Gap
+
+Peat Protocol synchronizes structured data (PLI, status, sensor readings, AI products) across a multi-transport mesh. But field operators communicate primarily by voice — and today that voice traffic flows through entirely separate radio systems (VHF/UHF tactical radios, cell phones, satellite phones) that are disconnected from the Peat data mesh. This creates several problems:
+
+| Problem | Impact |
+|---------|--------|
+| Voice lives outside the data mesh | No searchability, no persistence, no CRDT sync |
+| Radio channels are ephemeral | Missed transmissions are lost forever |
+| No transcript integration | Voice intel requires manual transcription |
+| Separate encryption domains | Peat data encrypted one way, voice another |
+| No transport flexibility | Voice locked to one radio, can't failover |
+
+### Why PTT (Record-Then-Send), Not Streaming
+
+Real-time voice streaming (VoIP, WebRTC, RTP) requires dedicated low-latency transport with jitter buffers, packet loss concealment, and sustained bandwidth — fundamentally incompatible with Peat's store-and-forward, multi-transport, CRDT-based architecture. The PTT model maps naturally to Peat because:
+
+| Property | PTT (Record-Then-Send) | Streaming (Real-Time) |
+|----------|------------------------|----------------------|
+| **Data model** | Discrete blob (immutable) | Continuous stream (mutable) |
+| **CRDT fit** | Perfect — blob ref in document | Poor — no merge semantics for streams |
+| **Transport** | Any (QUIC, BLE, LoRa, SBD) | Requires low-latency (QUIC only) |
+| **Latency tolerance** | Seconds to minutes | < 200ms required |
+| **Bandwidth** | Adapts to transport | Fixed minimum required |
+| **Offline** | Works — sync when connected | Fails without connection |
+| **Persistence** | Automatic — it's a blob | Requires separate recording |
+| **Searchability** | Transcribe → text search | Requires separate pipeline |
+
+A 10-second PTT message at Opus 16kbps mono is ~20 KB — smaller than many CRDT documents. It can sync over BLE, LoRa, or even SBD satellite.
+
+### TerminalPhone as Prior Art
+
+[TerminalPhone](https://gitlab.com/here_forawhile/terminalphone) is a Bash script that provides anonymous encrypted PTT voice communication over Tor hidden services. Its design decisions are directly relevant to Peat:
+
+| TerminalPhone Concept | Peat Equivalent |
+|-----------------------|-----------------|
+| `.onion` address as identity | Cryptographic node ID |
+| PTT model (record → send) | Audio blob → CRDT document → mesh sync |
+| App-layer encryption (independent of transport) | ChaCha20-Poly1305 (ADR-044) |
+| Simple line protocol over Tor | peat-lite frame format over any transport (ADR-035) |
+| Tor as anonymous transport | Noted as future transport possibility |
+| `opusenc`/`opusdec` for audio | Opus codec (or Codec2 for constrained links) |
+
+TerminalPhone validates the core concept: PTT voice as discrete encrypted messages over an overlay network. Peat extends this to multi-transport mesh sync with CRDT persistence and transcription integration.
+
+---
+
+## Decision Drivers
+
+### Requirements
+
+1. **Audio as Blob**: Voice messages stored via ADR-025 BlobStore, referenced by BlobRef in CRDT documents
+2. **Transport-Aware Encoding**: Audio quality adapts to available transport bandwidth
+3. **PTT Model**: Record-then-send, not real-time streaming
+4. **App-Layer Encryption**: Audio blobs encrypted independently of transport (ADR-044)
+5. **Transcription Integration**: Link audio blobs to TranscriptionProduct for searchability
+6. **Embedded Support**: Codec selection appropriate for resource-constrained devices (ADR-037)
+7. **Multi-Transport**: Audio messages sync over any transport — QUIC, BLE, LoRa, SBD
+
+### Constraints
+
+1. **BLE throughput**: ~2 Mbps theoretical, practical ~100-200 KB/s — audio must be compact
+2. **LoRa bandwidth**: 1.5-9.1 kB/s — only ultra-compressed codecs are viable
+3. **SBD message size**: 1,960 bytes per message — fits ~22 seconds of Codec2 700C audio
+4. **Embedded resources**: ESP32 has limited CPU/RAM — codec must be lightweight
+5. **CRDT merge**: Binary blobs don't merge well in Automerge — must keep audio out of CRDT documents, using BlobRef indirection instead
+
+---
+
+## Decision
+
+### Architecture: Audio-as-Blob Pattern
+
+Voice messages follow the established blob-document integration pattern (ADR-025): audio payloads are stored in the BlobStore as content-addressed blobs, and CRDT documents hold only the metadata and BlobRef. This keeps audio out of the CRDT merge path while enabling mesh-wide discovery and sync.
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Sender Node                                                 │
+│                                                              │
+│  1. Record audio (microphone / PTT button)                   │
+│  2. Encode: PCM → Opus (or Codec2 for constrained links)    │
+│  3. Encrypt: ChaCha20-Poly1305 (ADR-044)                    │
+│  4. Store blob: BlobStore::store_bytes(encrypted_audio)      │
+│  5. Create AudioMessage document with BlobRef                │
+│  6. Document + blob sync via mesh                            │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+                         │
+                    mesh sync
+                         │
+┌──────────────────────────────────────────────────────────────┐
+│  Receiver Node                                               │
+│                                                              │
+│  1. Receive AudioMessage document via CRDT sync              │
+│  2. Extract BlobRef from document                            │
+│  3. Fetch blob: BlobStore::fetch(blob_ref)                   │
+│  4. Decrypt: ChaCha20-Poly1305                               │
+│  5. Decode: Opus/Codec2 → PCM                                │
+│  6. Play audio (speaker) or queue for playback               │
+│                                                              │
+│  Optional:                                                   │
+│  7. Transcribe: Whisper/etc → TranscriptionProduct           │
+│  8. Link transcription to AudioMessage document              │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### AudioMessage CRDT Document
+
+Each voice message is represented by a single CRDT document (per ADR-021, one document per entity) containing metadata and a BlobRef to the encrypted audio payload:
+
+```rust
+/// AudioMessage CRDT document schema
+///
+/// Stored in the "audio_messages" collection.
+/// Document ID: "{sender_node_id}:{timestamp_us}"
+///
+/// The audio payload itself is in the BlobStore — this document
+/// holds only the metadata and BlobRef, keeping audio out of
+/// the CRDT merge path.
+pub struct AudioMessage {
+    /// BlobRef to encrypted Opus/Codec2 audio in BlobStore
+    pub audio_blob: BlobRef,
+
+    /// Sender node ID (hex)
+    pub sender_node_id: String,
+
+    /// Recording timestamp (microseconds since epoch)
+    pub recorded_at_us: u64,
+
+    /// Audio duration in seconds
+    pub duration_secs: f32,
+
+    /// Codec information
+    pub codec: AudioCodec,
+
+    /// Optional: BlobRef to TranscriptionProduct
+    pub transcription_blob: Option<BlobRef>,
+
+    /// Optional: channel/group identifier for multi-channel PTT
+    pub channel: Option<String>,
+
+    /// TTL / expiry timestamp (microseconds since epoch, 0 = no expiry)
+    pub expires_at_us: u64,
+}
+
+/// Audio codec metadata
+pub struct AudioCodec {
+    /// Codec name: "opus", "codec2"
+    pub name: String,
+
+    /// Bitrate in bits per second
+    pub bitrate_bps: u32,
+
+    /// Sample rate in Hz
+    pub sample_rate_hz: u32,
+
+    /// Number of channels (1 = mono, 2 = stereo)
+    pub channels: u8,
+
+    /// Codec2 mode (only for Codec2): "3200", "2400", "1600", "1300", "700C"
+    pub codec2_mode: Option<String>,
+}
+```
+
+### Transport-Aware Encoding
+
+Audio quality adapts to the available transport, trading fidelity for bandwidth. The sender selects the codec and bitrate based on which transport will carry the message:
+
+| Transport | Codec | Bitrate | Quality | Size per Minute | Notes |
+|-----------|-------|---------|---------|-----------------|-------|
+| QUIC/Iroh | Opus | 64 kbps stereo | Full quality | ~480 KB | Wideband, clear speech + ambient |
+| QUIC/Iroh | Opus | 32 kbps mono | High quality | ~240 KB | Wideband, clear speech |
+| BLE | Opus | 16 kbps mono | Good quality | ~120 KB | Narrowband, intelligible speech |
+| LoRa (2.4 GHz) | Opus | 6 kbps mono | Acceptable | ~45 KB | Heavily compressed but intelligible |
+| LoRa (868/915) | Codec2 2400 | 2.4 kbps | Low quality | ~18 KB | Robotic but intelligible speech |
+| SBD | Codec2 700C | 700 bps | Minimal | ~5.25 KB | Fits ~22s in 1,960-byte SBD message |
+
+**Codec selection logic:**
+
+```rust
+/// Select codec parameters based on transport bandwidth
+pub fn select_audio_codec(transport_bandwidth_bps: u32) -> AudioCodec {
+    match transport_bandwidth_bps {
+        // QUIC/Iroh: full quality Opus
+        bw if bw >= 100_000 => AudioCodec {
+            name: "opus".into(),
+            bitrate_bps: 64_000,
+            sample_rate_hz: 48_000,
+            channels: 2,
+            codec2_mode: None,
+        },
+        // BLE: compact Opus mono
+        bw if bw >= 20_000 => AudioCodec {
+            name: "opus".into(),
+            bitrate_bps: 16_000,
+            sample_rate_hz: 16_000,
+            channels: 1,
+            codec2_mode: None,
+        },
+        // LoRa 2.4 GHz: minimal Opus
+        bw if bw >= 6_000 => AudioCodec {
+            name: "opus".into(),
+            bitrate_bps: 6_000,
+            sample_rate_hz: 8_000,
+            channels: 1,
+            codec2_mode: None,
+        },
+        // LoRa 868/915: Codec2 2400
+        bw if bw >= 2_400 => AudioCodec {
+            name: "codec2".into(),
+            bitrate_bps: 2_400,
+            sample_rate_hz: 8_000,
+            channels: 1,
+            codec2_mode: Some("2400".into()),
+        },
+        // SBD / extreme constraint: Codec2 700C
+        _ => AudioCodec {
+            name: "codec2".into(),
+            bitrate_bps: 700,
+            sample_rate_hz: 8_000,
+            channels: 1,
+            codec2_mode: Some("700C".into()),
+        },
+    }
+}
+```
+
+**Codec data rate verification (from specifications):**
+
+- **Opus**: RFC 6716. Supports 6 kbps – 510 kbps. At 16 kbps mono, produces ~120 KB/min (16,000 bits/s × 60s / 8 = 120,000 bytes). Narrowband mode (8 kHz) available down to 6 kbps.
+- **Codec2**: Open-source speech codec by David Rowe VK5DGR. Mode 2400 produces 2,400 bits/s = 18 KB/min. Mode 700C produces 700 bits/s = 5.25 KB/min. At 700C, a 1,960-byte SBD message holds 1,960 × 8 / 700 ≈ 22.4 seconds of audio.
+
+### Encryption
+
+Audio blobs are encrypted at the application layer using ChaCha20-Poly1305, consistent with ADR-044 and ADR-006. Transport encryption (TLS for QUIC, link-layer for BLE/LoRa) is independent and additive:
+
+```
+┌─────────────────────────────────────────┐
+│  Application Layer (this ADR)           │
+│  ChaCha20-Poly1305 per blob             │
+│  Key: per-channel or per-group PSK      │
+│  Nonce: 12 bytes prepended to ciphertext│
+│  Tag: 16 bytes appended                 │
+├─────────────────────────────────────────┤
+│  Transport Layer (independent)          │
+│  QUIC: TLS 1.3                          │
+│  BLE: AES-CCM (Bluetooth 4.2+)         │
+│  LoRa: mLRS AES + app-layer (ADR-052)  │
+│  SBD: Iridium link encryption           │
+└─────────────────────────────────────────┘
+```
+
+Audio is always encrypted before being stored in the BlobStore. The BlobRef in the AudioMessage document is to the encrypted blob — receivers must hold the decryption key (channel PSK or group key) to play the audio.
+
+### Transcription Integration
+
+The existing `TranscriptionProduct` schema in `product.proto` provides speech-to-text with word-level timestamps and speaker diarization — a natural companion to audio blobs:
+
+```protobuf
+// Already defined in product.proto:
+message TranscriptionProduct {
+  string text = 1;              // Full transcribed text
+  string language = 2;          // Language code (e.g., "en-US")
+  float confidence = 3;         // Overall confidence
+  float duration_seconds = 4;   // Audio duration
+  repeated WordTimestamp words = 5;      // Word-level timing
+  repeated SpeakerSegment speakers = 6;  // Speaker diarization
+}
+```
+
+**Integration pattern:**
+
+1. Node receives AudioMessage document with BlobRef
+2. Node fetches and decrypts audio blob
+3. Node runs speech-to-text (Whisper, etc.) on decoded audio
+4. Node creates TranscriptionProduct and stores as blob
+5. Node updates AudioMessage document with `transcription_blob` BlobRef
+6. TranscriptionProduct syncs via CRDT — now the audio is text-searchable across the mesh
+
+This is optional and compute-dependent: resource-constrained nodes skip transcription, while nodes with GPU/NPU capability transcribe and share results.
+
+### Physical Device Concept ("Peat")
+
+A purpose-built field audio device running Peat for transport:
+
+```
+┌───────────────────────────────────────┐
+│  "Peat" - Peat Audio Field Device     │
+│                                       │
+│  ┌─────────┐  ┌────────────────────┐  │
+│  │   Mic   │  │  Speaker           │  │
+│  └────┬────┘  └────────┬───────────┘  │
+│       │                │              │
+│  ┌────▼────────────────▼───────────┐  │
+│  │  Audio Pipeline                 │  │
+│  │  PCM → Opus/Codec2 → Encrypt   │  │
+│  │  Decrypt → Opus/Codec2 → PCM   │  │
+│  └────────────┬────────────────────┘  │
+│               │                       │
+│  ┌────────────▼────────────────────┐  │
+│  │  Peat Node (peat-lite)          │  │
+│  │  AudioMessage doc + BlobStore   │  │
+│  └────────────┬────────────────────┘  │
+│               │                       │
+│  ┌────────────▼────────────────────┐  │
+│  │  Transport(s)                   │  │
+│  │  BLE │ LoRa │ WiFi/QUIC        │  │
+│  └─────────────────────────────────┘  │
+│                                       │
+│  [PTT Button]  [Channel Dial]         │
+│                                       │
+│  Hardware: Pi Zero 2W or ESP32-S3     │
+│  + I2S mic/speaker + LoRa SX1262      │
+│  + BLE (built-in) + battery           │
+└───────────────────────────────────────┘
+```
+
+The "Peat" concept demonstrates that Peat can subsume the role of a tactical radio: audio captured locally, Opus-encoded, published as a CRDT blob, transported over whatever link is available. Unlike a traditional radio, the message persists, syncs to nodes that weren't online during transmission, and can be transcribed for searchability.
+
+---
+
+## Consequences
+
+### Positive
+
+- **Voice joins the data mesh**: Audio messages sync, persist, and are discoverable like any other CRDT data
+- **Transport flexibility**: Voice travels over QUIC, BLE, LoRa, or SBD — whatever is available
+- **Offline resilience**: PTT messages queue and sync when connectivity returns
+- **Searchability**: Transcription integration makes voice content text-searchable
+- **Consistent encryption**: Same app-layer encryption model as all other Peat data (ADR-044)
+- **Natural CRDT fit**: Immutable audio blobs + metadata documents work perfectly with existing blob-document integration (ADR-025)
+- **Embedded viable**: Codec2 at 700 bps enables voice over SBD satellite — global voice messaging in < 2 KB
+
+### Negative
+
+- **Not real-time**: PTT latency is seconds to minutes, not suitable for conversation-paced dialogue
+- **Codec complexity**: Supporting both Opus and Codec2 adds codec dependencies
+- **Storage growth**: Audio blobs accumulate — need TTL/expiry and garbage collection
+- **Transcription cost**: Speech-to-text requires significant compute (GPU/NPU) — not available on all nodes
+- **Key management**: Per-channel encryption keys add key distribution complexity
+
+### Risks
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|-----------|--------|------------|
+| Audio blobs bloat storage | Medium | Medium | TTL/expiry on AudioMessage docs; BlobStore GC |
+| Opus too heavy for ESP32 | Low | Medium | ESP32-S3 has sufficient CPU for Opus encode at 16 kbps; fallback to Codec2 |
+| Codec2 quality insufficient | Medium | Low | 2400 mode is intelligible for speech; 700C is last resort for SBD only |
+| Transcription accuracy on noisy field audio | High | Low | Confidence scores in TranscriptionProduct; human review for critical intel |
+| Key distribution for channel PSKs | Medium | Medium | Reuse existing Peat key distribution (ADR-044); pre-shared keys for initial deployment |
+
+---
+
+## Alternatives Considered
+
+### Option 1: Real-Time Streaming Voice (WebRTC/RTP)
+**Pros**: Natural conversation flow, low latency
+**Cons**: Requires sustained low-latency transport (only QUIC), incompatible with store-and-forward transports (BLE, LoRa, SBD), doesn't persist, doesn't sync across disconnected nodes, fundamentally different problem than CRDT data sync
+**Decision**: Deferred — streaming voice is a separate feature that could coexist alongside PTT, but requires dedicated real-time transport infrastructure that Peat doesn't currently have.
+
+### Option 2: Integrate TerminalPhone Directly
+**Pros**: Working implementation, proven concept
+**Cons**: Written in Bash (not embeddable in Rust/embedded), depends on Tor (not available on embedded), tightly coupled to Unix toolchain (`opusenc`, `sox`, `socat`), single transport only
+**Decision**: Rejected as direct integration. TerminalPhone validates the concept but Peat needs a native Rust implementation that works across all transports and on embedded platforms.
+
+### Option 3: Tor as a Peat Transport
+**Pros**: Anonymous communication, TerminalPhone compatibility, censorship resistance
+**Cons**: High latency (seconds), requires Tor daemon, not available on embedded, adds significant complexity
+**Decision**: Noted as future possibility. Tor could be a transport plugin (ADR-032) independent of this audio ADR. The audio architecture is transport-agnostic by design.
+
+### Option 4: Audio Directly in CRDT Documents (Not Blob)
+**Pros**: Simpler — no blob indirection
+**Cons**: Automerge handles binary data inefficiently for merge operations; a 20 KB audio clip embedded in a document would be treated as an opaque binary field that can't merge, creating conflicts on concurrent updates to other fields in the same document; defeats CRDT delta efficiency (ADR-021)
+**Decision**: Rejected — BlobRef indirection (ADR-025) is the established pattern for binary data. Audio payloads in the BlobStore, metadata in the CRDT document.
+
+---
+
+## Related ADRs
+
+| ADR | Relationship |
+|-----|-------------|
+| ADR-021 (Document-Oriented Architecture) | AudioMessage follows one-document-per-entity pattern |
+| ADR-025 (Blob Transfer Protocol) | Audio stored as content-addressed blobs via BlobStore trait |
+| ADR-032 (Transport Abstraction) | Transport bandwidth drives codec selection |
+| ADR-035 (peat-lite Embedded Nodes) | Embedded node constraints for audio on ESP32 |
+| ADR-037 (Resource-Constrained Devices) | Codec2 selection for constrained nodes |
+| ADR-039 (BLE Transport) | BLE bandwidth constraints for audio quality |
+| ADR-044 (Encryption) | ChaCha20-Poly1305 app-layer encryption for audio blobs |
+| ADR-051 (SBD Satellite Transport) | Codec2 700C enables voice over 1,960-byte SBD messages |
+| ADR-052 (LoRa Transport) | LoRa bandwidth constraints; Codec2 for 868/915 MHz bands |
+
+---
+
+## References
+
+1. [TerminalPhone](https://gitlab.com/here_forawhile/terminalphone) — Anonymous encrypted PTT voice over Tor hidden services (Bash)
+2. [Opus Codec (RFC 6716)](https://www.rfc-editor.org/rfc/rfc6716) — Versatile audio codec, 6-510 kbps, open standard
+3. [Codec2](https://www.rowetel.com/?page_id=452) — Open-source speech codec by David Rowe VK5DGR, 700-3200 bps
+4. [opus-rs](https://crates.io/crates/opus) — Rust bindings for libopus
+5. [codec2-rs](https://crates.io/crates/codec2) — Rust bindings for Codec2
+6. ADR-021: Document-Oriented Architecture and Update Semantics
+7. ADR-025: Blob Transfer Protocol
+8. ADR-032: Pluggable Transport Abstraction
+9. ADR-035: Peat-Lite Embedded Nodes (peat-lite protocol)
+10. ADR-044: Application-Layer Encryption
+11. ADR-051: Peat-SBD Satellite Transport
+12. ADR-052: Peat-LoRa Long-Range Radio Transport
+13. `peat-schema/proto/product.proto` — TranscriptionProduct definition (speech-to-text with word timestamps and speaker diarization)
+14. `peat-protocol/src/storage/blob_document_integration.rs` — BlobDocumentIntegration trait and BlobReference types
+
+---
+
+## Decision Log
+
+| Date | Decision | Rationale |
+|------|----------|-----------|
+| 2026-02-26 | Proposed ADR-053 | Voice is a natural fit for CRDT blob sync; TerminalPhone validates the PTT-over-overlay concept |
+| 2026-02-26 | PTT model, not streaming | Record-then-send maps to CRDT sync; streaming requires fundamentally different transport |
+| 2026-02-26 | Audio-as-Blob via ADR-025 | Binary audio payloads don't belong in CRDT merge path; BlobRef indirection is established pattern |
+| 2026-02-26 | Transport-aware codec selection | Opus for high-bandwidth (QUIC, BLE), Codec2 for extreme constraint (LoRa, SBD) |
+| 2026-02-26 | App-layer encryption per ADR-044 | Audio encrypted before BlobStore; transport encryption is independent/additive |
+| 2026-02-26 | Transcription via existing TranscriptionProduct | product.proto already has speech-to-text schema with word timestamps and diarization |
+
+---
+
+**Next Steps:**
+1. Review and approve ADR
+2. Prototype AudioMessage document schema in peat-schema
+3. Prototype Opus encoding pipeline (Rust, using `opus` crate)
+4. Prototype Codec2 encoding for SBD/LoRa constraint testing
+5. Build "Peat" hardware prototype (Pi Zero 2W + I2S mic/speaker + SX1262)
+6. Integration test: record PTT → encode → encrypt → blob store → CRDT sync → decrypt → decode → playback
+7. Transcription integration: audio blob → Whisper → TranscriptionProduct → link to AudioMessage
+
+

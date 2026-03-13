@@ -1,4 +1,4 @@
-# ADR-006: Security, Authentication, and Authorization for PEAT Protocol
+# ADR-006: Security, Authentication, and Authorization for Peat Protocol
 
 **Status**: Proposed
 **Date**: 2025-11-04
@@ -7,7 +7,7 @@
 
 ## Context
 
-PEAT Protocol coordinates autonomous platforms in tactical military environments where security failures can result in:
+Peat Protocol coordinates autonomous platforms in tactical military environments where security failures can result in:
 - **Loss of life** (compromised UAVs, corrupted mission data)
 - **Mission failure** (adversary disruption of coordination)
 - **Tactical disadvantage** (enemy intelligence gathering)
@@ -33,7 +33,7 @@ Current implementation has **no authentication or authorization**. All nodes tru
 
 ### Security Requirements
 
-PEAT Protocol must provide:
+Peat Protocol must provide:
 
 1. **Device Authentication** - Cryptographically verify device identity
 2. **User Authentication** - Verify human operator credentials (for C2 apps)
@@ -336,7 +336,7 @@ impl ApplicationAuthenticator {
 Control what each authenticated entity can do.
 
 ```rust
-/// Roles in PEAT Protocol
+/// Roles in Peat Protocol
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Role {
     /// Squad/cell leader - can command cell, set objectives
@@ -479,7 +479,7 @@ pub struct AuthorizationContext {
     pub cell_store: Arc<dyn CellStoreReader>,
 }
 
-/// Default authorization policy for PEAT Protocol
+/// Default authorization policy for Peat Protocol
 impl AuthorizationPolicy {
     pub fn default_policy() -> Self {
         let mut policy = AuthorizationPolicy::new();
@@ -523,7 +523,7 @@ impl AuthorizationPolicy {
 Encrypt all data in transit and at rest.
 
 ```rust
-/// Encryption manager for PEAT Protocol
+/// Encryption manager for Peat Protocol
 pub struct EncryptionManager {
     /// Device's encryption keypair
     keypair: EncryptionKeypair,
@@ -616,7 +616,7 @@ impl EncryptionManager {
 
 Security must integrate with the abstraction layer from ADR-005.
 
-**Critical Requirement**: Following the Ports & Adapters pattern from ADR-005/ADR-011, the security layer **must be backend-agnostic**. The PEAT Protocol API should work identically regardless of whether Ditto or AutomergeIroh is the underlying backend.
+**Critical Requirement**: Following the Ports & Adapters pattern from ADR-005/ADR-011, the security layer **must be backend-agnostic**. The Peat Protocol API should work identically regardless of whether Ditto or AutomergeIroh is the underlying backend.
 
 #### Backend Implementation Notes
 
@@ -846,7 +846,7 @@ impl AuditLogger for FileAuditLogger {
 }
 ```
 
-## Integration with PEAT Protocol Phases
+## Integration with Peat Protocol Phases
 
 ### Phase 1: Discovery → Requires Device Authentication
 
@@ -985,7 +985,7 @@ if !user.has_clearance_for_level(HierarchyLevel::Platoon) {
 
 ## Compliance Considerations
 
-PEAT Protocol security must align with:
+Peat Protocol security must align with:
 
 - **NIST SP 800-53** - Security and Privacy Controls for Information Systems
 - **DoD 8500 Series** - Cybersecurity for DoD Information Systems

@@ -1,11 +1,11 @@
-//! PEAT-TAK Bridge Service
+//! Peat-TAK Bridge Service
 //!
 //! Connects Peat mesh network to TAK Server for C2 visibility.
 //!
 //! ## Architecture
 //!
 //! ```text
-//! PEAT Mesh (Automerge/Iroh)
+//! Peat Mesh (Automerge/Iroh)
 //!     │
 //!     │ Document subscriptions
 //!     ▼
@@ -40,12 +40,12 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 use tracing::{debug, error, info, warn};
 
-/// PEAT-TAK Bridge Service
+/// Peat-TAK Bridge Service
 ///
 /// Bridges Peat mesh network to TAK Server for C2 visibility.
 #[derive(Parser, Debug)]
 #[command(name = "peat-tak-bridge")]
-#[command(about = "PEAT-TAK Bridge - connects Peat mesh to TAK Server")]
+#[command(about = "Peat-TAK Bridge - connects Peat mesh to TAK Server")]
 struct Args {
     /// TAK Server address (host:port)
     #[arg(long, env = "TAK_SERVER", default_value = "127.0.0.1:8087")]
@@ -72,22 +72,22 @@ struct Args {
     tak_protocol: String,
 
     /// Bridge callsign (shown in TAK)
-    #[arg(long, env = "BRIDGE_CALLSIGN", default_value = "PEAT-BRIDGE")]
+    #[arg(long, env = "BRIDGE_CALLSIGN", default_value = "Peat-BRIDGE")]
     callsign: String,
 
-    /// PEAT app ID for mesh authentication
+    /// Peat app ID for mesh authentication
     #[arg(long, env = "PEAT_APP_ID", default_value = "peat-demo")]
     peat_app_id: String,
 
-    /// PEAT shared key (base64) - required for mesh authentication
+    /// Peat shared key (base64) - required for mesh authentication
     #[arg(long, env = "PEAT_SHARED_KEY")]
     peat_shared_key: Option<String>,
 
-    /// PEAT storage path for Automerge documents
+    /// Peat storage path for Automerge documents
     #[arg(long, env = "PEAT_STORAGE", default_value = "/tmp/peat-bridge")]
     peat_storage: PathBuf,
 
-    /// PEAT peer to connect to (format: node_id@address)
+    /// Peat peer to connect to (format: node_id@address)
     #[arg(long, env = "PEAT_PEER")]
     peat_peer: Vec<String>,
 
@@ -95,7 +95,7 @@ struct Args {
     #[arg(long, default_value = "tracks,capabilities")]
     collections: String,
 
-    /// Run in demo mode (simulated messages, no PEAT connection)
+    /// Run in demo mode (simulated messages, no Peat connection)
     #[arg(long)]
     demo: bool,
 
@@ -116,7 +116,7 @@ async fn main() -> Result<()> {
     };
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
-    info!("PEAT-TAK Bridge starting");
+    info!("Peat-TAK Bridge starting");
     info!("TAK Server: {}", args.tak_server);
     info!("Callsign: {}", args.callsign);
 
@@ -186,7 +186,7 @@ async fn main() -> Result<()> {
         }
         Err(e) => {
             warn!(
-                "Failed to subscribe to TAK events (TAK→PEAT disabled): {}",
+                "Failed to subscribe to TAK events (TAK→Peat disabled): {}",
                 e
             );
             None
@@ -229,7 +229,7 @@ async fn main() -> Result<()> {
         let seed = format!("{}/bridge", args.peat_app_id);
         let transport = Arc::new(IrohTransport::from_seed(&seed).await?);
         info!(
-            "PEAT Node ID: {}",
+            "Peat Node ID: {}",
             hex::encode(transport.endpoint_id().as_bytes())
         );
 
@@ -261,21 +261,21 @@ async fn main() -> Result<()> {
         let change_rx = store.subscribe_to_changes();
         info!("Subscribed to document changes");
 
-        // Spawn the PEAT → TAK relay task
+        // Spawn the Peat → TAK relay task
         let bridge_clone = Arc::clone(&bridge);
         let collections_clone = collections.clone();
         let peat_to_tak_task = tokio::spawn(async move {
             relay_peat_to_tak(change_rx, backend, bridge_clone, collections_clone).await;
         });
 
-        // Spawn the TAK → PEAT relay task (if subscription succeeded)
+        // Spawn the TAK → Peat relay task (if subscription succeeded)
         let tak_to_peat_task = if let Some(stream) = tak_event_stream {
             let store_clone = Arc::clone(&store);
             Some(tokio::spawn(async move {
                 relay_tak_to_peat(stream, store_clone).await;
             }))
         } else {
-            info!("TAK→PEAT relay disabled (no subscription)");
+            info!("TAK→Peat relay disabled (no subscription)");
             None
         };
 
@@ -288,18 +288,18 @@ async fn main() -> Result<()> {
         }
     }
 
-    info!("PEAT-TAK Bridge stopped");
+    info!("Peat-TAK Bridge stopped");
     Ok(())
 }
 
-/// Relay PEAT document changes to TAK Server
+/// Relay Peat document changes to TAK Server
 async fn relay_peat_to_tak(
     mut change_rx: broadcast::Receiver<String>,
     backend: AutomergeBackend,
     bridge: Arc<PeatTakBridge<TakServerTransport>>,
     collections: Vec<String>,
 ) {
-    info!("Starting PEAT→TAK relay loop");
+    info!("Starting Peat→TAK relay loop");
 
     loop {
         match change_rx.recv().await {
@@ -494,7 +494,7 @@ fn parse_capability_document(data: &[u8], doc_id: &str) -> Option<PeatMessage> {
 /// Receives CoT events from TAK Server, converts mission-type events
 /// to MissionTask, and stores them in the Automerge "missions" collection.
 async fn relay_tak_to_peat(mut event_stream: CotEventStream, store: Arc<AutomergeStore>) {
-    info!("Starting TAK→PEAT relay loop");
+    info!("Starting TAK→Peat relay loop");
 
     while let Some(result) = event_stream.next().await {
         match result {
@@ -557,7 +557,7 @@ async fn relay_tak_to_peat(mut event_stream: CotEventStream, store: Arc<Automerg
         }
     }
 
-    info!("TAK→PEAT relay loop ended");
+    info!("TAK→Peat relay loop ended");
 }
 
 /// Demo function that sends simulated messages

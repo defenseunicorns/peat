@@ -1,7 +1,7 @@
 //! Chipout extraction module - Detection-triggered image extraction
 //!
 //! Extracts cropped detection images (chipouts) when specific triggers occur.
-//! Chipouts are published to PEAT for consumption by ATAK and TAK Server.
+//! Chipouts are published to Peat for consumption by ATAK and TAK Server.
 //!
 //! ## Trigger Conditions
 //!

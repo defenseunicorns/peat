@@ -241,7 +241,7 @@ Unknown or invalid certificates → reject peer, do not sync.
 ### Neutral
 
 - Coexists with ADR-006 PKI model for enterprise deployments
-- peat-btle provides crypto primitives, PEAT implements policy
+- peat-btle provides crypto primitives, Peat implements policy
 
 ## Implementation
 
@@ -251,14 +251,14 @@ Unknown or invalid certificates → reject peer, do not sync.
 |-------|----------------|
 | **peat-btle** | Ed25519 sign/verify, IdentityAttestation, peer pubkey registry |
 | **peat-lite** | Signed wire formats (86-byte CannedMessage) |
-| **PEAT** | MembershipCertificate, enrollment protocol, auth policy, UX |
+| **Peat** | MembershipCertificate, enrollment protocol, auth policy, UX |
 | **Apps** | Enrollment UI, QR display/scan, callsign assignment |
 
 ### Related Issues
 
 - **peat-btle** `cac154cc`: Crypto primitives (sign/verify utilities)
 - **peat-lite** `2140b82a`: Signed CannedMessage wire format
-- **PEAT** `23505348`: Membership certificates, enrollment, trust hierarchy
+- **Peat** `23505348`: Membership certificates, enrollment, trust hierarchy
 
 ## References
 

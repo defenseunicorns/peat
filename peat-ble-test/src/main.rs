@@ -1,4 +1,4 @@
-//! PEAT BLE Mesh Transport Test Application
+//! Peat BLE Mesh Transport Test Application
 //!
 //! Tests the peat-btle integration with peat-protocol's transport abstraction.
 //!
@@ -37,7 +37,7 @@ use peat_protocol::transport::{
 
 #[derive(Parser)]
 #[command(name = "peat-ble-test")]
-#[command(about = "PEAT BLE mesh transport test application")]
+#[command(about = "Peat BLE mesh transport test application")]
 struct Cli {
     /// Node ID (hex, e.g., "12345678"). If not provided, generates a random ID.
     #[arg(short, long)]
@@ -53,7 +53,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Scan for nearby PEAT BLE nodes
+    /// Scan for nearby Peat BLE nodes
     Scan {
         /// Duration in seconds
         #[arg(short, long, default_value = "10")]
@@ -89,7 +89,7 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    info!("PEAT BLE Test Application");
+    info!("Peat BLE Test Application");
 
     // Parse or generate node ID
     let node_id_u32 = match &cli.node_id {

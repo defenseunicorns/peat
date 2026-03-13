@@ -1,9 +1,9 @@
-# ADR-050: PEAT SDK Integration (Optimal Path)
+# ADR-050: Peat SDK Integration (Optimal Path)
 
 **Status**: Proposed  
 **Date**: 2025-01-31  
-**Authors**: Kit Plummer, Codex  
-**Organization**: (r)evolve - Revolve Team LLC (https://revolveteam.com)  
+**Authors**: Kit Plummer, Claude  
+**Organization**: Defense Unicorns (https://defenseunicorns.com)  
 **Depends On**: ADR-049 (Schema Extraction)  
 **Relates To**: ADR-043 (Consumer Interface Adapters - Compatibility Path)
 
@@ -11,11 +11,11 @@
 
 ## Executive Summary
 
-This ADR defines the **PEAT SDK** (`peat-sdk`) - the **optimal integration path** for systems that can incorporate PEAT directly. Unlike the consumer interface adapters (ADR-043), SDK integration provides:
+This ADR defines the **Peat SDK** (`peat-sdk`) - the **optimal integration path** for systems that can incorporate Peat directly. Unlike the consumer interface adapters (ADR-043), SDK integration provides:
 
 - **Full CRDT synchronization** with eventual consistency guarantees
 - **Offline operation** with automatic reconnection and sync
-- **Hierarchical participation** as a first-class PEAT node
+- **Hierarchical participation** as a first-class Peat node
 - **Minimal latency** (sync latency only, no adapter overhead)
 - **Native capability aggregation** and cell membership
 
@@ -29,7 +29,7 @@ This ADR defines the **PEAT SDK** (`peat-sdk`) - the **optimal integration path*
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         PEAT Mesh                                        │
+│                         Peat Mesh                                        │
 │                                                                          │
 │    ┌──────────┐      ┌──────────┐      ┌──────────┐      ┌──────────┐  │
 │    │  Squad   │◄────►│  UAS-1   │◄────►│  UGV-2   │◄────►│  Human   │  │
@@ -54,7 +54,7 @@ vs.
 │                   Consumer Interface Architecture                        │
 │                                                                          │
 │    ┌──────────┐      ┌──────────┐                                       │
-│    │  PEAT    │◄────►│  PEAT    │                                       │
+│    │  Peat    │◄────►│  Peat    │                                       │
 │    │  Node    │      │  Node    │◄───HTTP/WS───► Legacy System          │
 │    └──────────┘      └──────────┘                (not a real participant)│
 │                           │                                              │
@@ -82,7 +82,7 @@ vs.
 
 ### Target Platforms
 
-The SDK targets systems where PEAT can be embedded:
+The SDK targets systems where Peat can be embedded:
 
 | Platform | Language Binding | Use Case |
 |----------|------------------|----------|
@@ -156,14 +156,14 @@ The SDK targets systems where PEAT can be embedded:
 use peat_schema::peat::v1::*;
 use std::sync::Arc;
 
-/// Main entry point for PEAT integration
+/// Main entry point for Peat integration
 pub struct PeatNode {
     platform: Platform,
     config: PeatConfig,
 }
 
 impl PeatNode {
-    /// Create a new PEAT node with the given configuration
+    /// Create a new Peat node with the given configuration
     pub async fn new(config: PeatConfig) -> Result<Self, PeatError> {
         let platform = Platform::new(&config.platform_id);
         Ok(Self { platform, config })
@@ -287,7 +287,7 @@ pub enum SpatialFilter {
 import asyncio
 
 async def main():
-    # Create and start a PEAT node
+    # Create and start a Peat node
     config = PeatConfig(
         platform_id="uav-001",
         mesh_backend="automerge",  # or "ditto"
@@ -408,7 +408,7 @@ import (
     "unsafe"
 )
 
-// PeatNode represents a PEAT mesh participant
+// PeatNode represents a Peat mesh participant
 type PeatNode struct {
     ptr unsafe.Pointer
 }
@@ -421,7 +421,7 @@ type Config struct {
     BeaconInterval int       `json:"beacon_interval_secs"`
 }
 
-// NewPeatNode creates a new PEAT node
+// NewPeatNode creates a new Peat node
 func NewPeatNode(cfg Config) (*PeatNode, error) {
     cfgJSON, _ := json.Marshal(cfg)
     cConfig := C.CString(string(cfgJSON))
@@ -513,14 +513,14 @@ import (
     "os"
     "os/signal"
     
-    "github.com/revolveteam/peat-sdk-go"
+    "github.com/defenseunicorns/peat-sdk-go"
 )
 
 func main() {
     ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
     defer cancel()
     
-    // Create PEAT node for this operator instance
+    // Create Peat node for this operator instance
     node, err := peat.NewPeatNode(peat.Config{
         PlatformID:  os.Getenv("HOSTNAME"),
         MeshBackend: "automerge",
@@ -557,8 +557,8 @@ func main() {
 
 use peat_sdk::PeatNode;
 
-/// ROS2 bridge that publishes PEAT state as ROS2 topics
-/// and subscribes to ROS2 topics to update PEAT state
+/// ROS2 bridge that publishes Peat state as ROS2 topics
+/// and subscribes to ROS2 topics to update Peat state
 pub struct PeatRos2Bridge {
     peat: PeatNode,
     // ROS2 node, publishers, subscribers...
@@ -575,8 +575,8 @@ impl PeatRos2Bridge {
         
         loop {
             tokio::select! {
-                // ROS2 odometry → PEAT position
-                // PEAT platform updates → ROS2 topics
+                // ROS2 odometry → Peat position
+                // Peat platform updates → ROS2 topics
             }
         }
     }
@@ -678,7 +678,7 @@ pub enum TransportConfig {
 - [ ] Zarf/UDS integration example
 - [ ] Kubernetes operator example
 
-**Deliverable**: `go get github.com/revolveteam/peat-sdk-go` works
+**Deliverable**: `go get github.com/defenseunicorns/peat-sdk-go` works
 
 ### Phase 4: Mobile Bindings (Week 8-10)
 
@@ -698,7 +698,7 @@ pub enum TransportConfig {
 - [ ] ROS2 Humble/Iron compatibility
 - [ ] Integration with common robot platforms
 
-**Deliverable**: ROS2 robots can join PEAT mesh
+**Deliverable**: ROS2 robots can join Peat mesh
 
 ### Phase 6: Documentation & Examples (Week 13-14)
 
@@ -719,7 +719,7 @@ pub enum TransportConfig {
 3. **Go Integration**: `go get` + idiomatic Go API with channels and context
 4. **Android Integration**: AAR dependency + Kotlin coroutines API
 5. **iOS Integration**: Swift Package Manager + async/await API
-6. **ROS2 Integration**: Single launch file to bridge robot to PEAT
+6. **ROS2 Integration**: Single launch file to bridge robot to Peat
 7. **Latency**: < 50ms position sync between SDK nodes (network permitting)
 8. **Offline**: Survives 10-minute network partition, syncs on reconnect
 9. **Documentation**: New developer productive in < 1 hour per language
@@ -759,7 +759,7 @@ pub enum TransportConfig {
 
 **Pros**: Single integration point, simpler
 **Cons**: Loses all CRDT benefits, adds latency, no offline
-**Decision**: Rejected - defeats the purpose of PEAT's architecture
+**Decision**: Rejected - defeats the purpose of Peat's architecture
 
 ### 2. WASM-Only Cross-Platform
 

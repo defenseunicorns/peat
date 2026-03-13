@@ -1,12 +1,12 @@
-# PEAT Protocol: Standards Landscape & Strategic Positioning Analysis
+# Peat Protocol: Standards Landscape & Strategic Positioning Analysis
 **Date:** November 14, 2025  
 **Status:** Strategic Planning Document
 
 ## Executive Summary
 
-PEAT Protocol (formerly CAP) addresses a **fundamentally different problem** than existing standards. While STANAG 4586/4817, JAUS, and FACE focus on **individual platform control and message interoperability**, PEAT enables **hierarchical coordination and capability composition** at scale (1000+ platforms). This positions PEAT as **complementary to—not competitive with—existing standards**, creating a strategic opportunity for NATO standardization as the missing "coordination layer" above existing control standards.
+Peat Protocol (formerly CAP) addresses a **fundamentally different problem** than existing standards. While STANAG 4586/4817, JAUS, and FACE focus on **individual platform control and message interoperability**, Peat enables **hierarchical coordination and capability composition** at scale (1000+ platforms). This positions Peat as **complementary to—not competitive with—existing standards**, creating a strategic opportunity for NATO standardization as the missing "coordination layer" above existing control standards.
 
-**Key Strategic Recommendation:** Position PEAT as the **coordination standard that sits above** STANAG 4586/4817, JAUS, and ROS2/DDS, enabling hierarchical capability aggregation while maintaining compatibility with existing control standards through the three-layer architecture (peat-schema, peat-transport, peat-persistence).
+**Key Strategic Recommendation:** Position Peat as the **coordination standard that sits above** STANAG 4586/4817, JAUS, and ROS2/DDS, enabling hierarchical capability aggregation while maintaining compatibility with existing control standards through the three-layer architecture (peat-schema, peat-transport, peat-persistence).
 
 ---
 
@@ -57,16 +57,16 @@ NATO standardization operates through the **NATO Standardization Office (NSO)** 
 - Specifies UCS-to-UAV messaging protocols
 - Vehicle Specific Module (VSM) for platform translation
 - **Limitation:** Designed for single-operator to single/few-platform control
-- **PEAT Relationship:** Complementary - PEAT aggregates capabilities *above* 4586 control layer
+- **Peat Relationship:** Complementary - Peat aggregates capabilities *above* 4586 control layer
 
 #### STANAG 4817 - Multi-Domain Control Station (Under Development)
 **Status:** In development, not yet promulgated  
 **Scope:** Extends 4586 to multi-domain (Air, Sea, Ground, Underwater)
 - Cross-domain platform control from single station
 - **Limitation:** Still focused on operator-to-platform control, not swarm coordination
-- **PEAT Relationship:** Complementary - PEAT enables coordination *between* platforms
+- **Peat Relationship:** Complementary - Peat enables coordination *between* platforms
 
-**Critical Gap PEAT Addresses:** Neither 4586 nor 4817 solve the **n-squared message complexity** problem when coordinating 100+ platforms. Both assume centralized command with human-in-the-loop for each platform.
+**Critical Gap Peat Addresses:** Neither 4586 nor 4817 solve the **n-squared message complexity** problem when coordinating 100+ platforms. Both assume centralized command with human-in-the-loop for each platform.
 
 ### NATO Standardization Precedents for Open Standards
 
@@ -77,7 +77,7 @@ Historical examples of successful open standards adoption:
 - **STANAG 3838/5066:** HF Radio communications
 - **NATO NISP (STANAG 5524):** Network services interoperability
 
-**Lesson:** NATO prioritizes standards that enable **multi-national interoperability** without vendor lock-in. PEAT's open-source GOTS positioning is strategically aligned.
+**Lesson:** NATO prioritizes standards that enable **multi-national interoperability** without vendor lock-in. Peat's open-source GOTS positioning is strategically aligned.
 
 ---
 
@@ -104,10 +104,10 @@ Historical examples of successful open standards adoption:
 - No native support for CRDT-based differential synchronization
 - Focuses on command/control, not capability composition
 
-**PEAT Relationship:** 
-- **Complementary:** PEAT can expose capabilities through JAUS service interfaces
+**Peat Relationship:** 
+- **Complementary:** Peat can expose capabilities through JAUS service interfaces
 - **Integration Path:** peat-transport layer could include JAUS message adapters
-- **Differentiation:** PEAT operates at squad/platoon level; JAUS at platform/component level
+- **Differentiation:** Peat operates at squad/platoon level; JAUS at platform/component level
 
 **Recent Activity:** 
 - AeroVironment integrating JAUS into AV_Halo Command (2024-2025)
@@ -136,10 +136,10 @@ Historical examples of successful open standards adoption:
 - Topic proliferation (ROS2 creates 12+ topics per node for parameters)
 - **Not hierarchical** - flat peer-to-peer model doesn't match military C2 structure
 
-**PEAT Relationship:**
-- **Compatible Transport:** PEAT's peat-transport could use DDS/RTPS as one transport option
-- **Differentiation:** PEAT's hierarchical aggregation **reduces** DDS message volume by 95-99%
-- **Integration:** ROS2 platforms can participate in PEAT using DDS bridge
+**Peat Relationship:**
+- **Compatible Transport:** Peat's peat-transport could use DDS/RTPS as one transport option
+- **Differentiation:** Peat's hierarchical aggregation **reduces** DDS message volume by 95-99%
+- **Integration:** ROS2 platforms can participate in Peat using DDS bridge
 
 **Research Insights:**
 - Recent studies (2024-2025) show ROS2/DDS struggles with large-payload wireless transmission
@@ -168,18 +168,18 @@ Historical examples of successful open standards adoption:
 - Safety-certified options (DO-178C DAL A)
 - Supports human-piloted and autonomous missions
 
-**Limitations for PEAT's Use Case:**
+**Limitations for Peat's Use Case:**
 - **Aviation-centric** (though expanding to ground/maritime)
 - Designed for **single-platform software portability**, not multi-platform coordination
 - FACE TSS provides data exchange *within* a platform or *between* platforms
 - No hierarchical coordination or capability composition concepts
 
-**PEAT Relationship:**
-- **Potentially Complementary:** PEAT could be implemented as FACE-conformant UoC
-- **Different Problem Domain:** FACE solves "run same software on different aircraft"; PEAT solves "coordinate 1000 autonomous platforms"
-- **Integration Opportunity:** FACE platforms could expose/consume PEAT capabilities
+**Peat Relationship:**
+- **Potentially Complementary:** Peat could be implemented as FACE-conformant UoC
+- **Different Problem Domain:** FACE solves "run same software on different aircraft"; Peat solves "coordinate 1000 autonomous platforms"
+- **Integration Opportunity:** FACE platforms could expose/consume Peat capabilities
 
-**Strategic Note:** FACE has successfully established MOSA as DoD acquisition policy. PEAT should align with MOSA principles for acquisition pathway.
+**Strategic Note:** FACE has successfully established MOSA as DoD acquisition policy. Peat should align with MOSA principles for acquisition pathway.
 
 ### 4. AUTOSAR Adaptive Platform
 
@@ -191,10 +191,10 @@ Historical examples of successful open standards adoption:
 - ISO 26262 functional safety compliance
 - Service-oriented architecture
 
-**PEAT Relationship:** 
+**Peat Relationship:** 
 - Commercial autonomous vehicle lessons learned applicable to military UGVs
 - Similar safety/security requirements
-- **Differentiation:** AUTOSAR focuses on single-vehicle autonomy; PEAT on multi-vehicle coordination
+- **Differentiation:** AUTOSAR focuses on single-vehicle autonomy; Peat on multi-vehicle coordination
 
 ---
 
@@ -208,23 +208,23 @@ Historical examples of successful open standards adoption:
    - Recognition that pure centralization creates bottlenecks
    - Pure decentralization lacks global coordination
    - **Trend:** Combining hierarchical structures with local autonomy
-   - **PEAT Alignment:** This is exactly PEAT's approach
+   - **Peat Alignment:** This is exactly Peat's approach
 
 2. **Hierarchical Consensus Mechanisms**
    - Feng et al. (2024): HC-MARL framework using contrastive learning
    - Addresses limitations of Centralized Training with Decentralized Execution (CTDE)
-   - **Gap PEAT Fills:** These focus on training/learning; PEAT provides operational coordination
+   - **Gap Peat Fills:** These focus on training/learning; Peat provides operational coordination
 
 3. **Self-Organizing Hierarchies**
    - SoNS (Self-Organizing Nervous System) by Heinrich & Dorigo (2025)
    - Dynamic hierarchy formation for robot swarms
    - LLM-based code generation for swarm behaviors
-   - **PEAT Differentiation:** PEAT provides persistent hierarchies matching military structure; SoNS is fully dynamic
+   - **Peat Differentiation:** Peat provides persistent hierarchies matching military structure; SoNS is fully dynamic
 
 4. **Large-Scale Coordination Research**
    - Studies confirming hierarchical structures scale better than flat topologies
    - Energy grid management using 3-layer agent systems (device → microgrid → main grid)
-   - **Validation of PEAT Approach:** Academic consensus that hierarchy is necessary for 100+ agent systems
+   - **Validation of Peat Approach:** Academic consensus that hierarchy is necessary for 100+ agent systems
 
 ### Specific Research Programs:
 
@@ -239,32 +239,32 @@ Historical examples of successful open standards adoption:
 - Goal: Same-day autonomy transfer for rapid operational pivots
 - Addresses "simulation-to-reality gap" problem
 
-**Relevance to PEAT:**
+**Relevance to Peat:**
 - **NOT competitive** - TIAMAT solves *individual platform behavior transfer*
-- PEAT solves *multi-platform coordination architecture*
-- **Potentially complementary:** TIAMAT-trained platforms could use PEAT for coordination
-- **Strategic positioning:** PEAT addresses the coordination problem that TIAMAT assumes is solved
+- Peat solves *multi-platform coordination architecture*
+- **Potentially complementary:** TIAMAT-trained platforms could use Peat for coordination
+- **Strategic positioning:** Peat addresses the coordination problem that TIAMAT assumes is solved
 
-**Key Insight:** TIAMAT's existence validates that DoD recognizes **rapid adaptability** as critical requirement. PEAT's CRDT-based approach enables rapid reconfiguration complementary to TIAMAT's behavior transfer.
+**Key Insight:** TIAMAT's existence validates that DoD recognizes **rapid adaptability** as critical requirement. Peat's CRDT-based approach enables rapid reconfiguration complementary to TIAMAT's behavior transfer.
 
 #### Other Notable Research:
 
 1. **Multi-Agent LLM Systems (2024-2025)**
    - MetaGPT, HALO, Puppeteer frameworks
    - Hierarchical orchestration of LLM agents
-   - **PEAT Application:** Could integrate LLM-based decision agents within PEAT hierarchy
+   - **Peat Application:** Could integrate LLM-based decision agents within Peat hierarchy
 
 2. **Swarm Intelligence + Multi-Agent Systems**
    - Abdulameer & Yassen (2025): Decentralized drone coordination
    - Achieved 96% area coverage, <7 second recovery from failures
-   - **PEAT Differentiation:** Research validates swarm behaviors; PEAT provides hierarchical command structure on top
+   - **Peat Differentiation:** Research validates swarm behaviors; Peat provides hierarchical command structure on top
 
 3. **Satellite Constellation Coordination**
    - Distributed routing protocols demonstrated at thousands of satellites
    - Time-varying topology challenges similar to tactical networks
-   - **PEAT Applicability:** Same coordination challenges as ground/air swarms
+   - **Peat Applicability:** Same coordination challenges as ground/air swarms
 
-### Academic Validation of PEAT's Core Concepts:
+### Academic Validation of Peat's Core Concepts:
 
 ✅ **Hierarchical structures are necessary for large-scale MAS** (100+ agents)  
 ✅ **Hybrid hierarchical-decentralized** beats pure centralized or pure decentralized  
@@ -285,7 +285,7 @@ Historical examples of successful open standards adoption:
 | ROS2/DDS | Rich robotics ecosystem, real-time pub-sub | ~50-100 nodes (bandwidth dependent) |
 | FACE | Software portability, MOSA compliance | Single platform focus |
 
-### What PEAT Uniquely Provides:
+### What Peat Uniquely Provides:
 
 ✅ **Hierarchical capability aggregation** - Composing squad→platoon→company capabilities  
 ✅ **O(n log n) scaling** - Breaking the n-squared barrier through hierarchy  
@@ -299,7 +299,7 @@ Historical examples of successful open standards adoption:
 ```
                     NATO Command & Control
                             ↑
-                    [PEAT Coordination Layer]
+                    [Peat Coordination Layer]
               ┌──────────────┴──────────────┐
         Squad A (10x)              Squad B (10x)
     ┌───────┴───────┐          ┌───────┴───────┐
@@ -307,7 +307,7 @@ Historical examples of successful open standards adoption:
   [STANAG 4586]   [JAUS]     [ROS2/DDS]      [STANAG 4586]
 ```
 
-**PEAT sits at the coordination layer**, consuming capabilities from platforms using *any* underlying control standard, and exposing aggregated capabilities upward to C2 systems.
+**Peat sits at the coordination layer**, consuming capabilities from platforms using *any* underlying control standard, and exposing aggregated capabilities upward to C2 systems.
 
 ---
 
@@ -315,7 +315,7 @@ Historical examples of successful open standards adoption:
 
 ### COA 1: NATO STANAG Path (Long-term, High Impact)
 
-**Objective:** Establish PEAT as **STANAG for Hierarchical Autonomous Platform Coordination**
+**Objective:** Establish Peat as **STANAG for Hierarchical Autonomous Platform Coordination**
 
 **Timeline:** 4-5 years to promulgation
 
@@ -356,7 +356,7 @@ Historical examples of successful open standards adoption:
 
 ### COA 2: SAE Standard Path (Medium-term, Industry Focus)
 
-**Objective:** Establish PEAT as SAE AS-series standard for swarm coordination
+**Objective:** Establish Peat as SAE AS-series standard for swarm coordination
 
 **Timeline:** 2-3 years to publication
 
@@ -377,14 +377,14 @@ Historical examples of successful open standards adoption:
 
 ### COA 3: Open Standard + Industry Consortium (Near-term, Flexible)
 
-**Objective:** Establish PEAT as *de facto* standard through adoption before standardization
+**Objective:** Establish Peat as *de facto* standard through adoption before standardization
 
 **Timeline:** 12-24 months to initial adoption
 
 **Approach:**
 - Continue open-source development under Apache 2.0
-- Form PEAT Consortium (model: FACE, ROS-Industrial)
-- Publish PEAT Technical Specification (not formal standard yet)
+- Form Peat Consortium (model: FACE, ROS-Industrial)
+- Publish Peat Technical Specification (not formal standard yet)
 - Enable vendor implementations and certifications
 - Build ecosystem of compatible products
 
@@ -407,15 +407,15 @@ Historical examples of successful open standards adoption:
 
 ### COA 4: DoD Modular Open Systems Approach (MOSA) Alignment (Parallel to above)
 
-**Objective:** Position PEAT as MOSA-compliant for acquisition preference
+**Objective:** Position Peat as MOSA-compliant for acquisition preference
 
 **Immediate Actions:**
-- Document PEAT's alignment with MOSA principles:
+- Document Peat's alignment with MOSA principles:
   - ✅ Establish Enabling Environment (open source, documented interfaces)
   - ✅ Employ Modular Design (peat-schema/transport/persistence separation)
   - ✅ Designate Key Interfaces (well-defined APIs)
   - ✅ Select Open Standards (DDS, RTPS, QUIC, etc.)
-  - ✅ Certify Conformance (define PEAT conformance process)
+  - ✅ Certify Conformance (define Peat conformance process)
 
 - Align with **DoD Digital Engineering Strategy**
 - Support **Open Mission Systems (OMS)** initiative for unmanned systems
@@ -434,40 +434,40 @@ Historical examples of successful open standards adoption:
 **Implement protocol bridges in peat-transport layer:**
 
 1. **STANAG 4586 Bridge**
-   - PEAT node consumes 4586 messages from individual UAVs
+   - Peat node consumes 4586 messages from individual UAVs
    - Aggregates capabilities and exposes to higher echelons
-   - PEAT coordination messages translated to 4586 commands
+   - Peat coordination messages translated to 4586 commands
 
 2. **JAUS Service Adapter**
-   - PEAT capabilities exposed as JAUS services
-   - Allows JAUS-compliant systems to participate in PEAT hierarchies
+   - Peat capabilities exposed as JAUS services
+   - Allows JAUS-compliant systems to participate in Peat hierarchies
 
 3. **ROS2/DDS Integration**
    - Native DDS transport option in peat-transport
-   - PEAT discovery compatible with DDS discovery
-   - ROS2 topics mapped to PEAT capabilities
+   - Peat discovery compatible with DDS discovery
+   - ROS2 topics mapped to Peat capabilities
 
 ### Medium-term (18-36 months): Reference Implementations
 
-**Demonstrate PEAT coordinating heterogeneous fleets:**
+**Demonstrate Peat coordinating heterogeneous fleets:**
 
 - Example: STANAG 4586 UAVs + JAUS UGVs + ROS2 robotic systems in single coordinated mission
-- Validate that PEAT's hierarchical coordination works *above* any underlying control standard
+- Validate that Peat's hierarchical coordination works *above* any underlying control standard
 - Publish integration guides and SDKs
 
 ### Long-term (36+ months): Standards Harmonization
 
 **Work with standards bodies to define integration points:**
 
-- Propose PEAT extensions to STANAG 4817 (multi-domain control)
-- Coordinate with SAE AS4 on JAUS + PEAT interoperability profiles
-- Engage with ROS-Industrial on ROS2-PEAT integration patterns
+- Propose Peat extensions to STANAG 4817 (multi-domain control)
+- Coordinate with SAE AS4 on JAUS + Peat interoperability profiles
+- Engage with ROS-Industrial on ROS2-Peat integration patterns
 
 ---
 
 ## Addressing the Man-Machine Teaming & AI Integration Question
 
-### Current State: PEAT's Human-Machine Teaming Architecture (ADR-004)
+### Current State: Peat's Human-Machine Teaming Architecture (ADR-004)
 
 ✅ Already includes authority scoring based on rank and expertise  
 ✅ Configurable autonomy policies (when AI acts independently vs. requires approval)  
@@ -478,7 +478,7 @@ Historical examples of successful open standards adoption:
 #### 1. AI as Squad Member (Peer Role)
 - AI agent participates in capability composition
 - Contributes specialized capabilities (e.g., sensor fusion, threat assessment)
-- Subject to same PEAT coordination protocols as human/robot platforms
+- Subject to same Peat coordination protocols as human/robot platforms
 
 **Example:** 
 ```
@@ -530,11 +530,11 @@ authority_policy:
 
 **DoD AI Principles (2020):**
 - Responsible, Equitable, Traceable, Reliable, Governable
-- PEAT's authority scoring and audit logs support traceability and governability
+- Peat's authority scoring and audit logs support traceability and governability
 
 **NATO REAIM (Responsible AI in the Military) (2025):**
 - Human control and oversight requirements
-- PEAT's configurable authority policies enable compliance with varying national policies
+- Peat's configurable authority policies enable compliance with varying national policies
 
 **Recommendation:** Create **ADR-017: AI Agent Integration & Authority Management**
 - Define AI agent capability schema extensions
@@ -575,10 +575,10 @@ authority_policy:
 ## Immediate Next Steps (Next 90 Days)
 
 ### 1. Update Documentation for Standards Compliance
-- [ ] Revise all 14 ADRs with PEAT branding
+- [ ] Revise all 14 ADRs with Peat branding
 - [ ] Add "Standards Alignment" section to each ADR
 - [ ] Document MOSA compliance explicitly
-- [ ] Create PEAT Technical Specification v1.0
+- [ ] Create Peat Technical Specification v1.0
 
 ### 2. Engage Standards Communities
 - [ ] Join NATO STO as research contributor
@@ -594,11 +594,11 @@ authority_policy:
 ### 4. Demonstrate Standards Interoperability
 - [ ] Complete Exercise 8 with Automerge/Iroh validation
 - [ ] Build STANAG 4586 message bridge (proof of concept)
-- [ ] Demonstrate ROS2-PEAT integration
+- [ ] Demonstrate ROS2-Peat integration
 - [ ] Publish interoperability test results
 
 ### 5. Develop Acquisition Narrative
-- [ ] Position PEAT as "missing coordination layer" for existing standards
+- [ ] Position Peat as "missing coordination layer" for existing standards
 - [ ] Create acquisition value proposition (cost savings, reduced program risk)
 - [ ] Document MOSA alignment for acquisition preference
 - [ ] Prepare responses to anticipated objections (vendor lock-in, maturity, etc.)
@@ -607,9 +607,9 @@ authority_policy:
 
 ## Conclusion
 
-PEAT Protocol addresses a **critical gap** in the autonomous systems standards landscape. While existing standards (STANAG 4586/4817, JAUS, ROS2/DDS, FACE) provide excellent foundations for **individual platform control and software portability**, none solve the **hierarchical coordination problem at scale**.
+Peat Protocol addresses a **critical gap** in the autonomous systems standards landscape. While existing standards (STANAG 4586/4817, JAUS, ROS2/DDS, FACE) provide excellent foundations for **individual platform control and software portability**, none solve the **hierarchical coordination problem at scale**.
 
-**Strategic Positioning:** PEAT is not a competitor to existing standards—it's the **complementary coordination layer** that enables them to work together at military operational scale.
+**Strategic Positioning:** Peat is not a competitor to existing standards—it's the **complementary coordination layer** that enables them to work together at military operational scale.
 
 **Path Forward:** Pursue parallel strategies:
 1. **Near-term:** Open standard + industry consortium (12-24 months)
@@ -665,4 +665,4 @@ The window of opportunity is **now** as DoD and NATO recognize the need for larg
 - **Shield AI Peatmind:** Onboard AI for individual platforms, not swarm coordination
 - **Epirus Leonidas:** Counter-UAS, not coordination
 
-PEAT is **infrastructure** that these solutions could build upon.
+Peat is **infrastructure** that these solutions could build upon.

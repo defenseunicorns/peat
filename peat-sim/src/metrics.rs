@@ -1,4 +1,4 @@
-//! Metrics event types and logging for PEAT simulation
+//! Metrics event types and logging for Peat simulation
 //!
 //! This module provides structured logging for simulation metrics including:
 //! - Document synchronization latency

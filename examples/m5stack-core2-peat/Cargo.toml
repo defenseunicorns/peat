@@ -2,9 +2,9 @@
 name = "m5stack-core2-peat"
 version = "0.1.0"
 edition = "2021"
-authors = ["(r)evolve - Revolve Team LLC"]
+authors = ["Defense Unicorns"]
 license = "Apache-2.0"
-description = "PEAT Protocol demonstration on M5Stack Core2 (ESP32)"
+description = "Peat Protocol demonstration on M5Stack Core2 (ESP32)"
 repository = "https://github.com/defenseunicorns/peat"
 
 [dependencies]
@@ -27,7 +27,7 @@ display-interface-spi = "0.5"
 mipidsi = "0.8"
 embedded-graphics = "0.8"
 
-# PEAT libraries (external repo - radicle)
+# Peat libraries (external repo - radicle)
 peat-btle = { path = "../../../revolve/peat-btle", default-features = false, features = ["esp32"] }
 
 [build-dependencies]

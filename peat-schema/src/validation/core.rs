@@ -1,4 +1,4 @@
-//! Core validators for basic PEAT Protocol types
+//! Core validators for basic Peat Protocol types
 //!
 //! Validates: Capability, NodeConfig, NodeState, CellConfig, CellState
 

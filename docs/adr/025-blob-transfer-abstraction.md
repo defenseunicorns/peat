@@ -9,7 +9,7 @@
 
 ### The File Transfer Gap
 
-PEAT Protocol has comprehensive architecture for distributed AI model operations (ADR-013, ADR-022) and capability advertisement (ADR-018), but lacks the foundational primitive: **backend-agnostic binary file transfer through the mesh**.
+Peat Protocol has comprehensive architecture for distributed AI model operations (ADR-013, ADR-022) and capability advertisement (ADR-018), but lacks the foundational primitive: **backend-agnostic binary file transfer through the mesh**.
 
 **Current State:**
 - `StorageBackend` and `Collection` traits handle document CRUD (`storage/traits.rs`)
@@ -113,7 +113,7 @@ while let Some(chunk) = reader.next().await {
 
 ### Gap Analysis
 
-| Feature | Ditto | iroh-blobs | PEAT (Current) |
+| Feature | Ditto | iroh-blobs | Peat (Current) |
 |---------|-------|------------|----------------|
 | Content-addressed storage | Yes | Yes | No |
 | Progress tracking | Yes | Yes | No |
@@ -131,7 +131,7 @@ Introduce a `BlobStore` trait parallel to `StorageBackend`, acknowledging that b
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    PEAT Protocol Layer                       │
+│                    Peat Protocol Layer                       │
 │                                                              │
 │  ┌─────────────────┐           ┌─────────────────────────┐  │
 │  │ ModelDistribution│           │  SoftwareDistribution   │  │
@@ -1014,4 +1014,4 @@ These questions must be answered before implementing Phase 4:
 
 ---
 
-**This ADR establishes the foundational file transfer abstraction enabling AI model distribution and software operations across the PEAT mesh network.**
+**This ADR establishes the foundational file transfer abstraction enabling AI model distribution and software operations across the Peat mesh network.**

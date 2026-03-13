@@ -23,7 +23,7 @@ Based on ADR-011 ("Ditto vs Automerge+Iroh") and experiments team feedback, we r
 ## Experiments Team Recommendation (ENDORSED)
 
 > "The protocol team should finish Mode 3/4 validation with Ditto first, then add Automerge as a
-> pluggable backend. PEAT Protocol should be backend-agnostic anyway - the capability filtering
+> pluggable backend. Peat Protocol should be backend-agnostic anyway - the capability filtering
 > and hierarchical aggregation logic shouldn't depend on which CRDT library is used."
 
 **This is the correct approach.** Here's why:
@@ -186,7 +186,7 @@ Based on ADR-011 ("Ditto vs Automerge+Iroh") and experiments team feedback, we r
 **Problem**: More Mode 3/4 work with Ditto creates more code to migrate
 
 **Mitigation**:
-- PEAT Protocol logic is **already backend-agnostic** ✅
+- Peat Protocol logic is **already backend-agnostic** ✅
 - Storage layer follows interface-based design ✅
 - Migration path is clear (swap DittoStore → AutomergeStore + Iroh)
 

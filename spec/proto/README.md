@@ -1,6 +1,6 @@
-# PEAT Protocol Buffer Definitions
+# Peat Protocol Buffer Definitions
 
-This directory contains the **normative** Protocol Buffer schema definitions for the PEAT Protocol.
+This directory contains the **normative** Protocol Buffer schema definitions for the Peat Protocol.
 
 ## License
 

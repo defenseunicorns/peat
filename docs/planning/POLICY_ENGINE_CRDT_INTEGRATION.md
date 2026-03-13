@@ -5,7 +5,7 @@
 
 ## Problem Statement
 
-The PEAT Protocol policy engine provides conflict resolution policies (e.g., `HighestPriorityWins`, `LowestAttributeWins`) that operate at the **application semantic layer**. However, CRDT backends like Ditto resolve conflicts at the **CRDT structural layer** using built-in semantics (typically Last-Write-Wins based on timestamps).
+The Peat Protocol policy engine provides conflict resolution policies (e.g., `HighestPriorityWins`, `LowestAttributeWins`) that operate at the **application semantic layer**. However, CRDT backends like Ditto resolve conflicts at the **CRDT structural layer** using built-in semantics (typically Last-Write-Wins based on timestamps).
 
 This creates a fundamental timing problem: **policy evaluation happens AFTER CRDT merge has already chosen a winner**.
 
@@ -283,7 +283,7 @@ Yjs uses a similar approach to Automerge with custom conflict resolvers. Policie
 
 ## Application-Managed Policies
 
-The PEAT Protocol policy engine provides **mechanism**, not **policy mandate**. Applications may need custom conflict resolution logic based on:
+The Peat Protocol policy engine provides **mechanism**, not **policy mandate**. Applications may need custom conflict resolution logic based on:
 
 - Mission context (ISR mission > logistics mission)
 - Operator authority (human override > autonomous decision)
@@ -511,7 +511,7 @@ Document how to implement custom policies:
 - Use `LastWriteWins` for Ditto unless strong requirements exist
 - Implement OCC for `HighestPriorityWins` if needed (with awareness of limitations)
 - Design applications with policy flexibility in mind for future backend migrations
-- Emphasize that PEAT Protocol provides **mechanism** (Conflictable trait, ResolutionPolicy interface), not **policy mandate**
+- Emphasize that Peat Protocol provides **mechanism** (Conflictable trait, ResolutionPolicy interface), not **policy mandate**
 
 ## Related Documentation
 

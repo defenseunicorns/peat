@@ -1,6 +1,6 @@
 //! MIL-STD-2525 symbol type mappings for CoT
 //!
-//! Maps PEAT entity classifications to CoT type codes following MIL-STD-2525
+//! Maps Peat entity classifications to CoT type codes following MIL-STD-2525
 //! military symbology standards.
 
 use serde::{Deserialize, Serialize};
@@ -116,7 +116,7 @@ impl std::fmt::Display for CotType {
     }
 }
 
-/// Mapper for converting PEAT classifications to CoT types
+/// Mapper for converting Peat classifications to CoT types
 #[derive(Debug, Clone)]
 pub struct CotTypeMapper {
     /// Custom type overrides
@@ -193,7 +193,7 @@ impl CotTypeMapper {
         CotType::new(&type_code)
     }
 
-    /// Map a PEAT platform type to CoT type
+    /// Map a Peat platform type to CoT type
     pub fn map_platform(&self, platform_type: &str, affiliation: Affiliation) -> CotType {
         let aff = affiliation.cot_char();
 

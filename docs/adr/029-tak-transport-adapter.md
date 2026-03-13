@@ -31,7 +31,7 @@ ADR-020 defines the high-level TAK/CoT integration strategy, but the transport l
 
 ### Transport Adapter Pattern
 
-PEAT already uses transport adapters for backend abstraction (Ditto, Iroh). TAK integration follows this pattern as an external bridge transport, not a CRDT sync backend.
+Peat already uses transport adapters for backend abstraction (Ditto, Iroh). TAK integration follows this pattern as an external bridge transport, not a CRDT sync backend.
 
 ## Decision
 
@@ -42,7 +42,7 @@ We will implement `TakTransport` as a first-class transport adapter with DIL-res
 ```rust
 /// TAK Transport Adapter
 ///
-/// Provides bidirectional CoT message transport between PEAT and TAK ecosystem.
+/// Provides bidirectional CoT message transport between Peat and TAK ecosystem.
 /// Supports TAK Server (TCP/SSL) and Mesh SA (UDP multicast) modes.
 #[async_trait]
 pub trait TakTransport: Send + Sync {
@@ -235,7 +235,7 @@ pub struct XmlEncodingOptions {
     /// Pretty print (development only)
     pub pretty_print: bool,
 
-    /// Include PEAT extension by default
+    /// Include Peat extension by default
     pub include_peat_extension: bool,
 }
 ```
@@ -585,7 +585,7 @@ impl TakServerTransport {
     async fn send_presence(&mut self) -> Result<(), TakError> {
         let callsign = self.config.identity.as_ref()
             .map(|i| i.callsign.as_str())
-            .unwrap_or("PEAT-BRIDGE");
+            .unwrap_or("Peat-BRIDGE");
 
         let presence = CotEvent::presence(callsign);
         self.send_raw(&presence).await
@@ -903,7 +903,7 @@ pub struct QueueDepthMetrics {
 ### Integration Tests
 
 1. FreeTakServer connection lifecycle
-2. Message round-trip (PEAT → TAK → ATAK)
+2. Message round-trip (Peat → TAK → ATAK)
 3. Disconnection/reconnection handling
 4. Certificate authentication
 
@@ -918,7 +918,7 @@ pub struct QueueDepthMetrics {
 
 ### Why Protobuf is Preferred
 
-TAK Server and modern TAK clients (ATAK, WinTAK, iTAK) support **TAK Protocol Version 1** which uses Google Protocol Buffers instead of XML. This is critical for PEAT's tactical/DIL environments:
+TAK Server and modern TAK clients (ATAK, WinTAK, iTAK) support **TAK Protocol Version 1** which uses Google Protocol Buffers instead of XML. This is critical for Peat's tactical/DIL environments:
 
 | Metric | XML | Protobuf | Benefit |
 |--------|-----|----------|---------|
@@ -947,7 +947,7 @@ The official TAK Protocol Buffers definitions are available at:
 
 Key message type: `atakmap.commoncommo.v1.TakMessage`
 
-### PEAT Extension in Protobuf
+### Peat Extension in Protobuf
 
 The `_peat_` XML extension (ADR-028) can be embedded in Protobuf via:
 1. **`xmlDetail` field** - Embed XML string in Protobuf detail (initial approach, maximum compatibility)

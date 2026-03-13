@@ -1,7 +1,7 @@
 //! FFI (Foreign Function Interface) for Peat Protocol
 //!
 //! This module provides C-compatible FFI bindings for use with Android (JNI/Kotlin),
-//! iOS (Swift/Objective-C), and other languages that need to interop with PEAT.
+//! iOS (Swift/Objective-C), and other languages that need to interop with Peat.
 //!
 //! ## Overview
 //!

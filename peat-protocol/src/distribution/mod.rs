@@ -1,6 +1,6 @@
-//! Software Distribution for PEAT - ADR-012 / ADR-026
+//! Software Distribution for Peat - ADR-012 / ADR-026
 //!
-//! This module provides types for distributing software across the PEAT network:
+//! This module provides types for distributing software across the Peat network:
 //!
 //! - **Deployment Directives**: C2→node commands for software deployment
 //! - **Model Manifest**: Metadata for downloadable models (hash, size, requirements)

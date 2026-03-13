@@ -99,7 +99,7 @@ Traditional Machine Learning Operations (MLOps) architectures assume:
 - Continuous monitoring telemetry → Central dashboards
 - Model registry as source of truth
 
-**PEAT Enables:**
+**Peat Enables:**
 - Edge-first inference with local model execution
 - Hierarchical model distribution via differential sync
 - Aggregated performance monitoring through hierarchy
@@ -108,14 +108,14 @@ Traditional Machine Learning Operations (MLOps) architectures assume:
 
 **Design Philosophy:**
 - **Models run at the edge** where decisions are made
-- **Model updates propagate hierarchically** using PEAT's differential sync
+- **Model updates propagate hierarchically** using Peat's differential sync
 - **Performance metrics aggregate upward** through command hierarchy
 - **Training happens offline** or via federated learning
 - **Capability, not inventory** is the operational metric
 
 ### Model Format Standards: ONNX as Foundation
 
-**PEAT uses ONNX (Open Neural Network Exchange) as the standard model interchange format** for edge AI operations. This decision provides critical benefits for military edge deployments:
+**Peat uses ONNX (Open Neural Network Exchange) as the standard model interchange format** for edge AI operations. This decision provides critical benefits for military edge deployments:
 
 #### Why ONNX for Tactical Edge
 
@@ -162,10 +162,10 @@ Traditional Machine Learning Operations (MLOps) architectures assume:
 - Integration with MLOps tools (MLflow, Azure ML)
 - Active development and governance (LF AI & Data)
 
-#### ONNX Integration in PEAT
+#### ONNX Integration in Peat
 
 ```python
-# Example: ONNX model in PEAT registry
+# Example: ONNX model in Peat registry
 {
   "model_id": "target_recognition_yolov8",
   "version": "4.2.1",
@@ -244,7 +244,7 @@ Traditional Machine Learning Operations (MLOps) architectures assume:
 }
 ```
 
-**PEAT's ONNX Runtime Integration:**
+**Peat's ONNX Runtime Integration:**
 
 ```python
 class PeatMLRuntime:
@@ -275,7 +275,7 @@ class PeatMLRuntime:
         
     def load_model(self, model_spec: ModelSpec):
         """Load ONNX model with automatic variant selection"""
-        # Fetch model metadata from PEAT
+        # Fetch model metadata from Peat
         model_metadata = self.peat_sync.get_artifact_metadata(
             collection="models.registry",
             artifact_id=f"{model_spec.model_id}:{model_spec.version}"
@@ -288,7 +288,7 @@ class PeatMLRuntime:
             self.get_hardware_capabilities()
         )
         
-        # Fetch ONNX model file via PEAT differential sync
+        # Fetch ONNX model file via Peat differential sync
         onnx_model_path = self.peat_sync.fetch_artifact(
             artifact_id=variant.file,
             priority="normal"
@@ -318,7 +318,7 @@ class PeatMLRuntime:
             "loaded_at": datetime.now()
         }
         
-        # Update capability state in PEAT
+        # Update capability state in Peat
         self.peat_sync.update_capability_state(
             platform_id=self.platform_id,
             capability=model_spec.model_id,
@@ -402,7 +402,7 @@ ONNX's structured format enables intelligent differential sync:
 }
 ```
 
-**Benefits for PEAT:**
+**Benefits for Peat:**
 - ONNX graph structure enables semantic chunking (by layer/operator)
 - Changed weights identified at granular level
 - Architecture changes (nodes/edges) detected separately
@@ -460,18 +460,18 @@ class PeatMLRuntime:
         self.performance_metrics = {}
         
     def load_model(self, model_spec: ModelSpec):
-        """Load model from PEAT-synced model registry"""
+        """Load model from Peat-synced model registry"""
         model_id = model_spec.model_id
         version = model_spec.version
         
-        # Check if model available in local PEAT state
+        # Check if model available in local Peat state
         model_artifact = self.peat_sync.get_artifact(
             collection="models.registry",
             artifact_id=f"{model_id}:{version}"
         )
         
         if model_artifact is None:
-            # Request from parent via PEAT sync
+            # Request from parent via Peat sync
             self.peat_sync.request_artifact(
                 artifact_id=f"{model_id}:{version}",
                 priority="normal"
@@ -492,7 +492,7 @@ class PeatMLRuntime:
             "inference_count": 0
         }
         
-        # Update capability state in PEAT
+        # Update capability state in Peat
         self.peat_sync.update_capability_state(
             platform_id=self.platform_id,
             capability=model_id,
@@ -551,12 +551,12 @@ class PeatMLRuntime:
         metrics["inference_count"] += 1
         metrics["last_updated"] = datetime.now()
         
-        # Periodically sync performance metrics up through PEAT
+        # Periodically sync performance metrics up through Peat
         if metrics["inference_count"] % 100 == 0:
             self.sync_performance_metrics(model_id)
             
     def sync_performance_metrics(self, model_id: str):
-        """Aggregate performance metrics into PEAT state"""
+        """Aggregate performance metrics into Peat state"""
         metrics = self.performance_metrics[model_id]
         
         self.peat_sync.update_capability_state(
@@ -691,7 +691,7 @@ impl ModelDistribution {
         
         // Companies automatically propagate to Platoons
         // Platoons to Squads, Squads to Platforms
-        // All via PEAT sync protocol
+        // All via Peat sync protocol
         
         // Step 5: Monitor convergence
         let convergence = self.monitor_convergence(
@@ -733,7 +733,7 @@ impl ModelDistribution {
 
 #### 3. Hierarchical Performance Monitoring
 
-Performance metrics aggregate up through PEAT hierarchy:
+Performance metrics aggregate up through Peat hierarchy:
 
 ```javascript
 // Platform-level performance (raw)
@@ -908,7 +908,7 @@ class TrainingDataCollector:
         # Store locally
         self.local_storage.store(metadata)
         
-        # Metadata propagates up via PEAT (small)
+        # Metadata propagates up via Peat (small)
         # Raw data stays local until platform returns to base
         self.peat_sync.log_training_metadata(metadata)
 ```
@@ -967,7 +967,7 @@ class FederatedLearningClient:
         compressed_delta = compress(weight_delta)
         signed_delta = self.sign_update(compressed_delta)
         
-        # Send delta up via PEAT (much smaller than raw data)
+        # Send delta up via Peat (much smaller than raw data)
         self.peat_sync.send_federated_update(
             model_id=model_id,
             delta=signed_delta,
@@ -1005,7 +1005,7 @@ class FederatedLearningAggregator:
         validation_results = self.validate_model(updated_model)
         
         if validation_results.meets_criteria():
-            # Publish new version via PEAT
+            # Publish new version via Peat
             new_version = self.model_registry.publish(
                 model=updated_model,
                 validation=validation_results,
@@ -1065,21 +1065,21 @@ class SyntheticDataGenerator:
 
 #### 5. Agent Context Integration (MCP Bridge)
 
-PEAT-synced state becomes context for AI agents:
+Peat-synced state becomes context for AI agents:
 
 ```python
 class PeatMCPBridge:
-    """Bridge between PEAT distributed state and MCP agent context"""
+    """Bridge between Peat distributed state and MCP agent context"""
     
     def __init__(self, peat_sync: PeatSyncEngine):
         self.peat_sync = peat_sync
         self.mcp_server = MCPServer()
         
-        # Register PEAT collections as MCP resources
+        # Register Peat collections as MCP resources
         self.register_peat_resources()
         
     def register_peat_resources(self):
-        """Expose PEAT state as MCP resources for agents"""
+        """Expose Peat state as MCP resources for agents"""
         
         # Resource: Current model registry
         @self.mcp_server.resource("models://registry")
@@ -1112,7 +1112,7 @@ class PeatMCPBridge:
         # Tool: Request model update
         @self.mcp_server.tool("request_model_update")
         def request_model_update(model_id: str, target_version: str, justification: str):
-            """Agent can request model updates through PEAT"""
+            """Agent can request model updates through Peat"""
             return self.peat_sync.request_model_update(
                 model_id=model_id,
                 target_version=target_version,
@@ -1123,7 +1123,7 @@ class PeatMCPBridge:
         # Tool: Report model performance issue
         @self.mcp_server.tool("report_performance_issue")
         def report_performance_issue(model_id: str, issue_type: str, details: dict):
-            """Agent can report degradation through PEAT"""
+            """Agent can report degradation through Peat"""
             return self.peat_sync.log_performance_issue(
                 model_id=model_id,
                 issue_type=issue_type,
@@ -1132,16 +1132,16 @@ class PeatMCPBridge:
             )
 
 class EdgeAgent:
-    """AI agent using PEAT-synced context via MCP"""
+    """AI agent using Peat-synced context via MCP"""
     
     def __init__(self, agent_id: str, mcp_client: MCPClient):
         self.agent_id = agent_id
         self.mcp = mcp_client
         
     async def make_decision(self, situation: Situation):
-        """Agent decision-making with PEAT context"""
+        """Agent decision-making with Peat context"""
         
-        # Get current context from PEAT via MCP
+        # Get current context from Peat via MCP
         model_registry = await self.mcp.get_resource("models://registry")
         capabilities = await self.mcp.get_resource("capabilities://platforms")
         mission_context = await self.mcp.get_resource("mission://context")
@@ -1172,8 +1172,8 @@ class EdgeAgent:
 │  AI Agent (ReAct, function calling) │
 │         ↕ [MCP Protocol]            │
 │  MCP Server (Context Provider)      │
-│         ↕ [PEAT Bridge]             │
-│  PEAT Sync Engine                   │
+│         ↕ [Peat Bridge]             │
+│  Peat Sync Engine                   │
 │    • Model Registry                 │
 │    • Capability State               │
 │    • Performance Metrics            │
@@ -1185,8 +1185,8 @@ class EdgeAgent:
 
 **Value Proposition:**
 - **MCP standardizes** agent-to-context interface
-- **PEAT ensures** context is available, current, consistent in DIL environments
-- **Separation of concerns**: MCP = local API, PEAT = distributed state
+- **Peat ensures** context is available, current, consistent in DIL environments
+- **Separation of concerns**: MCP = local API, Peat = distributed state
 - **Agents reason over hierarchically-appropriate context** (platform sees squad, squad sees platoon, etc.)
 
 ### Implementation Phases
@@ -1194,7 +1194,7 @@ class EdgeAgent:
 #### Phase 1: Foundation (Months 1-3)
 - **Model distribution infrastructure** using ADR-013 differential propagation
 - **Edge runtime instrumentation** for performance tracking
-- **Basic performance aggregation** through PEAT hierarchy
+- **Basic performance aggregation** through Peat hierarchy
 - **Content-addressed model storage** with signature verification
 
 **Success Criteria:**
@@ -1225,15 +1225,15 @@ class EdgeAgent:
 - Model performance improves from operational feedback
 
 #### Phase 4: Agent Integration (Months 9-12)
-- **MCP bridge** exposing PEAT state to agents
+- **MCP bridge** exposing Peat state to agents
 - **Hierarchical agent architecture** (agents at each echelon)
-- **Agent-driven model requests** through PEAT
+- **Agent-driven model requests** through Peat
 - **Multi-echelon agentic coordination**
 
 **Success Criteria:**
-- Agents can query PEAT-synced context via MCP
+- Agents can query Peat-synced context via MCP
 - Agents at different echelons see appropriate abstraction levels
-- Agent decisions propagate through PEAT hierarchy
+- Agent decisions propagate through Peat hierarchy
 
 ## Consequences
 
@@ -1265,9 +1265,9 @@ class EdgeAgent:
 
 **Agent Enablement:**
 - MCP provides standard interface for agent context
-- PEAT ensures context availability in disconnected environments
+- Peat ensures context availability in disconnected environments
 - Hierarchical abstraction matches agent decision scope
-- Agents can request updates through PEAT infrastructure
+- Agents can request updates through Peat infrastructure
 
 ### Negative
 
@@ -1332,7 +1332,7 @@ class EdgeAgent:
 ### With ADR-006 (Security, Authentication, Authorization)
 - **Model provenance:** Signature chains for model verification
 - **Federated learning:** Cryptographic verification of gradient updates
-- **Agent authorization:** MCP tools respect PEAT authorization model
+- **Agent authorization:** MCP tools respect Peat authorization model
 - **Training data:** Encryption of sensitive training metadata
 
 ### With ADR-007 (Automerge-Based Sync Engine)
@@ -1401,12 +1401,12 @@ class EdgeAgent:
 - Not designed for contested environments
 - Heavy resource requirements for edge
 
-**Why PEAT Edge MLOps:**
+**Why Peat Edge MLOps:**
 - **Hierarchical by design:** Matches military organization
 - **Offline-first:** Works in DIL environments
 - **Differential propagation:** Optimal for bandwidth constraints
 - **Capability focus:** Operational assessment, not just inventory
-- **Integrated:** Leverages existing PEAT infrastructure for distribution, monitoring, and coordination
+- **Integrated:** Leverages existing Peat infrastructure for distribution, monitoring, and coordination
 
 ## References
 
@@ -1458,7 +1458,7 @@ class EdgeAgent:
 
 ## Appendix A: Model Format Comparison for Tactical Edge
 
-This appendix compares the three primary model formats considered for PEAT edge deployments: **ONNX**, **TensorFlow Lite (TFLite)**, and **Native Framework Formats** (PyTorch .pt/.pth, TensorFlow SavedModel).
+This appendix compares the three primary model formats considered for Peat edge deployments: **ONNX**, **TensorFlow Lite (TFLite)**, and **Native Framework Formats** (PyTorch .pt/.pth, TensorFlow SavedModel).
 
 ### Evaluation Criteria for Military Edge
 
@@ -1494,7 +1494,7 @@ This appendix compares the three primary model formats considered for PEAT edge 
 
 **Tactical Edge Suitability:** ⭐⭐⭐⭐⭐ (5/5)
 
-**PEAT Integration:**
+**Peat Integration:**
 ```python
 # ONNX as standard format
 model_variants = {
@@ -1504,7 +1504,7 @@ model_variants = {
 }
 
 # Differential sync: 16MB delta between versions vs 487MB full model
-# PEAT distributes only changed weights using ONNX graph structure
+# Peat distributes only changed weights using ONNX graph structure
 ```
 
 **Size Analysis:**
@@ -1544,9 +1544,9 @@ model_variants = {
 
 **Tactical Edge Suitability:** ⭐⭐⭐ (3/5)
 
-**PEAT Integration Challenges:**
+**Peat Integration Challenges:**
 ```python
-# TFLite more difficult to integrate into PEAT
+# TFLite more difficult to integrate into Peat
 # - Conversion from PyTorch requires TF intermediate step
 # - Less semantic structure for differential sync
 # - Fewer hardware backend options
@@ -1581,9 +1581,9 @@ model_variants = {
 
 **Tactical Edge Suitability:** ⭐⭐ (2/5)
 
-**PEAT Integration Challenges:**
+**Peat Integration Challenges:**
 ```python
-# Native formats problematic for PEAT
+# Native formats problematic for Peat
 # - Large runtime dependencies (PyTorch 700MB + model 500MB = 1.2GB)
 # - Vendor lock-in unacceptable for government procurement
 # - Security: PyTorch uses pickle (arbitrary code execution risk)
@@ -1616,9 +1616,9 @@ model_variants = {
 | **Extremely constrained** | TFLite | When <10MB total footprint required |
 | **Research/experimentation** | Native | Rapid iteration, full operator support |
 
-### PEAT Architecture Decision
+### Peat Architecture Decision
 
-**PEAT adopts ONNX as the standard model format** for the following reasons:
+**Peat adopts ONNX as the standard model format** for the following reasons:
 
 1. **Vendor Neutrality:** Critical for government procurement and multi-vendor ecosystem
 2. **Security:** Auditable graph structure enables malware detection and operator whitelisting
@@ -1637,7 +1637,7 @@ Traditional PyTorch Deployment:
 - 200 platforms = 140GB runtime + 100GB models = 240GB total
 - Update: 100GB for new model version
 
-PEAT with ONNX:
+Peat with ONNX:
 - Runtime: 15MB per platform (ONNX Runtime)
 - Model: 125MB INT8 per model
 - 200 platforms = 3GB runtime + 25GB models = 28GB total (88% reduction)
@@ -1671,12 +1671,12 @@ def verify_onnx_security(model_path: str) -> bool:
 ```
 
 **NATO Standardization Argument:**
-> "PEAT uses ONNX as the standard model interchange format, enabling allied forces to share AI capabilities without vendor lock-in. A US-trained ONNX model can deploy to UK, Australian, or Canadian platforms via PEAT's hierarchical distribution, supporting coalition operations and AUKUS Pillar II technology sharing objectives."
+> "Peat uses ONNX as the standard model interchange format, enabling allied forces to share AI capabilities without vendor lock-in. A US-trained ONNX model can deploy to UK, Australian, or Canadian platforms via Peat's hierarchical distribution, supporting coalition operations and AUKUS Pillar II technology sharing objectives."
 
 ### Future Considerations
 
 **Multi-Format Support:**
-While ONNX is the standard, PEAT architecture allows for alternative formats when operationally necessary:
+While ONNX is the standard, Peat architecture allows for alternative formats when operationally necessary:
 - TFLite for extremely constrained platforms (<100MB storage)
 - Native formats for experimental/research deployments
 - Emerging formats (e.g., MLIR, StableHLO) as they mature
@@ -1693,11 +1693,11 @@ Quantization (FP16/INT8)
     ↓
 AFRL AI Passport Validation
     ↓
-PEAT Model Registry
+Peat Model Registry
     ↓
 Hierarchical Distribution to Tactical Edge
 ```
 
 ---
 
-**This ADR establishes PEAT as the enabling infrastructure for edge-first ML operations in contested tactical environments, supporting the full model lifecycle from distribution through training while maintaining operational capability focus throughout the hierarchy.**
+**This ADR establishes Peat as the enabling infrastructure for edge-first ML operations in contested tactical environments, supporting the full model lifecycle from distribution through training while maintaining operational capability focus throughout the hierarchy.**

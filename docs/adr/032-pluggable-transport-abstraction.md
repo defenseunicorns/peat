@@ -69,7 +69,7 @@ How multiple transports are used together:
 **ADR-030** answered: "Does Iroh support multiple NICs?"
 - Yes, Iroh automatically binds to all interfaces
 
-**ADR-032** answers: "How does PEAT manage multiple transports holistically?"
+**ADR-032** answers: "How does Peat manage multiple transports holistically?"
 - Transport registration with unique IDs
 - PACE-style failover policies
 - Simultaneous use modes
@@ -694,7 +694,7 @@ impl BluetoothLETransport {
             },
             adapter,
             connections: RwLock::new(HashMap::new()),
-            service_uuid: Uuid::parse_str("PEAT-SERVICE-UUID").unwrap(),
+            service_uuid: Uuid::parse_str("Peat-SERVICE-UUID").unwrap(),
         }
     }
 }

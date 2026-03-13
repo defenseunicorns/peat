@@ -86,6 +86,6 @@ The coordination layer will be filled. The question is whether it's filled by op
 
 ### Key Finding: Section II
 
-> "Existing standards solve device-level interoperability and messaging. None address hierarchical coordination at scale—they assume that layer exists. It doesn't. PEAT fills this gap."
+> "Existing standards solve device-level interoperability and messaging. None address hierarchical coordination at scale—they assume that layer exists. It doesn't. Peat fills this gap."
 
 ---

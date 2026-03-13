@@ -1,14 +1,14 @@
-//! Error types for the PEAT protocol
+//! Error types for the Peat protocol
 //!
 //! This module provides a comprehensive error hierarchy with context,
 //! recovery strategies, and structured error information.
 
 use thiserror::Error;
 
-/// Result type alias for PEAT protocol operations
+/// Result type alias for Peat protocol operations
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// Errors that can occur in the PEAT protocol
+/// Errors that can occur in the Peat protocol
 #[derive(Error, Debug)]
 pub enum Error {
     /// Discovery phase errors

@@ -1,7 +1,7 @@
 # Lab 4 Backend Comparison: Ditto vs AutomergeIroh
 
 **Date:** December 2, 2024
-**Test Type:** Hierarchical PEAT CRDT (Squad → Platoon → Company)
+**Test Type:** Hierarchical Peat CRDT (Squad → Platoon → Company)
 
 ## Executive Summary
 

@@ -19,7 +19,7 @@ fn main() {
     // Initialize logging
     tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
-    info!("=== PEAT UGV Demo ===");
+    info!("=== Peat UGV Demo ===");
     info!("Simulating Unmanned Ground Vehicle for M1 Vignette");
 
     // Create UGV configuration with patrol waypoints (Atlanta area)
@@ -118,7 +118,7 @@ fn main() {
     info!("Final State: {}", ugv.state());
     info!("Battery Level: {:.1}%", ugv.battery_level() * 100.0);
 
-    // Show final TrackUpdate JSON (for PEAT integration)
+    // Show final TrackUpdate JSON (for Peat integration)
     info!("\n=== Sample TrackUpdate JSON ===");
     let json = serde_json::to_string_pretty(&final_track).unwrap();
     println!("{}", json);

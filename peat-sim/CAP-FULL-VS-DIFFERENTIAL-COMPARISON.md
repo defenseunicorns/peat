@@ -1,7 +1,7 @@
 # CAP Full Replication vs CAP Differential Comparison
 
 **Test Date:** 2025-11-07
-**Purpose:** Compare PEAT Protocol performance with full replication (Query::All) vs capability-filtered queries
+**Purpose:** Compare Peat Protocol performance with full replication (Query::All) vs capability-filtered queries
 
 ---
 

@@ -1,6 +1,6 @@
 //! Model deployment validators
 //!
-//! Validates ModelDeployment and ModelDeploymentStatus messages for PEAT Protocol.
+//! Validates ModelDeployment and ModelDeploymentStatus messages for Peat Protocol.
 
 use super::{ValidationError, ValidationResult};
 use crate::model::v1::{

@@ -4,7 +4,7 @@
 //! 1. Receive video frame
 //! 2. Run object detection
 //! 3. Update multi-object tracker
-//! 4. Convert tracks to PEAT TrackUpdate messages
+//! 4. Convert tracks to Peat TrackUpdate messages
 //! 5. Collect performance metrics
 
 use super::detector::{Detection, Detector};
@@ -62,7 +62,7 @@ pub struct PipelineOutput {
     pub detections: Vec<Detection>,
     /// Active tracks from tracker
     pub tracks: Vec<Track>,
-    /// PEAT TrackUpdate messages
+    /// Peat TrackUpdate messages
     pub track_updates: Vec<TrackUpdate>,
     /// Processing latency in milliseconds
     pub latency_ms: f64,
@@ -164,7 +164,7 @@ impl<D: Detector, T: Tracker> InferencePipeline<D, T> {
         })
     }
 
-    /// Convert tracks to PEAT TrackUpdate messages
+    /// Convert tracks to Peat TrackUpdate messages
     fn tracks_to_updates(&self, tracks: &[Track], frame: &VideoFrame) -> Vec<TrackUpdate> {
         tracks
             .iter()

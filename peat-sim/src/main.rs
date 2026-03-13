@@ -38,7 +38,7 @@
 //! --tcp-connect <addr>   Optional: Connect to TCP peer at this address
 //! --node-type <type>     Node type for authorization (e.g., "soldier", "squad_leader")
 //! --update-rate-ms <ms>  Update rate in milliseconds (default: 5000)
-//! --peat-filter          Enable PEAT capability-based filtering
+//! --peat-filter          Enable Peat capability-based filtering
 //!
 //! # Environment Variables
 //!
@@ -54,7 +54,7 @@
 //! - SQUAD_MEMBERS: Comma-separated member IDs for squad leaders
 //! - PLATOON_ID: Platoon identifier for platoon leaders
 //!
-//! **PEAT Filtering:**
+//! **Peat Filtering:**
 //! - PEAT_FILTER_ENABLED: Set to "true" or "1" to enable differential updates
 //!
 //! # Exit Codes
@@ -1646,7 +1646,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let node_type = node_type.unwrap_or_else(|| "unknown".to_string());
     let update_rate_ms = update_rate_ms.unwrap_or(5000); // Default: 5 seconds
 
-    println!("[{}] PEAT Network Simulation Node starting", node_id);
+    println!("[{}] Peat Network Simulation Node starting", node_id);
     println!("[{}] Mode: {}", node_id, mode);
     println!("[{}] Backend: {}", node_id, backend_type);
     println!("[{}] Node Type: {}", node_id, node_type);
@@ -1656,7 +1656,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let role = std::env::var("ROLE").unwrap_or_else(|_| node_type.clone());
     orchestrator::register(&node_id, &backend_type, &role);
     println!(
-        "[{}] PEAT Filtering: {}",
+        "[{}] Peat Filtering: {}",
         node_id,
         if peat_filter_enabled {
             "ENABLED (differential updates)"
@@ -1705,7 +1705,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sync_engine = backend.sync_engine();
 
     // Create subscription for the test collection
-    // Use capability-filtered query if PEAT filtering is enabled
+    // Use capability-filtered query if Peat filtering is enabled
     println!("[{}] Creating sync subscription...", node_id);
     let subscription_query = if peat_filter_enabled {
         if is_hierarchical_mode && std::env::var("ROLE").unwrap_or_default() == "platoon_leader" {
@@ -1716,9 +1716,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
             Query::Custom("collection_name == 'squad_summaries'".to_string())
         } else {
-            // Existing PEAT-filtered query for soldiers and squad leaders
+            // Existing Peat-filtered query for soldiers and squad leaders
             println!(
-                "[{}]   → Using PEAT-filtered query for role: {}",
+                "[{}]   → Using Peat-filtered query for role: {}",
                 node_id, node_type
             );
             Query::Custom(format!(
@@ -2338,7 +2338,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             hierarchical_mode(&*backend, &node_id, &node_type, update_rate_ms).await
         }
         "flat_mesh" => {
-            // Lab 3b: Flat P2P mesh with PEAT CRDT (all nodes at same tier)
+            // Lab 3b: Flat P2P mesh with Peat CRDT (all nodes at same tier)
             flat_mesh_mode(&*backend, &node_id, &node_type, update_rate_ms).await
         }
         _ => {
@@ -2349,13 +2349,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match result {
         Ok(()) => {
-            println!("[{}] ✓✓✓ PEAT SIMULATION SUCCESS ✓✓✓", node_id);
+            println!("[{}] ✓✓✓ Peat SIMULATION SUCCESS ✓✓✓", node_id);
             // Shutdown gracefully
             backend.shutdown().await?;
             std::process::exit(0);
         }
         Err(e) => {
-            eprintln!("[{}] ✗✗✗ PEAT SIMULATION FAILED: {} ✗✗✗", node_id, e);
+            eprintln!("[{}] ✗✗✗ Peat SIMULATION FAILED: {} ✗✗✗", node_id, e);
             backend.shutdown().await.ok();
             std::process::exit(1);
         }
@@ -3303,7 +3303,7 @@ fn generate_soldier_capabilities(node_id: &str) -> Vec<String> {
     caps
 }
 
-/// Lab 3b: Flat P2P mesh mode with PEAT CRDT
+/// Lab 3b: Flat P2P mesh mode with Peat CRDT
 ///
 /// All nodes operate at the same hierarchy level (Squad) using DynamicHierarchyStrategy
 /// for leader election and CRDT for state synchronization.
@@ -3491,7 +3491,7 @@ async fn writer_mode(
             "message_number".to_string(),
             serde_json::json!(message_number),
         );
-        // Add PEAT authorization field
+        // Add Peat authorization field
         fields.insert("public".to_string(), Value::Bool(true));
 
         let document = Document::with_id(doc_id.clone(), fields.clone());
@@ -3705,7 +3705,7 @@ async fn process_document(
 
             // Verify content
             if let Some(Value::String(message)) = doc.get("message") {
-                if message == "Hello from PEAT Simulation!" {
+                if message == "Hello from Peat Simulation!" {
                     println!("[{}] ✓ Document content verified", node_id);
 
                     log_metrics(&MetricsEvent::DocumentReceived {

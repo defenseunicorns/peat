@@ -9,7 +9,7 @@
 
 ### The File Transfer Gap
 
-PEAT Protocol provides CRDT-based document synchronization for coordination state (capabilities, commands, events). However, many coordination scenarios require transferring large binary artifacts:
+Peat Protocol provides CRDT-based document synchronization for coordination state (capabilities, commands, events). However, many coordination scenarios require transferring large binary artifacts:
 
 | Use Case | Examples | Size Range |
 |----------|----------|------------|
@@ -43,14 +43,14 @@ Both Ditto and Iroh recognize this distinction with separate APIs:
 
 ### Scope Clarification
 
-**This ADR defines PEAT Protocol primitives for blob transfer.**
+**This ADR defines Peat Protocol primitives for blob transfer.**
 
 It does NOT define:
 - How applications use blobs (model loading, container execution)
 - Distribution orchestration (which nodes get which blobs)
 - Application-specific metadata schemas
 
-Those concerns belong to applications built on PEAT (see ADR-026 Reference Implementation).
+Those concerns belong to applications built on Peat (see ADR-026 Reference Implementation).
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -60,7 +60,7 @@ Those concerns belong to applications built on PEAT (see ADR-026 Reference Imple
 └──────────────────────────┬──────────────────────────────────────┘
                            │ uses
 ═══════════════════════════╪═══════════════════════════════════════
-         PEAT PROTOCOL (this ADR)
+         Peat PROTOCOL (this ADR)
 ═══════════════════════════╪═══════════════════════════════════════
                            │
 ┌──────────────────────────┴──────────────────────────────────────┐
@@ -83,7 +83,7 @@ Blobs are identified by content hash, enabling:
 
 ### Schema: BlobReference
 
-The fundamental unit of blob identification in PEAT:
+The fundamental unit of blob identification in Peat:
 
 ```protobuf
 syntax = "proto3";
@@ -93,7 +93,7 @@ package peat.blob.v1;
 import "google/protobuf/timestamp.proto";
 
 // Content-addressed blob reference
-// This is the PEAT protocol's way of identifying binary artifacts
+// This is the Peat protocol's way of identifying binary artifacts
 message BlobReference {
   // Content hash (hex-encoded)
   string hash = 1;
@@ -105,7 +105,7 @@ message BlobReference {
   uint64 size_bytes = 3;
   
   // Optional: application-defined metadata
-  // PEAT treats this as opaque - applications define semantics
+  // Peat treats this as opaque - applications define semantics
   map<string, string> metadata = 10;
 }
 
@@ -179,7 +179,7 @@ Backend-agnostic interface for blob operations:
 //!
 //! This trait abstracts over backend-specific blob storage implementations
 //! (Ditto Attachments, iroh-blobs, etc.) providing a unified interface
-//! for the PEAT protocol layer.
+//! for the Peat protocol layer.
 //!
 //! # Design Principles
 //!
@@ -832,4 +832,4 @@ The following are explicitly out of scope for this ADR:
 
 ---
 
-**This ADR establishes the PEAT Protocol primitive for content-addressed blob transfer, enabling applications to distribute large binary artifacts through the mesh network.**
+**This ADR establishes the Peat Protocol primitive for content-addressed blob transfer, enabling applications to distribute large binary artifacts through the mesh network.**

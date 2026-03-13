@@ -1,4 +1,4 @@
-# PEAT Protocol Development Roadmap
+# Peat Protocol Development Roadmap
 
 **Last Updated**: November 21, 2025
 **GitHub Issues**: [View All Epics](https://github.com/defenseunicorns/peat/labels/epic)
@@ -8,7 +8,7 @@
 
 ## 🎯 Executive Summary
 
-The PEAT Protocol has a clear 12-month development pathway to achieve:
+The Peat Protocol has a clear 12-month development pathway to achieve:
 - **O(n log n) hierarchical coordination** at tactical scale (200+ nodes)
 - **95%+ bandwidth reduction** through differential updates and aggregation
 - **Security-ready tactical deployment** with PKI and encryption
@@ -134,7 +134,7 @@ The PEAT Protocol has a clear 12-month development pathway to achieve:
 **Timeline**: 12 weeks
 **Depends On**: EPIC 2, EPIC 5
 
-**Value**: PEAT-coordinated assets visible in ATAK, operators can control via TAK
+**Value**: Peat-coordinated assets visible in ATAK, operators can control via TAK
 
 ---
 
@@ -166,9 +166,9 @@ The PEAT Protocol has a clear 12-month development pathway to achieve:
 - **Iroh provides ~20%**: Point-to-point QUIC connections, multi-path networking
 - **EPIC 2 provides ~80%**: Discovery, topology, routing, aggregation, healing
 
-**Without EPIC 2**: PEAT is just an all-to-all mesh (O(n²)) - defeats the entire purpose
+**Without EPIC 2**: Peat is just an all-to-all mesh (O(n²)) - defeats the entire purpose
 
-**With EPIC 2**: PEAT becomes true hierarchical coordination (O(n log n)) - transformational
+**With EPIC 2**: Peat becomes true hierarchical coordination (O(n log n)) - transformational
 
 ### Dependency Chain
 
@@ -200,7 +200,7 @@ EPIC 2 (Mesh)
 
 ### Operational Capability
 - [ ] Complete ISR mission scenario (100 platforms)
-- [ ] TAK integration allowing ATAK control of PEAT assets
+- [ ] TAK integration allowing ATAK control of Peat assets
 - [ ] Model capability queries and intelligent tasking
 - [ ] Network partition tolerance demonstrated
 - [ ] Tactical radio network validated (25% packet loss)
@@ -260,7 +260,7 @@ EPIC 2 (Mesh)
 ### On P2P Mesh Intelligence (EPIC 2)
 **This is not "nice to have" - it's existential**
 
-Per ADR-017: Iroh provides excellent transport, but PEAT's value proposition is **hierarchical coordination intelligence**. Without EPIC 2:
+Per ADR-017: Iroh provides excellent transport, but Peat's value proposition is **hierarchical coordination intelligence**. Without EPIC 2:
 - No geographic-based squad formation
 - No automatic parent/child relationships
 - No hierarchical aggregation (stuck at O(n²))
@@ -285,7 +285,7 @@ This de-risks both technology and licensing/procurement paths.
 ## 📚 References
 
 ### ADR Mapping
-- **ADR-001**: PEAT Protocol POC Architecture → Foundation for all work
+- **ADR-001**: Peat Protocol POC Architecture → Foundation for all work
 - **ADR-002**: Beacon Storage Architecture → Used in EPIC 2 (Geographic Beacons)
 - **ADR-005**: Data Sync Abstraction Layer → Backend switching capability
 - **ADR-006**: Security, Authentication, Authorization → EPIC 3

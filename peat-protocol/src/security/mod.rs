@@ -43,7 +43,7 @@ mod error;
 mod formation_key;
 mod keypair;
 
-// PEAT-specific security modules (depend on peat-schema / domain types)
+// Peat-specific security modules (depend on peat-schema / domain types)
 mod audit;
 mod auth_state;
 mod authenticator;
@@ -94,7 +94,7 @@ pub use peat_mesh::security::{
     X25519_PUBLIC_KEY_SIZE,
 };
 
-// --- PEAT-specific exports ---
+// --- Peat-specific exports ---
 
 pub use audit::{
     AuditEventType, AuditLogEntry, AuditLogger, FileAuditLogger, MemoryAuditLogger,

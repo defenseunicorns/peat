@@ -1,5 +1,5 @@
 name: "📋 Schema Definition"
-description: "Define or modify a PEAT Protocol schema (Core team primary)"
+description: "Define or modify a Peat Protocol schema (Core team primary)"
 title: "[SCHEMA] "
 labels: ["type/schema", "team/core", "status/needs-triage"]
 assignees: []

@@ -1,22 +1,22 @@
-# PEAT Protocol Proof-of-Concept Vignette
+# Peat Protocol Proof-of-Concept Vignette
 ## Object Tracking Across Distributed Human-Machine-AI Teams
 
 **Document Version**: 3.0
 **Date**: 2025-12-10
-**Author**: (r)evolve Inc. — https://revolveteam.com
+**Author**: Defense Unicorns — https://defenseunicorns.com
 **Status**: Draft
 
 **Revision History**:
 | Version | Date | Changes |
 |---------|------|---------|
 | 2.0 | 2025-11-26 | Initial vignette with flat team structure |
-| 3.0 | 2025-12-10 | Added sub-tier architecture (PEAT-Lite), M5Stack Core2 wearables, Waveshare UGV Beast platforms, ADR-035 reference |
+| 3.0 | 2025-12-10 | Added sub-tier architecture (Peat-Lite), M5Stack Core2 wearables, Waveshare UGV Beast platforms, ADR-035 reference |
 
 ---
 
 ## Executive Summary
 
-This vignette demonstrates PEAT Protocol's core value proposition: enabling coordinated object tracking across geographically distributed, network-separated teams of humans, machines, and AI models. The scenario showcases hierarchical capability aggregation, cross-network synchronization, TAK-based command and control, edge MLOps with model redistribution, and the "stop moving data, start moving decisions" philosophy that differentiates PEAT from traditional data-centric approaches.
+This vignette demonstrates Peat Protocol's core value proposition: enabling coordinated object tracking across geographically distributed, network-separated teams of humans, machines, and AI models. The scenario showcases hierarchical capability aggregation, cross-network synchronization, TAK-based command and control, edge MLOps with model redistribution, and the "stop moving data, start moving decisions" philosophy that differentiates Peat from traditional data-centric approaches.
 
 ---
 
@@ -26,11 +26,11 @@ This vignette demonstrates PEAT Protocol's core value proposition: enabling coor
 
 A **Person of Interest (POI)** is being tracked as they move through an operational area monitored by two independent tactical teams. The POI's movement path crosses team boundaries, requiring seamless handoff of tracking responsibility. A central coordinator manages both teams, while a higher C2 element issues tasking and monitors mission progress via TAK.
 
-During the mission, the C2 element pushes an updated AI model to improve tracking performance — demonstrating PEAT's **bidirectional flows**: decisions flow up, capabilities (including models) flow down.
+During the mission, the C2 element pushes an updated AI model to improve tracking performance — demonstrating Peat's **bidirectional flows**: decisions flow up, capabilities (including models) flow down.
 
 ### 1.2 Operational Challenge
 
-Traditional approaches require each sensor to stream raw video/imagery to a central fusion center, consuming massive bandwidth. PEAT's approach:
+Traditional approaches require each sensor to stream raw video/imagery to a central fusion center, consuming massive bandwidth. Peat's approach:
 - Each team runs object-tracking AI locally
 - Teams **advertise tracking capability** rather than stream raw data
 - Only **track updates (decisions)** flow upward — not raw sensor data
@@ -39,14 +39,14 @@ Traditional approaches require each sensor to stream raw video/imagery to a cent
 
 ### 1.3 Key Demonstration Objectives
 
-| Objective | PEAT Feature Demonstrated |
+| Objective | Peat Feature Demonstrated |
 |-----------|--------------------------|
-| Cross-network coordination | PEAT Bridge + Relay Discovery |
+| Cross-network coordination | Peat Bridge + Relay Discovery |
 | Human-AI-Machine teaming | Operator model with authority composition |
 | Capability-based tasking | AI Model Capability Advertisement |
-| TAK integration | CoT ↔ PEAT message translation |
+| TAK integration | CoT ↔ Peat message translation |
 | Hierarchical aggregation | Track summaries flow upward, not raw data |
-| Edge MLOps | Model retraining + redistribution via PEAT |
+| Edge MLOps | Model retraining + redistribution via Peat |
 | Bandwidth efficiency | 95%+ reduction vs. raw streaming |
 
 ---
@@ -55,30 +55,30 @@ Traditional approaches require each sensor to stream raw video/imagery to a cent
 
 ### 2.1 Team Alpha (Network A)
 
-Team Alpha demonstrates the **hierarchical sub-tier architecture** where both human operators and autonomous platforms aggregate multiple PEAT nodes:
+Team Alpha demonstrates the **hierarchical sub-tier architecture** where both human operators and autonomous platforms aggregate multiple Peat nodes:
 
-| Entity | PEAT Node(s) | Description |
+| Entity | Peat Node(s) | Description |
 |--------|--------------|-------------|
 | **Alpha-1 (Operator)** | Squad Member (aggregation tier) | Human operator identity |
-| ↳ Alpha-1a | ATAK on Android (PEAT-Full) | SA, comms, mapping, tasking |
-| ↳ Alpha-1b | M5Stack Core2 (PEAT-Lite) | Biometrics, activity, panic button |
+| ↳ Alpha-1a | ATAK on Android (Peat-Full) | SA, comms, mapping, tasking |
+| ↳ Alpha-1b | M5Stack Core2 (Peat-Lite) | Biometrics, activity, panic button |
 | **Alpha-2 (UGV)** | UGV (aggregation tier) | Waveshare UGV Beast platform |
-| ↳ Alpha-2a | Jetson Orin Nano (PEAT-Full) | AI vision, navigation, ROS2 |
-| ↳ Alpha-2b | ESP32 (PEAT-Lite) | Motor control, proximity, IMU |
+| ↳ Alpha-2a | Jetson Orin Nano (Peat-Full) | AI vision, navigation, ROS2 |
+| ↳ Alpha-2b | ESP32 (Peat-Lite) | Motor control, proximity, IMU |
 
 **Hardware Details:**
 
 | Component | Model | Capabilities |
 |-----------|-------|--------------|
-| Operator Phone | Android + ATAK | GPS, camera, mesh radio, full PEAT |
+| Operator Phone | Android + ATAK | GPS, camera, mesh radio, full Peat |
 | Wearable Sensor | M5Stack Core2 | 6-axis IMU (MPU6886), microphone (SPM1423), touch, RTC, battery monitoring |
 | UGV Platform | Waveshare UGV Beast | Tracked chassis, 360° pan-tilt, 5MP 160° camera, LiDAR |
-| UGV Compute | Jetson Orin Nano | YOLOv8 + DeepSORT, ROS2, full PEAT |
-| UGV Controller | ESP32 | Motor PID, sensor fusion, PEAT-Lite |
+| UGV Compute | Jetson Orin Nano | YOLOv8 + DeepSORT, ROS2, full Peat |
+| UGV Controller | ESP32 | Motor PID, sensor fusion, Peat-Lite |
 
 **Sub-Tier Data Flow:**
 ```
-Alpha Squad (PEAT aggregation)
+Alpha Squad (Peat aggregation)
 ├── Alpha-1 (Operator) ──────────────────────────────┐
 │   ├── ATAK Phone (Full) ◄──────────────────────────┤ Operator
 │   │   └── Position, SA, tasking, comms             │ Document
@@ -94,20 +94,20 @@ Alpha Squad (PEAT aggregation)
 └── Squad-level aggregation ─────────────────────────► Coordinator
 ```
 
-**Team Composition**: 1 Human (2 nodes) + 1 UGV (2 nodes) = 4 PEAT nodes forming 2 logical entities
+**Team Composition**: 1 Human (2 nodes) + 1 UGV (2 nodes) = 4 Peat nodes forming 2 logical entities
 
 ### 2.2 Team Bravo (Network B)
 
-| Entity | PEAT Node(s) | Description |
+| Entity | Peat Node(s) | Description |
 |--------|--------------|-------------|
 | **Bravo-1 (Operator)** | Squad Member (aggregation tier) | Human operator identity |
-| ↳ Bravo-1a | ATAK on Android (PEAT-Full) | SA, comms, mapping, tasking |
-| ↳ Bravo-1b | M5Stack Core2 (PEAT-Lite) | Biometrics, activity, panic button |
+| ↳ Bravo-1a | ATAK on Android (Peat-Full) | SA, comms, mapping, tasking |
+| ↳ Bravo-1b | M5Stack Core2 (Peat-Lite) | Biometrics, activity, panic button |
 | **Bravo-2 (UGV)** | UGV (aggregation tier) | Waveshare UGV Beast platform |
-| ↳ Bravo-2a | Jetson Orin Nano (PEAT-Full) | AI vision, navigation, ROS2 |
-| ↳ Bravo-2b | ESP32 (PEAT-Lite) | Motor control, proximity, IMU |
+| ↳ Bravo-2a | Jetson Orin Nano (Peat-Full) | AI vision, navigation, ROS2 |
+| ↳ Bravo-2b | ESP32 (Peat-Lite) | Motor control, proximity, IMU |
 
-**Team Composition**: 1 Human (2 nodes) + 1 UGV (2 nodes) = 4 PEAT nodes forming 2 logical entities
+**Team Composition**: 1 Human (2 nodes) + 1 UGV (2 nodes) = 4 Peat nodes forming 2 logical entities
 
 > **Note**: Original vignette specified Bravo-2 as UAV. Updated to UGV for hardware consistency with available Waveshare platforms. UAV variant remains a valid extension scenario.
 
@@ -115,7 +115,7 @@ Alpha Squad (PEAT aggregation)
 
 | Role | Platform | Description |
 |------|----------|-------------|
-| **Coord-1 (Bridge)** | Laptop/Tablet | Runs PEAT Bridge connecting Networks A & B |
+| **Coord-1 (Bridge)** | Laptop/Tablet | Runs Peat Bridge connecting Networks A & B |
 | **Coord-2 (Aggregator)** | Same device | Aggregates tracks from both teams |
 | **Coord-3 (Operator)** | ATAK on Android | Coordinator's tactical display |
 
@@ -127,7 +127,7 @@ Alpha Squad (PEAT aggregation)
 |-----------|----------|-------------|
 | **C2-1 (TAK Server)** | TAK Server | Receives aggregated tracks, hosts WebTAK |
 | **C2-2 (Commander)** | WebTAK (Browser) | Issues track-target commands, monitors mission |
-| **C2-3 (MLOps)** | Training Server | Retrains models, pushes updates via PEAT |
+| **C2-3 (MLOps)** | Training Server | Retrains models, pushes updates via Peat |
 
 ---
 
@@ -151,10 +151,10 @@ Alpha Squad (PEAT aggregation)
 │                      Coordinator (Bridge Node)                       │
 │                                                                      │
 │  ┌──────────────────────────────────────────────────────────────┐   │
-│  │                    PEAT-TAK Bridge                            │   │
+│  │                    Peat-TAK Bridge                            │   │
 │  │  • Aggregates tracks from Alpha + Bravo                       │   │
-│  │  • Converts PEAT → CoT for TAK Server                        │   │
-│  │  • Converts CoT → PEAT for team tasking                      │   │
+│  │  • Converts Peat → CoT for TAK Server                        │   │
+│  │  • Converts CoT → Peat for team tasking                      │   │
 │  │  • Routes model updates to teams (downward flow)             │   │
 │  └─────────────────────────┬────────────────────────────────────┘   │
 │                            │                                         │
@@ -164,7 +164,7 @@ Alpha Squad (PEAT aggregation)
 │  └──────────┬─────────────┴──────────────┬─────────────────────┘    │
 └─────────────┼────────────────────────────┼──────────────────────────┘
               │                            │
-              │ PEAT Protocol              │ PEAT Protocol
+              │ Peat Protocol              │ Peat Protocol
               │ (Mesh Sync)                │ (Mesh Sync)
               │                            │
               ▼                            ▼
@@ -193,17 +193,17 @@ Alpha Squad (PEAT aggregation)
 │  │  └──────────┘ └──────────┘ │  │  │  │  └──────────┘ └──────────┘ │  │
 │  └────────────────────────────┘  │  │  └────────────────────────────┘  │
 │                                  │  │                                  │
-│  4 PEAT nodes → 2 entities       │  │  4 PEAT nodes → 2 entities       │
+│  4 Peat nodes → 2 entities       │  │  4 Peat nodes → 2 entities       │
 └──────────────────────────────────┘  └──────────────────────────────────┘
 
 Legend:
-  (Full) = PEAT-Full node: persistent storage, full CRDTs, relay capable
-  (Lite) = PEAT-Lite node: ephemeral, primitive CRDTs, first-class mesh participant
+  (Full) = Peat-Full node: persistent storage, full CRDTs, relay capable
+  (Lite) = Peat-Lite node: ephemeral, primitive CRDTs, first-class mesh participant
 ```
 
 ### 3.1 Sub-Tier Architecture Detail
 
-The vignette demonstrates PEAT's **hierarchical sub-tier architecture** where complex entities (humans with wearables, robots with multiple computers) aggregate multiple PEAT nodes into unified logical identities:
+The vignette demonstrates Peat's **hierarchical sub-tier architecture** where complex entities (humans with wearables, robots with multiple computers) aggregate multiple Peat nodes into unified logical identities:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -245,12 +245,12 @@ The vignette demonstrates PEAT's **hierarchical sub-tier architecture** where co
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-**Key Insight**: PEAT-Lite nodes (Core2, ESP32) are **first-class mesh participants**, not bridged peripherals. They speak the same protocol as Full nodes but with capability negotiation:
+**Key Insight**: Peat-Lite nodes (Core2, ESP32) are **first-class mesh participants**, not bridged peripherals. They speak the same protocol as Full nodes but with capability negotiation:
 
 - Full nodes: persistent storage, document CRDTs, relay capable
 - Lite nodes: ephemeral, primitive CRDTs (LWW-Register, G-Counter), direct mesh participation
 
-See [ADR-035: PEAT-Lite Embedded Sensor Nodes](../../docs/adr/035-peat-lite-embedded-nodes.md) for detailed architecture.
+See [ADR-035: Peat-Lite Embedded Sensor Nodes](../../docs/adr/035-peat-lite-embedded-nodes.md) for detailed architecture.
 
 ---
 
@@ -262,7 +262,7 @@ See [ADR-035: PEAT-Lite Embedded Sensor Nodes](../../docs/adr/035-peat-lite-embe
 
 1. **Team Formation**
    - Alpha-1 powers on ATAK, joins Network A
-   - Alpha-2 (UGV) boots, advertises sensor capabilities via PEAT
+   - Alpha-2 (UGV) boots, advertises sensor capabilities via Peat
    - Alpha-3 (AI) advertises object-tracking model capability:
      ```json
      {
@@ -282,7 +282,7 @@ See [ADR-035: PEAT-Lite Embedded Sensor Nodes](../../docs/adr/035-peat-lite-embe
      ```
 
 2. **Hierarchical Discovery**
-   - Alpha team members discover each other via PEAT mesh discovery
+   - Alpha team members discover each other via Peat mesh discovery
    - Alpha-1 (human operator) elected team leader (authority weight)
    - Team capability aggregated: "1 camera, 1 object tracker v1.2.0, precision 0.91"
 
@@ -301,7 +301,7 @@ See [ADR-035: PEAT-Lite Embedded Sensor Nodes](../../docs/adr/035-peat-lite-embe
      ```
 
 5. **TAK Server Registration**
-   - Coordinator's PEAT-TAK Bridge connects to TAK Server
+   - Coordinator's Peat-TAK Bridge connects to TAK Server
    - Registers formation as TAK contact (MIL-STD-2525 symbol)
    - WebTAK (C2) sees unified platoon on map
 
@@ -315,9 +315,9 @@ See [ADR-035: PEAT-Lite Embedded Sensor Nodes](../../docs/adr/035-peat-lite-embe
    - Specifies POI description: "Adult male, blue jacket, carrying backpack"
    - TAK Server sends CoT mission command
 
-2. **PEAT-TAK Bridge Translation**
+2. **Peat-TAK Bridge Translation**
    - Bridge receives CoT `<t-x-m>` mission tasking
-   - Converts to PEAT command:
+   - Converts to Peat command:
      ```json
      {
        "command_type": "TRACK_TARGET",
@@ -333,7 +333,7 @@ See [ADR-035: PEAT-Lite Embedded Sensor Nodes](../../docs/adr/035-peat-lite-embe
 
 3. **Command Propagation**
    - Command flows down hierarchy: C2 → Coordinator → Teams
-   - Teams acknowledge receipt via PEAT sync
+   - Teams acknowledge receipt via Peat sync
    - ATAK operators on each team see tasking on their displays
 
 ### Phase 3: Active Tracking — Team Alpha
@@ -350,7 +350,7 @@ See [ADR-035: PEAT-Lite Embedded Sensor Nodes](../../docs/adr/035-peat-lite-embe
    - Bounding box + confidence: 0.89
 
 3. **Track Advertisement (NOT raw video)**
-   - Alpha-3 publishes track update via PEAT:
+   - Alpha-3 publishes track update via Peat:
      ```json
      {
        "track_id": "TRACK-001",
@@ -373,12 +373,12 @@ See [ADR-035: PEAT-Lite Embedded Sensor Nodes](../../docs/adr/035-peat-lite-embe
 4. **Hierarchical Aggregation**
    - Alpha team aggregates: "Tracking 1 POI, confidence HIGH"
    - Coordinator receives aggregated track (not raw video)
-   - PEAT-TAK Bridge converts to CoT position event
+   - Peat-TAK Bridge converts to CoT position event
    - TAK Server/WebTAK displays POI icon on map
 
 **Bandwidth Comparison:**
 - Traditional: 5 Mbps video stream
-- PEAT: ~500 bytes per track update @ 2 Hz = ~1 Kbps
+- Peat: ~500 bytes per track update @ 2 Hz = ~1 Kbps
 - **Reduction: 99.98%**
 
 ### Phase 4: Track Handoff — Alpha to Bravo
@@ -421,7 +421,7 @@ C2 observes that tracking confidence drops in low-light conditions. MLOps team h
    - Performance improvement: precision 0.91 → 0.94 in low-light
 
 2. **Model Package Creation**
-   - MLOps creates PEAT model package:
+   - MLOps creates Peat model package:
      ```json
      {
        "package_type": "AI_MODEL_UPDATE",
@@ -440,9 +440,9 @@ C2 observes that tracking confidence drops in low-light conditions. MLOps team h
      }
      ```
 
-3. **Downward Distribution via PEAT**
+3. **Downward Distribution via Peat**
    - Model package pushed to Coordinator
-   - Coordinator distributes to both teams via PEAT's **downward flow**
+   - Coordinator distributes to both teams via Peat's **downward flow**
    - Content-addressed blob transfer (only sends delta if partial model cached)
    - QoS: Model update = Priority 5 (Bulk) — doesn't interrupt active tracking
 
@@ -503,7 +503,7 @@ C2 observes that tracking confidence drops in low-light conditions. MLOps team h
      Traditional Approach Would Have Used:
        Video Streams:    938 MB (25 min × 2 cameras × 5 Mbps)
      
-     PEAT Savings:       95% bandwidth reduction
+     Peat Savings:       95% bandwidth reduction
      (Even with full model push)
      ```
 
@@ -514,7 +514,7 @@ C2 observes that tracking confidence drops in low-light conditions. MLOps team h
 
 ---
 
-## 5. PEAT Protocol Features Demonstrated
+## 5. Peat Protocol Features Demonstrated
 
 ### 5.1 Hierarchical Capability Aggregation
 
@@ -558,7 +558,7 @@ Team View:
 | Abort mission | Human operator or C2 |
 | Lethal engagement (if applicable) | Human only (ROE) |
 
-### 5.4 Edge MLOps via PEAT
+### 5.4 Edge MLOps via Peat
 
 | Capability | Description |
 |------------|-------------|
@@ -621,16 +621,16 @@ Team View:
 
 | Component | Model | Specification | Est. Cost |
 |-----------|-------|---------------|-----------|
-| Operator Phone | Android + ATAK | PEAT-Full node, SA/comms | $300-500 |
-| Operator Wearable | M5Stack Core2 | PEAT-Lite node, ESP32, 6-axis IMU, mic, touch, RTC | $50 |
+| Operator Phone | Android + ATAK | Peat-Full node, SA/comms | $300-500 |
+| Operator Wearable | M5Stack Core2 | Peat-Lite node, ESP32, 6-axis IMU, mic, touch, RTC | $50 |
 | UGV Platform | Waveshare UGV Beast | Tracked chassis, 360° pan-tilt, 5MP camera | $400 |
-| UGV Compute | Jetson Orin Nano | PEAT-Full node, AI/vision, ROS2, 4GB+ RAM | $200-500 |
-| UGV Controller | ESP32 (included) | PEAT-Lite node, motor PID, sensor fusion | (included) |
+| UGV Compute | Jetson Orin Nano | Peat-Full node, AI/vision, ROS2, 4GB+ RAM | $200-500 |
+| UGV Controller | ESP32 (included) | Peat-Lite node, motor PID, sensor fusion | (included) |
 | Local network | WiFi router or mesh radio | Team connectivity | $50-200 |
 
 **Per-Team Total**: ~$1,000-1,700
 
-**M5Stack Core2 Sensor Capabilities (PEAT-Lite):**
+**M5Stack Core2 Sensor Capabilities (Peat-Lite):**
 | Sensor | Chip | CRDT Mapping | Data |
 |--------|------|--------------|------|
 | 6-axis IMU | MPU6886 | LWW-Register | Orientation, activity, fall detection |
@@ -668,9 +668,9 @@ Team View:
 
 | Component | Description | Source |
 |-----------|-------------|--------|
-| PEAT Protocol | Core sync + capability advertisement | (r)evolve |
-| PEAT-TAK Bridge | CoT ↔ PEAT translation | (r)evolve |
-| PEAT MLOps Agent | Model distribution + hot-swap | (r)evolve |
+| Peat Protocol | Core sync + capability advertisement | Defense Unicorns |
+| Peat-TAK Bridge | CoT ↔ Peat translation | Defense Unicorns |
+| Peat MLOps Agent | Model distribution + hot-swap | Defense Unicorns |
 | Object Tracker | YOLOv8 + DeepSORT | Open source + custom |
 | ATAK | Tactical display | Government distribution |
 | TAK Server | Official TAK server | Government distribution |
@@ -722,7 +722,7 @@ Team View:
 
 ## Appendix A: Message Schemas
 
-### A.1 Track Update Message (PEAT)
+### A.1 Track Update Message (Peat)
 
 ```json
 {
@@ -739,7 +739,7 @@ Team View:
 }
 ```
 
-### A.2 Model Update Package (PEAT)
+### A.2 Model Update Package (Peat)
 
 ```json
 {
@@ -760,7 +760,7 @@ Team View:
 }
 ```
 
-### A.3 Capability Advertisement (PEAT)
+### A.3 Capability Advertisement (Peat)
 
 ```json
 {
@@ -812,9 +812,9 @@ Team View:
 | CoT | Cursor on Target - XML message format for SA data |
 | CRDT | Conflict-free Replicated Data Type - Data structures that merge without conflicts |
 | G-Counter | Grow-only Counter - CRDT that only increments (used for event counts) |
-| PEAT | Hierarchical Information and Value Exchange Protocol |
-| PEAT-Full | Full-capability PEAT node with persistent storage, document CRDTs, relay capability |
-| PEAT-Lite | Resource-constrained PEAT node with ephemeral storage, primitive CRDTs, first-class mesh participation |
+| Peat | Hierarchical Information and Value Exchange Protocol |
+| Peat-Full | Full-capability Peat node with persistent storage, document CRDTs, relay capability |
+| Peat-Lite | Resource-constrained Peat node with ephemeral storage, primitive CRDTs, first-class mesh participation |
 | LWW-Register | Last-Writer-Wins Register - CRDT where latest timestamp wins (used for sensor readings) |
 | M5Stack Core2 | ESP32-based development board with IMU, microphone, touch, RTC, display |
 | MLOps | Machine Learning Operations - Model lifecycle management |
@@ -832,7 +832,7 @@ Team View:
 
 ## Appendix C: References
 
-- [ADR-035: PEAT-Lite Embedded Sensor Nodes](../../docs/adr/035-peat-lite-embedded-nodes.md)
+- [ADR-035: Peat-Lite Embedded Sensor Nodes](../../docs/adr/035-peat-lite-embedded-nodes.md)
 - [M5Stack Core2 Specifications](https://docs.m5stack.com/en/core/core2)
 - [Waveshare UGV Beast](https://www.waveshare.com/ugv-beast.htm)
 - [NVIDIA Jetson Orin Nano](https://developer.nvidia.com/embedded/jetson-orin-nano-developer-kit)

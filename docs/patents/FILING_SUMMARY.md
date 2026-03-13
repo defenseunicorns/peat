@@ -1,5 +1,5 @@
 # Patent Filing Summary
-## PEAT Protocol - Provisional Patent Applications
+## Peat Protocol - Provisional Patent Applications
 
 **Date**: November 14, 2024
 **Status**: ✅ Ready to File

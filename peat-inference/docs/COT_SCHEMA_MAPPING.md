@@ -1,4 +1,4 @@
-# PEAT ↔ CoT Schema Mapping Specification
+# Peat ↔ CoT Schema Mapping Specification
 
 **Document Type**: Technical Specification
 **Date**: 2025-11-26
@@ -7,13 +7,13 @@
 
 ## Overview
 
-This document provides field-by-field mapping between PEAT M1 message types and Cursor-on-Target (CoT) XML schema. These mappings enable bidirectional translation for TAK integration.
+This document provides field-by-field mapping between Peat M1 message types and Cursor-on-Target (CoT) XML schema. These mappings enable bidirectional translation for TAK integration.
 
 ---
 
-## 1. TrackUpdate → CoT Event (PEAT → TAK)
+## 1. TrackUpdate → CoT Event (Peat → TAK)
 
-### PEAT Source Structure
+### Peat Source Structure
 
 ```rust
 pub struct TrackUpdate {
@@ -85,7 +85,7 @@ pub struct Velocity {
 
 ### Field Mapping Table
 
-| PEAT Field | CoT Field | Transformation | Notes |
+| Peat Field | CoT Field | Transformation | Notes |
 |------------|-----------|----------------|-------|
 | `track_id` | `event@uid` | Direct | Unique track identifier |
 | `classification` | `event@type` | Lookup table | See classification mapping |
@@ -101,11 +101,11 @@ pub struct Velocity {
 | `velocity.bearing` | `track@course` | Direct | Degrees from north |
 | `velocity.speed_mps` | `track@speed` | Direct | Meters per second |
 | `classification` + `attributes` + `confidence` | `remarks` | Formatted string | Human-readable summary |
-| `source_platform` | `_peat_/source@platform` | Direct | PEAT extension |
-| `source_model` | `_peat_/source@model` | Direct | PEAT extension |
-| `model_version` | `_peat_/source@model_version` | Direct | PEAT extension |
-| `confidence` | `_peat_/confidence@value` | Direct | PEAT extension |
-| `attributes` | `_peat_/attributes/attr` | Key-value pairs | PEAT extension |
+| `source_platform` | `_peat_/source@platform` | Direct | Peat extension |
+| `source_model` | `_peat_/source@model` | Direct | Peat extension |
+| `model_version` | `_peat_/source@model_version` | Direct | Peat extension |
+| `confidence` | `_peat_/confidence@value` | Direct | Peat extension |
+| `attributes` | `_peat_/attributes/attr` | Key-value pairs | Peat extension |
 | `source_platform` | `link@uid` | Direct | Links to sensor platform |
 
 ### Classification → CoT Type Mapping
@@ -122,7 +122,7 @@ pub struct Velocity {
 
 ### Example Conversion
 
-**PEAT TrackUpdate**:
+**Peat TrackUpdate**:
 ```json
 {
   "track_id": "TRACK-001",
@@ -189,9 +189,9 @@ pub struct Velocity {
 
 ---
 
-## 2. CapabilityAdvertisement → CoT Event (PEAT → TAK)
+## 2. CapabilityAdvertisement → CoT Event (Peat → TAK)
 
-### PEAT Source Structure
+### Peat Source Structure
 
 ```rust
 pub struct CapabilityAdvertisement {
@@ -270,7 +270,7 @@ pub enum OperationalStatus {
 
 ### Field Mapping Table
 
-| PEAT Field | CoT Field | Transformation | Notes |
+| Peat Field | CoT Field | Transformation | Notes |
 |------------|-----------|----------------|-------|
 | `platform_id` | `event@uid` | Direct | Platform identifier |
 | `platform_id` | `contact@callsign` | Direct | TAK callsign |
@@ -289,7 +289,7 @@ pub enum OperationalStatus {
 
 ### Operational Status Mapping
 
-| PEAT Status | CoT Value | TAK Display Suggestion |
+| Peat Status | CoT Value | TAK Display Suggestion |
 |-------------|-----------|----------------------|
 | `Ready` | `READY` | Green indicator |
 | `Active` | `ACTIVE` | Blue/pulsing indicator |
@@ -299,9 +299,9 @@ pub enum OperationalStatus {
 
 ---
 
-## 3. HandoffMessage → CoT Event (PEAT → TAK)
+## 3. HandoffMessage → CoT Event (Peat → TAK)
 
-### PEAT Source Structure
+### Peat Source Structure
 
 ```rust
 pub struct HandoffMessage {
@@ -374,7 +374,7 @@ pub enum HandoffType {
 
 ### Handoff Type Mapping
 
-| PEAT HandoffType | CoT Remarks Prefix | Semantics |
+| Peat HandoffType | CoT Remarks Prefix | Semantics |
 |------------------|-------------------|-----------|
 | `PrepareHandoff` | `HANDOFF PREPARE` | Source initiating handoff |
 | `ConfirmAcquisition` | `HANDOFF CONFIRM` | Target confirms acquisition |
@@ -383,7 +383,7 @@ pub enum HandoffType {
 
 ---
 
-## 4. CoT Event → TrackCommand (TAK → PEAT)
+## 4. CoT Event → TrackCommand (TAK → Peat)
 
 ### CoT Source Structure (Mission Tasking)
 
@@ -427,7 +427,7 @@ pub enum HandoffType {
 </event>
 ```
 
-### PEAT Target Structure
+### Peat Target Structure
 
 ```rust
 pub struct TrackCommand {
@@ -441,9 +441,9 @@ pub struct TrackCommand {
 }
 ```
 
-### Field Mapping Table (CoT → PEAT)
+### Field Mapping Table (CoT → Peat)
 
-| CoT Field | PEAT Field | Transformation | Notes |
+| CoT Field | Peat Field | Transformation | Notes |
 |-----------|------------|----------------|-------|
 | `event@uid` | `command_id` | Parse as UUID | May need to generate if not UUID |
 | `event@type` | `command_type` | Type mapping | See below |
@@ -456,16 +456,16 @@ pub struct TrackCommand {
 
 ### CoT Type → CommandType Mapping
 
-| CoT Type | PEAT CommandType | Description |
+| CoT Type | Peat CommandType | Description |
 |----------|-----------------|-------------|
 | `t-x-m-c` | `TrackTarget` | Mission tasking - track |
 | `t-x-m-c-c` | `CancelTrack` | Mission tasking - cancel |
 | `t-x-m-c-u` | `UpdateParameters` | Mission tasking - update |
 | `t-x-m-c-a` | `AcknowledgeHandoff` | Mission tasking - acknowledge |
 
-### Priority Mapping (CoT → PEAT)
+### Priority Mapping (CoT → Peat)
 
-| CoT Priority | PEAT Priority |
+| CoT Priority | Peat Priority |
 |--------------|---------------|
 | `flash` | `Critical` |
 | `immediate` | `High` |
@@ -476,7 +476,7 @@ pub struct TrackCommand {
 
 ---
 
-## 5. CoT Event → OperationalBoundary (TAK → PEAT)
+## 5. CoT Event → OperationalBoundary (TAK → Peat)
 
 ### CoT Source Structure (Drawing/Geofence)
 
@@ -513,7 +513,7 @@ pub struct TrackCommand {
 </event>
 ```
 
-### PEAT Target Structure
+### Peat Target Structure
 
 ```rust
 pub struct OperationalBoundary {
@@ -530,7 +530,7 @@ pub enum BoundaryType {
 
 ### Field Mapping Table
 
-| CoT Field | PEAT Field | Transformation |
+| CoT Field | Peat Field | Transformation |
 |-----------|------------|----------------|
 | `shape/polyline@closed="true"` | `boundary_type` | `Polygon` |
 | `shape/ellipse` | `boundary_type` | `Circle` |
@@ -539,9 +539,9 @@ pub enum BoundaryType {
 
 ---
 
-## 6. FormationCapabilitySummary → CoT Event (PEAT → TAK)
+## 6. FormationCapabilitySummary → CoT Event (Peat → TAK)
 
-### PEAT Source Structure
+### Peat Source Structure
 
 ```rust
 // From coordinator.rs (conceptual - aggregated at formation level)
@@ -617,12 +617,12 @@ pub struct FormationCapabilitySummary {
 ### Timestamp Handling
 
 ```rust
-// PEAT → CoT
+// Peat → CoT
 fn encode_timestamp(dt: DateTime<Utc>) -> String {
     dt.format("%Y-%m-%dT%H:%M:%SZ").to_string()
 }
 
-// CoT → PEAT
+// CoT → Peat
 fn decode_timestamp(s: &str) -> Result<DateTime<Utc>, ParseError> {
     DateTime::parse_from_rfc3339(s)
         .map(|dt| dt.with_timezone(&Utc))
@@ -692,7 +692,7 @@ fn encode_track_to_cot(track: &TrackUpdate) -> Result<String, EncodingError> {
 | Error | Handling |
 |-------|----------|
 | Malformed XML | Return `DecodingError::MalformedXml(details)` |
-| Unknown CoT type | Log and skip, or map to generic PEAT message |
+| Unknown CoT type | Log and skip, or map to generic Peat message |
 | Missing required element | Return `DecodingError::MissingElement(name)` |
 | Invalid timestamp | Return `DecodingError::InvalidTimestamp` |
 

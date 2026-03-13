@@ -7,7 +7,7 @@ fn main() {
     // Initialize logging
     tracing_subscriber::fmt::init();
 
-    tracing::info!("PEAT M1 POC - Object Tracking Demo");
+    tracing::info!("Peat M1 POC - Object Tracking Demo");
 
     // Create a coordinator for formation-level aggregation
     // Note: In a real deployment, the Peat protocol's CRDT mesh handles

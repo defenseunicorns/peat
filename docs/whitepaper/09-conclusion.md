@@ -4,7 +4,7 @@ The 20-node ceiling is real. It is mathematical. And it will constrain every dis
 
 The solution is not more technology. It is recognizing that hierarchy—the organizational pattern that has enabled coordinated action at scale for millennia, from ant colonies to human institutions—is the architecture that enables machine coordination at scale.
 
-PEAT Protocol implements this insight:
+Peat Protocol implements this insight:
 - **Hierarchical aggregation** reduces O(n²) to O(n log n)
 - **CRDTs** enable coordination without consensus—essential for constrained networks
 - **Capability composition** creates emergent capabilities greater than the sum of parts
@@ -14,11 +14,11 @@ The coordination layer will be filled. Every fleet, every sensor network, every 
 
 The window for deliberate architectural choice is now. Systems being designed today will coordinate autonomous agents for decades. The foundation must be built on openness, on mathematical scaling, on the proven patterns of hierarchical organization.
 
-PEAT is validated. PEAT is open. PEAT is ready.
+Peat is validated. Peat is open. Peat is ready.
 
 ---
 
-**PEAT Protocol**
+**Peat Protocol**
 Open Hierarchical Coordination for Distributed Multi-Agent Systems
 
 **Repository**: [GitHub](https://github.com/defenseunicorns/peat)

@@ -1,4 +1,4 @@
-# PEAT Protocol Architecture
+# Peat Protocol Architecture
 
 **Status**: Living Document
 **Last Updated**: 2025-01-07
@@ -6,34 +6,34 @@
 
 ## Overview
 
-PEAT (Hierarchical Intelligence for Virtual Environments) is a decentralized mesh protocol for human-machine teaming in tactical environments. It provides the foundational communication, synchronization, and coordination primitives that enable autonomous and semi-autonomous systems to form dynamic teams ("cells") and operate effectively in contested, denied, or limited communication environments.
+Peat is a decentralized mesh protocol for human-machine teaming in tactical environments. It provides the foundational communication, synchronization, and coordination primitives that enable autonomous and semi-autonomous systems to form dynamic teams ("cells") and operate effectively in contested, denied, or limited communication environments.
 
-### What PEAT Is
+### What Peat Is
 
-PEAT is a **protocol specification** with a reference implementation in Rust. Think of it as:
+Peat is a **protocol specification** with a reference implementation in Rust. Think of it as:
 
-- **TCP/IP for autonomy**: Just as TCP/IP provides reliable communication primitives, PEAT provides reliable synchronization and coordination primitives
-- **HTTP for state**: Just as HTTP provides request/response semantics, PEAT provides eventual consistency semantics via CRDTs
-- **Protobuf for tactical data**: Just as Protobuf defines wire formats, PEAT defines tactical entity schemas (tracks, capabilities, missions)
+- **TCP/IP for autonomy**: Just as TCP/IP provides reliable communication primitives, Peat provides reliable synchronization and coordination primitives
+- **HTTP for state**: Just as HTTP provides request/response semantics, Peat provides eventual consistency semantics via CRDTs
+- **Protobuf for tactical data**: Just as Protobuf defines wire formats, Peat defines tactical entity schemas (tracks, capabilities, missions)
 
-### What PEAT Is Not
+### What Peat Is Not
 
-- **Not an application**: PEAT is infrastructure that applications build on
-- **Not a replacement for tactical systems**: PEAT bridges and extends existing systems like TAK
-- **Not AI/ML**: PEAT provides the data fabric that AI systems consume and produce
+- **Not an application**: Peat is infrastructure that applications build on
+- **Not a replacement for tactical systems**: Peat bridges and extends existing systems like TAK
+- **Not AI/ML**: Peat provides the data fabric that AI systems consume and produce
 
 ---
 
 ## Architecture Layers
 
-PEAT is organized into five distinct layers, each with clear responsibilities:
+Peat is organized into five distinct layers, each with clear responsibilities:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         APPLICATION LAYER                                    │
 │  ┌─────────────┐  ┌─────────────────┐  ┌────────────┐                      │
-│  │ TAK Bridge  │  │ PEAT Inference  │  │  Your App  │                      │
-│  │ (CoT ↔ PEAT)│  │  (Edge ML)      │  │            │                      │
+│  │ TAK Bridge  │  │ Peat Inference  │  │  Your App  │                      │
+│  │ (CoT ↔ Peat)│  │  (Edge ML)      │  │            │                      │
 │  └─────────────┘  └─────────────────┘  └────────────┘                      │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                          BINDING LAYER                                       │
@@ -82,7 +82,7 @@ PEAT is organized into five distinct layers, each with clear responsibilities:
 
 ### 1. Schema Layer (`peat-schema`)
 
-**Purpose**: Define the wire format for all PEAT messages
+**Purpose**: Define the wire format for all Peat messages
 
 **Responsibilities**:
 - Protobuf message definitions for all tactical entities
@@ -183,7 +183,7 @@ pub trait Transport: Send + Sync {
 
 | Crate | Purpose |
 |-------|---------|
-| `peat-tak-bridge` | Bidirectional TAK Server <-> PEAT bridge |
+| `peat-tak-bridge` | Bidirectional TAK Server <-> Peat bridge |
 | `peat-inference` | Edge ML inference (YOLOv8, object tracking) |
 | `peat-sim` | Network simulation and validation |
 
@@ -247,7 +247,7 @@ pub trait Transport: Send + Sync {
 
 ### Cells
 
-A **cell** is a dynamic group of nodes that coordinate together. Cells are the fundamental unit of organization in PEAT:
+A **cell** is a dynamic group of nodes that coordinate together. Cells are the fundamental unit of organization in Peat:
 
 - **Formation**: Nodes discover each other and negotiate cell membership
 - **Leadership**: Cells elect leaders based on capabilities and authority
@@ -256,7 +256,7 @@ A **cell** is a dynamic group of nodes that coordinate together. Cells are the f
 
 ### Capability Aggregation and Emergent Behavior
 
-A core principle of PEAT is that **cells exhibit emergent capabilities** greater than the sum of their individual members:
+A core principle of Peat is that **cells exhibit emergent capabilities** greater than the sum of their individual members:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -298,7 +298,7 @@ A core principle of PEAT is that **cells exhibit emergent capabilities** greater
 
 ### Documents and CRDTs
 
-PEAT uses **Conflict-free Replicated Data Types (CRDTs)** for state synchronization:
+Peat uses **Conflict-free Replicated Data Types (CRDTs)** for state synchronization:
 
 - **Documents**: JSON-like structures that merge automatically
 - **Collections**: Named groups of documents (e.g., "tracks", "missions")
@@ -307,7 +307,7 @@ PEAT uses **Conflict-free Replicated Data Types (CRDTs)** for state synchronizat
 
 ### Bypass Channel
 
-For latency-critical data (sensor readings, control commands), PEAT provides a **UDP bypass channel**:
+For latency-critical data (sensor readings, control commands), Peat provides a **UDP bypass channel**:
 
 - Skips CRDT synchronization overhead
 - Configurable per-collection

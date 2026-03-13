@@ -99,9 +99,9 @@ body:
     id: protocol
     attributes:
       label: "Protocol / Transport"
-      description: "How is this data exchanged? (PEAT sync, HTTP, CoT, etc.)"
+      description: "How is this data exchanged? (Peat sync, HTTP, CoT, etc.)"
       placeholder: |
-        - Transport: PEAT Automerge document sync
+        - Transport: Peat Automerge document sync
         - Collection: `capabilities`
         - Sync frequency: On change + heartbeat every 30s
     validations:

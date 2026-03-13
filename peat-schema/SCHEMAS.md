@@ -1,6 +1,6 @@
-# PEAT Protocol Schema Reference
+# Peat Protocol Schema Reference
 
-Complete reference for all PEAT Protocol message schemas.
+Complete reference for all Peat Protocol message schemas.
 
 ## Overview
 
@@ -19,7 +19,7 @@ The CAP Schema defines **8 Protocol Buffer packages** organized into 4 categorie
 
 **File**: `proto/common.proto`
 
-**Purpose**: Shared types used across all PEAT Protocol messages
+**Purpose**: Shared types used across all Peat Protocol messages
 
 **Key Messages**:
 - `Uuid`: Unique identifier (UU ID format)

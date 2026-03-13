@@ -1,6 +1,6 @@
 //! HierarchicalCommand validators
 //!
-//! Validates command messages (MissionTask) for PEAT Protocol.
+//! Validates command messages (MissionTask) for Peat Protocol.
 
 use super::{ValidationError, ValidationResult};
 use crate::command::v1::HierarchicalCommand;

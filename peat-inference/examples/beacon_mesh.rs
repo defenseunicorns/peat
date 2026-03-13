@@ -1,4 +1,4 @@
-//! PEAT Beacon Mesh Integration Example
+//! Peat Beacon Mesh Integration Example
 //!
 //! Demonstrates connecting an edge device to the Peat mesh network
 //! and publishing capability advertisements.
@@ -19,7 +19,7 @@
 //!   --generate-secret     Generate a new formation secret and exit
 //!   --bind <addr>         Bind to specific address (default: random port)
 //!   --peer <addr>         Connect to a peer node
-//!   --formation <id>      Formation ID (default: from PEAT_APP_ID env)
+//!   --formation <id>      Formation ID (default: from Peat app ID env)
 //!   --platform-id <id>    Platform identifier (default: auto-generated)
 
 use peat_inference::beacon::{BeaconConfig, CameraSpec, ModelSpec, PeatBeacon};
@@ -97,7 +97,7 @@ async fn main() -> anyhow::Result<()> {
     // Get shared secret from environment
     let secret_key = std::env::var("PEAT_SECRET_KEY").ok();
 
-    println!("PEAT Beacon Mesh Integration");
+    println!("Peat Beacon Mesh Integration");
     println!("=============================");
     println!();
     println!("Formation: {}", formation_id);
@@ -134,7 +134,7 @@ async fn main() -> anyhow::Result<()> {
     println!("  Node ID: {:?}", endpoint_id);
 
     // Create AutomergeIrohBackend
-    println!("Creating PEAT backend...");
+    println!("Creating Peat backend...");
     let backend = Arc::new(AutomergeIrohBackend::from_parts(
         store,
         Arc::clone(&transport),

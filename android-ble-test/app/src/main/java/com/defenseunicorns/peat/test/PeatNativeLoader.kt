@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ * Copyright (c) 2026 Defense Unicorns.  All rights reserved.
  */
 
 package com.defenseunicorns.peat.test
@@ -9,7 +9,7 @@ import android.util.Log
 import java.io.File
 
 /**
- * Native library loader for PEAT BLE test app.
+ * Native library loader for Peat BLE test app.
  *
  * Simplified from atak-plugin version — standalone app can use
  * System.loadLibrary directly since there's no linker namespace isolation.
