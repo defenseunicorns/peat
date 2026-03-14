@@ -27,12 +27,29 @@ pub enum RegistryTier {
 }
 
 /// Authentication credentials for an OCI registry.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum RegistryAuth {
     Anonymous,
     Basic { username: String, password: String },
     Bearer { token: String },
+}
+
+impl std::fmt::Debug for RegistryAuth {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RegistryAuth::Anonymous => f.debug_struct("Anonymous").finish(),
+            RegistryAuth::Basic { username, .. } => f
+                .debug_struct("Basic")
+                .field("username", username)
+                .field("password", &"[REDACTED]")
+                .finish(),
+            RegistryAuth::Bearer { .. } => f
+                .debug_struct("Bearer")
+                .field("token", &"[REDACTED]")
+                .finish(),
+        }
+    }
 }
 
 impl RegistryAuth {
