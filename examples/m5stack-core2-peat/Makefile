@@ -1,4 +1,4 @@
-# M5Stack Core2 HIVE Demo - Makefile
+# M5Stack Core2 Peat Demo - Makefile
 #
 # Commands:
 #   make build      - Build the firmware
@@ -12,7 +12,7 @@ DEV1 := /dev/cu.usbserial-02036C1A
 DEV2 := /dev/cu.usbserial-5A490605921
 DEV3 := /dev/cu.usbserial-5A490607481
 
-TARGET := target/xtensa-esp32-espidf/release/m5stack-core2-hive
+TARGET := target/xtensa-esp32-espidf/release/m5stack-core2-peat
 
 .PHONY: build flash flash-all flash1 flash2 flash3 monitor clean
 
