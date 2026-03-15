@@ -25,7 +25,7 @@ use peat_registry::transfer::checkpoint::CheckpointStore;
 use peat_registry::transfer::engine::TransferEngine;
 use peat_registry::types::ConvergenceStatus;
 
-/// PEAT Registry Sync — OCI registry synchronization for DDIL environments
+/// Peat Registry Sync — OCI registry synchronization for DDIL environments
 #[derive(Parser, Debug)]
 #[command(name = "peat-registry")]
 #[command(about = "OCI registry sync control plane for DDIL environments")]
