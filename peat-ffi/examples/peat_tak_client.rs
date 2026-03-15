@@ -1,4 +1,4 @@
-//! PEAT TAK Test Client
+//! Peat TAK Test Client
 //!
 //! This example creates a Peat node that publishes mock data for testing
 //! mDNS peer discovery with the ATAK plugin.

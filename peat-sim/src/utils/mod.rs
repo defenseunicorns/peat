@@ -1,3 +1,3 @@
-//! Utility modules for PEAT simulation.
+//! Utility modules for Peat simulation.
 
 pub mod time;

@@ -18,7 +18,7 @@ const BLE_HS_FOREVER: i32 = i32::MAX;
 
 use peat_btle::NodeId;
 
-/// PEAT Service UUID (128-bit) - must match Android/iOS
+/// Peat Service UUID (128-bit) - must match Android/iOS
 /// f47ac10b-58cc-4372-a567-0e02b2c3d479
 pub const PEAT_SERVICE_UUID: [u8; 16] = [
     0x79, 0xd4, 0xc3, 0xb2, 0x02, 0x0e, 0x67, 0xa5,
@@ -55,7 +55,7 @@ struct PeerConnection {
     peer_doc_handle: u16,  // Their document characteristic (for writing)
     active: bool,
     peer_addr: [u8; 6],    // Peer's BLE address (for disconnect tracking)
-    node_id: u32,          // PEAT Node ID (set when first document received)
+    node_id: u32,          // Peat Node ID (set when first document received)
     we_are_central: bool,  // True if we initiated the connection
 }
 
@@ -156,7 +156,7 @@ fn get_peer_last_sync(mac: &[u8; 6]) -> u32 {
     0
 }
 
-/// Check if advertising data contains PEAT service UUID (16-bit or 128-bit)
+/// Check if advertising data contains Peat service UUID (16-bit or 128-bit)
 unsafe fn has_peat_service(data: *const u8, len: u8) -> bool {
     if data.is_null() || len < 4 {
         return false;
@@ -334,7 +334,7 @@ unsafe extern "C" fn gap_event_handler(event: *mut ble_gap_event, _arg: *mut c_v
         BLE_GAP_EVENT_DISC => {
             let disc = &event.__bindgen_anon_1.disc;
 
-            // Check if this device advertises PEAT service
+            // Check if this device advertises Peat service
             if has_peat_service(disc.data, disc.length_data) {
                 // Get peer MAC address
                 let peer_mac = disc.addr.val;
@@ -357,7 +357,7 @@ unsafe extern "C" fn gap_event_handler(event: *mut ble_gap_event, _arg: *mut c_v
                 } else if !can_accept_connection() {
                     debug!("BLE: At max connections ({}/{})", connection_count(), get_max_connections());
                 } else if !CONNECTING.load(Ordering::SeqCst) {
-                    info!("BLE: Found PEAT peer (last sync {}s ago), connecting... ({}/{} conns)",
+                    info!("BLE: Found Peat peer (last sync {}s ago), connecting... ({}/{} conns)",
                           since_sync, connection_count(), get_max_connections());
                     CONNECTING.store(true, Ordering::SeqCst);
 
@@ -504,7 +504,7 @@ unsafe extern "C" fn gatt_disc_chr_cb(
 
     if !chr.is_null() {
         let c = &*chr;
-        // Check if this is the PEAT document characteristic (128-bit or 16-bit)
+        // Check if this is the Peat document characteristic (128-bit or 16-bit)
         let is_peat_char = if c.uuid.u.type_ == BLE_UUID_TYPE_128 as u8 {
             let uuid128 = &*((&c.uuid) as *const ble_uuid_any_t as *const ble_uuid128_t);
             uuid128.value == DOC_CHAR_UUID
@@ -517,7 +517,7 @@ unsafe extern "C" fn gatt_disc_chr_cb(
         };
 
         if is_peat_char {
-            info!("BLE: Found PEAT document characteristic, handle={}", c.val_handle);
+            info!("BLE: Found Peat document characteristic, handle={}", c.val_handle);
             PEER_DOC_HANDLE.store(c.val_handle, Ordering::SeqCst);
 
             // Store in the connection struct

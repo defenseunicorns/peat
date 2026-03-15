@@ -1,6 +1,6 @@
 //! Mesh integration adapters
 //!
-//! This module contains PEAT-specific adapters that bridge `peat-mesh`
+//! This module contains Peat-specific adapters that bridge `peat-mesh`
 //! generic interfaces with Peat Protocol domain types.
 
 mod aggregator;

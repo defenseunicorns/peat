@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ * Copyright (c) 2026 Defense Unicorns.  All rights reserved.
  */
 
 package com.defenseunicorns.atak.peat
@@ -7,7 +7,7 @@ package com.defenseunicorns.atak.peat
 import android.util.Log
 
 /**
- * Direct JNI bindings for PEAT FFI.
+ * Direct JNI bindings for Peat FFI.
  *
  * This bypasses JNA/UniFFI which has symbol lookup issues on Android
  * due to linker namespace isolation. Uses standard JNI with native
@@ -57,7 +57,7 @@ object PeatJni {
     private external fun nativeInit()
 
     /**
-     * Get PEAT library version string.
+     * Get Peat library version string.
      */
     @JvmStatic
     external fun peatVersion(): String
@@ -69,7 +69,7 @@ object PeatJni {
     external fun testJni(): String
 
     /**
-     * Create a PEAT node and return its handle.
+     * Create a Peat node and return its handle.
      * @param appId Formation/app identifier
      * @param sharedKey Base64-encoded shared key
      * @param storagePath Path for persistent storage
@@ -79,7 +79,7 @@ object PeatJni {
     external fun createNodeJni(appId: String, sharedKey: String, storagePath: String): Long
 
     /**
-     * Create a PEAT node with transport configuration (ADR-039, #558).
+     * Create a Peat node with transport configuration (ADR-039, #558).
      *
      * This extended version supports BLE transport configuration for unified
      * multi-transport operation. When enableBle is true, the node will attempt
@@ -177,7 +177,7 @@ object PeatJni {
     external fun getPlatformsJni(handle: Long): String
 
     /**
-     * Publish a platform (self-position/PLI) to the PEAT network.
+     * Publish a platform (self-position/PLI) to the Peat network.
      * @param handle Node handle from createNodeJni
      * @param platformJson JSON string representing the platform data
      * @return true if published successfully
@@ -267,7 +267,7 @@ object PeatJni {
 }
 
 /**
- * Wrapper class for a PEAT node using JNI.
+ * Wrapper class for a Peat node using JNI.
  * Provides a more idiomatic Kotlin API over the raw JNI functions.
  *
  * Uses a global singleton handle that survives APK replacement to avoid
@@ -287,7 +287,7 @@ class PeatNodeJni private constructor(private val handle: Long) : AutoCloseable 
         private var globalInstance: PeatNodeJni? = null
 
         /**
-         * Create a new PEAT node, or return existing one if handle is still valid.
+         * Create a new Peat node, or return existing one if handle is still valid.
          * @param appId Formation/app identifier
          * @param sharedKey Base64-encoded shared key
          * @param storagePath Path for persistent storage
@@ -297,7 +297,7 @@ class PeatNodeJni private constructor(private val handle: Long) : AutoCloseable 
             createWithConfig(appId, sharedKey, storagePath, enableBle = false, blePowerProfile = null)
 
         /**
-         * Create a new PEAT node with transport configuration (ADR-039, #558).
+         * Create a new Peat node with transport configuration (ADR-039, #558).
          *
          * This is the preferred method for creating nodes with BLE transport support.
          * When enableBle is true, the node will be configured for unified multi-transport
@@ -323,7 +323,7 @@ class PeatNodeJni private constructor(private val handle: Long) : AutoCloseable 
                     // Verify handle is still valid by calling peerCount
                     val peerCount = PeatJni.peerCountJni(globalHandle)
                     if (peerCount >= 0) {
-                        Log.i(TAG, "Reusing existing PEAT node handle: $globalHandle (peers: $peerCount)")
+                        Log.i(TAG, "Reusing existing Peat node handle: $globalHandle (peers: $peerCount)")
                         if (globalInstance == null) {
                             globalInstance = PeatNodeJni(globalHandle)
                         }
@@ -345,16 +345,16 @@ class PeatNodeJni private constructor(private val handle: Long) : AutoCloseable 
                     blePowerProfile
                 )
                 if (handle != 0L) {
-                    Log.i(TAG, "Created PEAT node with handle: $handle (BLE: $enableBle)")
+                    Log.i(TAG, "Created Peat node with handle: $handle (BLE: $enableBle)")
                     globalHandle = handle
                     globalInstance = PeatNodeJni(handle)
                     globalInstance
                 } else {
-                    Log.e(TAG, "Failed to create PEAT node (handle=0)")
+                    Log.e(TAG, "Failed to create Peat node (handle=0)")
                     null
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Exception creating PEAT node: ${e.message}", e)
+                Log.e(TAG, "Exception creating Peat node: ${e.message}", e)
                 null
             }
         }
@@ -376,7 +376,7 @@ class PeatNodeJni private constructor(private val handle: Long) : AutoCloseable 
                     // Verify handle is still valid
                     val peerCount = PeatJni.peerCountJni(nativeHandle)
                     if (peerCount >= 0) {
-                        Log.i(TAG, "Recovered PEAT node from native global handle: $nativeHandle (peers: $peerCount)")
+                        Log.i(TAG, "Recovered Peat node from native global handle: $nativeHandle (peers: $peerCount)")
                         globalHandle = nativeHandle
                         globalInstance = PeatNodeJni(nativeHandle)
                         return globalInstance
@@ -431,7 +431,7 @@ class PeatNodeJni private constructor(private val handle: Long) : AutoCloseable 
     fun getPlatformsJson(): String = PeatJni.getPlatformsJni(handle)
 
     /**
-     * Publish a platform (self-position/PLI) to the PEAT network.
+     * Publish a platform (self-position/PLI) to the Peat network.
      * @param platformJson JSON string representing the platform data
      * @return true if published successfully
      */
@@ -484,7 +484,7 @@ class PeatNodeJni private constructor(private val handle: Long) : AutoCloseable 
      * Free the native node resources.
      */
     override fun close() {
-        Log.d(TAG, "Closing PEAT node handle: $handle")
+        Log.d(TAG, "Closing Peat node handle: $handle")
         PeatJni.freeNodeJni(handle)
     }
 }

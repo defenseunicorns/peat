@@ -1,13 +1,13 @@
 //! # TAK Transport Adapter
 //!
-//! Provides bidirectional CoT message transport between PEAT and TAK ecosystem.
+//! Provides bidirectional CoT message transport between Peat and TAK ecosystem.
 //! Supports TAK Server (TCP/SSL) and Mesh SA (UDP multicast) modes.
 //!
 //! ## Architecture (ADR-029)
 //!
 //! ```text
 //! ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-//! │  PEAT Protocol  │───▶│  TakTransport   │───▶│  TAK Server/    │
+//! │  Peat Protocol  │───▶│  TakTransport   │───▶│  TAK Server/    │
 //! │                 │    │                 │    │  Mesh SA        │
 //! │  CotEncoder     │    │  DIL Queue      │    │                 │
 //! │  CotEvent       │    │  Reconnection   │    │  ATAK/WinTAK    │

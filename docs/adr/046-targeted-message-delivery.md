@@ -9,7 +9,7 @@
 
 ### Current Model: Broadcast Replication
 
-PEAT's CRDT synchronization replicates documents to **all nodes** in a cell. When a document is written to a collection, every node eventually receives and persists a copy.
+Peat's CRDT synchronization replicates documents to **all nodes** in a cell. When a document is written to a collection, every node eventually receives and persists a copy.
 
 ```
 Writer → Node A → Node B → Node C → Node D

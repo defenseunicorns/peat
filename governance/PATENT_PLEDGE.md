@@ -1,12 +1,12 @@
-# PEAT Protocol Patent Pledge
+# Peat Protocol Patent Pledge
 
 ## Purpose
 
-This document establishes the intellectual property commitments for the PEAT Protocol, ensuring that the protocol can be freely implemented while protecting the ecosystem from patent aggression.
+This document establishes the intellectual property commitments for the Peat Protocol, ensuring that the protocol can be freely implemented while protecting the ecosystem from patent aggression.
 
 ## Patent Holdings
 
-(r)evolve, Inc. holds the following provisional patent applications related to the PEAT Protocol:
+Defense Unicorns holds the following provisional patent applications related to the Peat Protocol:
 
 ### Provisional Application 1: Hierarchical Capability Composition
 
@@ -32,17 +32,17 @@ This document establishes the intellectual property commitments for the PEAT Pro
 
 ### Grant Terms
 
-Subject to the conditions below, (r)evolve, Inc. grants to any person or entity ("You") a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable patent license to:
+Subject to the conditions below, Defense Unicorns grants to any person or entity ("You") a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable patent license to:
 
-- **Make** implementations of the PEAT Protocol
-- **Have made** implementations of the PEAT Protocol
-- **Use** implementations of the PEAT Protocol
-- **Offer to sell** implementations of the PEAT Protocol
-- **Sell** implementations of the PEAT Protocol
-- **Import** implementations of the PEAT Protocol
-- **Otherwise transfer** implementations of the PEAT Protocol
+- **Make** implementations of the Peat Protocol
+- **Have made** implementations of the Peat Protocol
+- **Use** implementations of the Peat Protocol
+- **Offer to sell** implementations of the Peat Protocol
+- **Sell** implementations of the Peat Protocol
+- **Import** implementations of the Peat Protocol
+- **Otherwise transfer** implementations of the Peat Protocol
 
-This grant covers any patent claims owned or controlled by (r)evolve, Inc. that are necessarily infringed by implementing the PEAT Protocol specification as published in the `/spec/` directory of the official repository.
+This grant covers any patent claims owned or controlled by Defense Unicorns that are necessarily infringed by implementing the Peat Protocol specification as published in the `/spec/` directory of the official repository.
 
 ### Covered Uses
 
@@ -66,8 +66,8 @@ This patent grant does NOT cover:
 |----------|---------|
 | Proprietary extensions incompatible with the specification | ❌ No |
 | Implementations that deviate from the specification | ❌ No |
-| Uses unrelated to the PEAT Protocol | ❌ No |
-| Patent assertion against PEAT implementations (see Defensive Termination) | ❌ No |
+| Uses unrelated to the Peat Protocol | ❌ No |
+| Patent assertion against Peat implementations (see Defensive Termination) | ❌ No |
 
 ---
 
@@ -77,18 +77,18 @@ This patent grant does NOT cover:
 
 This patent grant automatically terminates with respect to You if You (or any entity You control, or any entity that controls You, or any entity under common control with You):
 
-1. **Initiate patent litigation** against any entity alleging that the PEAT Protocol, or any implementation thereof, infringes a patent; or
+1. **Initiate patent litigation** against any entity alleging that the Peat Protocol, or any implementation thereof, infringes a patent; or
 
-2. **Assert patent claims** against any implementation of the PEAT Protocol in any legal proceeding; or
+2. **Assert patent claims** against any implementation of the Peat Protocol in any legal proceeding; or
 
-3. **Acquire patents** with the intent to assert them against PEAT Protocol implementations.
+3. **Acquire patents** with the intent to assert them against Peat Protocol implementations.
 
 ### Reinstatement
 
 Termination is permanent unless:
 
 1. The patent claims are withdrawn or dismissed within 60 days; and
-2. (r)evolve, Inc. provides written reinstatement (at sole discretion)
+2. Defense Unicorns provides written reinstatement (at sole discretion)
 
 ### Scope of Termination
 
@@ -106,7 +106,7 @@ This pledge is compatible with IETF IPR disclosure requirements:
 - Non-discriminatory terms
 - Irrevocable commitment
 
-Upon IETF submission, (r)evolve, Inc. will file appropriate IPR disclosures.
+Upon IETF submission, Defense Unicorns will file appropriate IPR disclosures.
 
 ### NATO Compatibility
 
@@ -131,15 +131,15 @@ This pledge aligns with W3C Patent Policy and Open Web Foundation Agreement prin
 
 ### No Submarine Patents
 
-(r)evolve, Inc. commits to:
+Defense Unicorns commits to:
 
-1. Disclose all patent applications related to PEAT Protocol
+1. Disclose all patent applications related to Peat Protocol
 2. Not acquire patents for offensive assertion against implementations
 3. Maintain this pledge for any future related patents
 
 ### Open Ecosystem
 
-(r)evolve, Inc. commits to:
+Defense Unicorns commits to:
 
 1. Not use patents to create vendor lock-in
 2. Not discriminate between implementers
@@ -147,7 +147,7 @@ This pledge aligns with W3C Patent Policy and Open Web Foundation Agreement prin
 
 ### Transparency
 
-(r)evolve, Inc. commits to:
+Defense Unicorns commits to:
 
 1. Maintain this pledge publicly
 2. Provide reasonable notice of any changes
@@ -173,7 +173,7 @@ The reference implementation uses Apache 2.0, which includes its own patent gran
 
 ## FAQ
 
-### Q: Can I make a commercial product using PEAT?
+### Q: Can I make a commercial product using Peat?
 
 **A**: Yes. Commercial use is explicitly permitted under this pledge, provided your implementation conforms to the specification.
 
@@ -183,11 +183,11 @@ The reference implementation uses Apache 2.0, which includes its own patent gran
 
 ### Q: Does this cover all CRDT-related patents?
 
-**A**: No. This covers only patents necessarily infringed by implementing the PEAT Protocol specification. It does not cover CRDT implementations in general (which are covered by their own patents, if any).
+**A**: No. This covers only patents necessarily infringed by implementing the Peat Protocol specification. It does not cover CRDT implementations in general (which are covered by their own patents, if any).
 
 ### Q: What if a patent troll sues me?
 
-**A**: This pledge only covers (r)evolve, Inc.'s patents. We cannot make commitments for third parties. However, the defensive termination clause means patent aggressors lose their rights under this pledge.
+**A**: This pledge only covers Defense Unicorns's patents. We cannot make commitments for third parties. However, the defensive termination clause means patent aggressors lose their rights under this pledge.
 
 ### Q: Can this pledge be revoked?
 
@@ -199,7 +199,7 @@ The reference implementation uses Apache 2.0, which includes its own patent gran
 
 For questions about this patent pledge:
 
-- Email: kit@revolveteam.com
+- Email: kitplummer@defenseunicorns.com
 - GitHub: https://github.com/defenseunicorns/peat/issues
 
 For legal questions, please consult your own legal counsel.
@@ -216,6 +216,6 @@ For legal questions, please consult your own legal counsel.
 
 ## Legal Notice
 
-This document constitutes a binding commitment by (r)evolve, Inc. regarding the patents identified above. It is not legal advice. Recipients should consult their own legal counsel regarding their specific situations.
+This document constitutes a binding commitment by Defense Unicorns regarding the patents identified above. It is not legal advice. Recipients should consult their own legal counsel regarding their specific situations.
 
-PEAT Protocol is a trademark of (r)evolve, Inc. Use of the trademark is permitted for implementations that conform to the specification.
+Peat Protocol is a trademark of Defense Unicorns Use of the trademark is permitted for implementations that conform to the specification.

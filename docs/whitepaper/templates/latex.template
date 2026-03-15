@@ -1,5 +1,5 @@
-% HIVE Whitepaper LaTeX Template
-% Color scheme: (r)evolve - revolveteam.com
+% Peat Whitepaper LaTeX Template
+% Color scheme: Defense Unicorns
 % Font: Space Grotesk
 \documentclass[$if(fontsize)$$fontsize$,$endif$$if(papersize)$$papersize$paper,$endif$]{$documentclass$}
 
@@ -26,7 +26,7 @@ $if(geometry)$
 \geometry{$for(geometry)$$geometry$$sep$,$endfor$}
 $endif$
 
-% (r)evolve Colors
+% Defense Unicorns Colors
 \definecolor{PrimaryBlue}{HTML}{0066CC}
 \definecolor{AccentBlue}{HTML}{3D8BFF}
 \definecolor{HighlightBlue}{HTML}{60A5FA}
@@ -68,7 +68,7 @@ $if(linestretch)$
 \setstretch{$linestretch$}
 $endif$
 
-% Section formatting with (r)evolve colors
+% Section formatting with Defense Unicorns colors
 \titleformat{\section}
   {\Large\bfseries\color{PrimaryBlue}}
   {\thesection}{1em}{}[\color{PrimaryBlue}\titlerule]

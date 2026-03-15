@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-Lab 3b (P2P Flat Mesh with PEAT CRDT) has been successfully implemented, tested, and merged into main. This document provides a comprehensive comparison of all lab configurations and identifies what empirical data comparisons are now possible.
+Lab 3b (P2P Flat Mesh with Peat CRDT) has been successfully implemented, tested, and merged into main. This document provides a comprehensive comparison of all lab configurations and identifies what empirical data comparisons are now possible.
 
 **Current Status**: **4 of 5 Labs Complete (80%)**
 
@@ -17,8 +17,8 @@ Lab 3b (P2P Flat Mesh with PEAT CRDT) has been successfully implemented, tested,
 | **Lab 1** | Producer-Only | ✅ Complete | 32 tests | 24-1000 nodes | Server ingress capacity |
 | **Lab 2** | Client-Server Broadcast | ✅ Complete | 32 tests | 24-1000 nodes | Broadcast saturation point |
 | **Lab 3** | P2P Full Mesh (Raw TCP) | ✅ Complete | 24 tests | 5-50 nodes | P2P connection explosion |
-| **Lab 3b** | P2P Flat Mesh (PEAT CRDT) | ✅ Complete | 24 tests | 5-50 nodes | CRDT overhead isolation |
-| **Lab 4** | Hierarchical PEAT CRDT | ⏳ Pending | TBD | 24-1000 nodes | Hierarchy scaling benefits |
+| **Lab 3b** | P2P Flat Mesh (Peat CRDT) | ✅ Complete | 24 tests | 5-50 nodes | CRDT overhead isolation |
+| **Lab 4** | Hierarchical Peat CRDT | ⏳ Pending | TBD | 24-1000 nodes | Hierarchy scaling benefits |
 
 ---
 
@@ -94,7 +94,7 @@ Complexity:   O(n²) connections + O(n²) messages
 
 ---
 
-### Lab 3b: P2P Flat Mesh with PEAT CRDT
+### Lab 3b: P2P Flat Mesh with Peat CRDT
 
 **Test Matrix**: 6 node counts × 4 bandwidths = **24 tests**
 
@@ -102,7 +102,7 @@ Complexity:   O(n²) connections + O(n²) messages
 Node Counts:  5, 10, 15, 20, 30, 50
 Bandwidths:   1 Gbps, 100 Mbps, 1 Mbps, 256 Kbps
 Duration:     120 seconds per test
-Pattern:      P2P Full Mesh + PEAT CRDT (Ditto backend)
+Pattern:      P2P Full Mesh + Peat CRDT (Ditto backend)
 Complexity:   O(n²) connections + CRDT sync overhead
 ```
 
@@ -120,7 +120,7 @@ Complexity:   O(n²) connections + CRDT sync overhead
 - ✅ Validates need for hierarchical topology to manage CRDT sync
 
 **CRDT Overhead Measured**:
-| Nodes | Lab 3 (Raw TCP) P95 | Lab 3b (PEAT CRDT) P95 | CRDT Overhead |
+| Nodes | Lab 3 (Raw TCP) P95 | Lab 3b (Peat CRDT) P95 | CRDT Overhead |
 |-------|---------------------|------------------------|---------------|
 | 5     | ~0.13ms            | 2.7ms                  | +2.6ms        |
 | 10    | ~0.12ms            | 25.7ms                 | +25.6ms       |
@@ -137,7 +137,7 @@ With Lab 3b complete, we can now answer these key questions:
 
 ### 1. What is Pure CRDT Overhead? ✅
 
-**Comparison**: Lab 3 (Raw TCP) vs Lab 3b (PEAT CRDT)
+**Comparison**: Lab 3 (Raw TCP) vs Lab 3b (Peat CRDT)
 
 ```
 Same topology (P2P full mesh)
@@ -278,7 +278,7 @@ Different: Lab 4 uses Squad → Platoon → Company hierarchy
 7. **`compare-lab3b-vs-lab4.py`** (Hierarchy benefit)
    - ⏳ Needs creation (after Lab 4)
    - Measures hierarchy scaling improvement
-   - Key for validating PEAT's core thesis
+   - Key for validating Peat's core thesis
 
 ---
 
@@ -317,14 +317,14 @@ docker images | grep peat-sim-node
 
 ### What Lab 3b Enables
 
-Lab 3b is the **critical bridge** between Labs 1-3 (traditional architectures) and Lab 4 (PEAT hierarchical CRDT):
+Lab 3b is the **critical bridge** between Labs 1-3 (traditional architectures) and Lab 4 (Peat hierarchical CRDT):
 
 1. **Isolates CRDT Overhead**
    - Same topology as Lab 3, but with CRDT
    - Pure measurement of CRDT sync cost
    - Proves CRDT overhead is measurable but manageable at small scale
 
-2. **Validates PEAT Core Library**
+2. **Validates Peat Core Library**
    - Uses `FlatMeshCoordinator` from `peat-mesh`
    - Tests DynamicHierarchyStrategy in production scenario
    - Validates ADR-024 design decisions
@@ -385,7 +385,7 @@ From Lab 3b testing (24 configurations):
 ### For Complete Epic #132 Validation
 
 1. **Lab 4 Implementation** ⏳
-   - [ ] Design hierarchical PEAT CRDT topology
+   - [ ] Design hierarchical Peat CRDT topology
    - [ ] Implement Lab 4 test binary (or mode in peat-sim)
    - [ ] Create topology generator for hierarchical deployments
    - [ ] Define squad/platoon/company sizes
@@ -428,7 +428,7 @@ From Lab 3b testing (24 configurations):
 
 ### Short Term (Next 2 Weeks)
 
-4. ⏳ **Implement Lab 4** - hierarchical PEAT CRDT baseline
+4. ⏳ **Implement Lab 4** - hierarchical Peat CRDT baseline
 5. ⏳ **Run Lab 4 tests** - 24-1000 node scaling validation
 6. ⏳ **Compare Lab 3b vs Lab 4** - measure hierarchy benefit
 
@@ -442,17 +442,17 @@ From Lab 3b testing (24 configurations):
 
 ## Conclusion
 
-Lab 3b successfully bridges traditional architectures (Labs 1-3) and PEAT's hierarchical CRDT (Lab 4):
+Lab 3b successfully bridges traditional architectures (Labs 1-3) and Peat's hierarchical CRDT (Lab 4):
 
 ✅ **Lab 3b Achievements**:
 - Isolated pure CRDT overhead (Lab 3 vs Lab 3b)
-- Validated PEAT core library in production scenario
+- Validated Peat core library in production scenario
 - Demonstrated flat mesh CRDT breaking point (~20-30 nodes)
 - Established baseline for hierarchical comparison
 
 ✅ **Epic #132 Status: 80% Complete**
 - Labs 1, 2, 3, 3b: Complete and validated
-- Lab 4: Pending (hierarchical PEAT CRDT)
+- Lab 4: Pending (hierarchical Peat CRDT)
 - Analysis scripts: Most complete, need cross-lab comparison
 - Final report: Pending Lab 4 completion
 
@@ -461,6 +461,6 @@ O(n²) scaling (connections or broadcast) is the fundamental barrier to large-sc
 
 ---
 
-**Epic #132 Goal**: Empirically prove PEAT's hierarchical CRDT scales logarithmically to 1000+ nodes where other architectures fail.
+**Epic #132 Goal**: Empirically prove Peat's hierarchical CRDT scales logarithmically to 1000+ nodes where other architectures fail.
 
 **Status**: On track for completion after Lab 4 implementation.

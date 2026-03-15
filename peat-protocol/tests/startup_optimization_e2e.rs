@@ -366,18 +366,18 @@ async fn test_full_startup_timing_like_ffi() {
 
     // Output timing in same format as FFI
     eprintln!("\n=== FFI-EQUIVALENT STARTUP TIMING ===");
-    eprintln!("[PEAT TIMING] Store open: {}ms", store_ms);
+    eprintln!("[Peat TIMING] Store open: {}ms", store_ms);
     eprintln!(
-        "[PEAT TIMING] Transport create (no mDNS): {}ms",
+        "[Peat TIMING] Transport create (no mDNS): {}ms",
         transport_ms
     );
     eprintln!(
-        "[PEAT TIMING] Parallel total (max of above): {}ms",
+        "[Peat TIMING] Parallel total (max of above): {}ms",
         parallel_ms
     );
-    eprintln!("[PEAT TIMING] Backend creation: {}ms", backend_ms);
-    eprintln!("[PEAT TIMING] Sync init: {}ms", sync_init_ms);
-    eprintln!("[PEAT TIMING] === TOTAL: {}ms ===\n", total_ms);
+    eprintln!("[Peat TIMING] Backend creation: {}ms", backend_ms);
+    eprintln!("[Peat TIMING] Sync init: {}ms", sync_init_ms);
+    eprintln!("[Peat TIMING] === TOTAL: {}ms ===\n", total_ms);
 
     // Cleanup
     backend.stop_sync().unwrap();

@@ -1,4 +1,4 @@
-# PEAT Protocol - Patent Strategy
+# Peat Protocol - Patent Strategy
 
 **Status**: Proposed
 **Date**: 2025-11-04
@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-**Recommendation**: File 2 provisional patent applications immediately (within 1 week) covering PEAT Protocol's core innovations, then open-source the automerge-edge infrastructure.
+**Recommendation**: File 2 provisional patent applications immediately (within 1 week) covering Peat Protocol's core innovations, then open-source the automerge-edge infrastructure.
 
 - **Cost**: $260 (DIY provisionals) or $4K-$6K (with attorney)
 - **Timeline**: File this week, then open-source freely
@@ -31,7 +31,7 @@ The Apache-2.0 license provides **patent protection for users**, not patent gene
 - **Patent retaliation**: If someone sues over patents, they lose their license
 - **User protection**: Downstream users get patent rights to use the software
 
-This protects *users* from patent trolls, but doesn't prevent (r)evolve from filing patents on innovations.
+This protects *users* from patent trolls, but doesn't prevent Defense Unicorns from filing patents on innovations.
 
 ## Patent Strategy Analysis
 
@@ -181,7 +181,7 @@ This provides:
 
 **Actions**:
 - Open-source automerge-edge on GitHub (Apache-2.0 license)
-- Release PEAT Protocol documentation
+- Release Peat Protocol documentation
 - Publish technical papers/blog posts
 - Present at conferences
 
@@ -365,7 +365,7 @@ Abandon provisionals if **all** of these are true:
 ### Week 2
 
 - [ ] Open-source automerge-edge on GitHub (now protected)
-- [ ] Update PEAT Protocol documentation
+- [ ] Update Peat Protocol documentation
 - [ ] Optionally add "patent pending" notices
 
 ### Months 1-12
@@ -415,7 +415,7 @@ Abandon provisionals if **all** of these are true:
 | Stakeholder | Date | Decision | Notes |
 |-------------|------|----------|-------|
 | Kit Plummer | TBD | Pending | Reviewing strategy |
-| (r)evolve Leadership | TBD | Pending | Budget approval for attorney? |
+| Defense Unicorns Leadership | TBD | Pending | Budget approval for attorney? |
 | Legal Counsel | TBD | Pending | Optional - review before filing |
 
 ---

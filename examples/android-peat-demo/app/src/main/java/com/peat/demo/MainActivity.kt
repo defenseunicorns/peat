@@ -24,10 +24,10 @@ import com.peat.btle.PeatPeer
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Demo activity for PEAT BLE mesh connectivity.
+ * Demo activity for Peat BLE mesh connectivity.
  *
  * This app demonstrates:
- * 1. Starting a PEAT mesh network
+ * 1. Starting a Peat mesh network
  * 2. Automatic peer discovery and connection
  * 3. Sending/receiving events (Emergency, ACK)
  * 4. CRDT sync across the mesh
@@ -107,7 +107,7 @@ class MainActivity : AppCompatActivity(), PeatMeshListener {
     override fun onDestroy() {
         super.onDestroy()
         if (::peatBtle.isInitialized) {
-            Log.i(TAG, "Shutting down PEAT mesh")
+            Log.i(TAG, "Shutting down Peat mesh")
             peatBtle.shutdown()
         }
     }
@@ -154,7 +154,7 @@ class MainActivity : AppCompatActivity(), PeatMeshListener {
             val meshId = PeatBtle.getMeshIdFromEnvironment()
             peatBtle = PeatBtle(applicationContext, meshId = meshId) // nodeId auto-generated from adapter
             peatBtle.init()
-            Log.i(TAG, "PEAT BLE initialized with nodeId: ${String.format("%08X", peatBtle.nodeId)}")
+            Log.i(TAG, "Peat BLE initialized with nodeId: ${String.format("%08X", peatBtle.nodeId)}")
 
             // Update UI with our node ID and mesh ID
             localNodeIdText.text = "Node: ${PeatBtle.generateDeviceName(peatBtle.getMeshId(), peatBtle.nodeId)}"
@@ -164,7 +164,7 @@ class MainActivity : AppCompatActivity(), PeatMeshListener {
             updateStatus("Mesh active")
 
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize PEAT BLE", e)
+            Log.e(TAG, "Failed to initialize Peat BLE", e)
             updateStatus("Error: ${e.message}")
             Toast.makeText(this, "Failed to initialize: ${e.message}", Toast.LENGTH_LONG).show()
         }

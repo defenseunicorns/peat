@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ * Copyright (c) 2026 Defense Unicorns.  All rights reserved.
  */
 
 package com.defenseunicorns.atak.peat
@@ -32,10 +32,10 @@ import uniffi.peat_lite_android.decodeCannedMessageAckEvent
 import uniffi.peat_lite_android.cannedMessageAckEventMerge
 
 /**
- * Manages PEAT BLE mesh connectivity for the ATAK plugin.
+ * Manages Peat BLE mesh connectivity for the ATAK plugin.
  *
  * This provides BLE mesh transport to sync with WearTAK devices and other
- * PEAT-enabled platforms without requiring network infrastructure.
+ * Peat-enabled platforms without requiring network infrastructure.
  *
  * Features:
  * - Automatic peer discovery via BLE scanning
@@ -193,7 +193,7 @@ class PeatBleManager(
             val identity = DeviceIdentity.generate()
             val genesisId = genesis.getMeshId()
 
-            Log.i(TAG, "Starting PEAT BLE mesh: $meshId (genesis: $genesisId)")
+            Log.i(TAG, "Starting Peat BLE mesh: $meshId (genesis: $genesisId)")
 
             peatBtle = PeatBtle(
                 context = context,
@@ -207,7 +207,7 @@ class PeatBleManager(
 
             _isRunning = true
             isRunning.value = true
-            Log.i(TAG, "PEAT BLE mesh started - nodeId: ${peatBtle?.nodeId}, mesh: $meshId")
+            Log.i(TAG, "Peat BLE mesh started - nodeId: ${peatBtle?.nodeId}, mesh: $meshId")
             true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start BLE mesh: ${e.message}", e)
@@ -223,7 +223,7 @@ class PeatBleManager(
             return
         }
 
-        Log.i(TAG, "Stopping PEAT BLE mesh")
+        Log.i(TAG, "Stopping Peat BLE mesh")
 
         try {
             peatBtle?.stopMesh()
@@ -239,7 +239,7 @@ class PeatBleManager(
         _connectedPeerCount = 0
         connectedPeerCount.value = 0
 
-        Log.i(TAG, "PEAT BLE mesh stopped")
+        Log.i(TAG, "Peat BLE mesh stopped")
     }
 
     /**

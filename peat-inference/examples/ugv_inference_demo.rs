@@ -3,7 +3,7 @@
 //! Demonstrates the full M1 vignette scenario where:
 //! 1. UGV patrols an area while running YOLOv8 inference
 //! 2. When a person is detected, the UGV pursues the target
-//! 3. Track updates and UGV position are published to PEAT
+//! 3. Track updates and UGV position are published to Peat
 //!
 //! Run with: cargo run --example ugv_inference_demo
 //!
@@ -27,7 +27,7 @@ async fn main() -> anyhow::Result<()> {
     // Initialize logging
     tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
-    info!("=== PEAT UGV + Inference Integration Demo ===");
+    info!("=== Peat UGV + Inference Integration Demo ===");
     info!("Demonstrating M1 vignette: detection-triggered UGV pursuit\n");
 
     // =========================================================================
@@ -255,7 +255,7 @@ async fn main() -> anyhow::Result<()> {
     info!("  Battery: {:.1}%", ugv.battery_level() * 100.0);
 
     // Output sample track update JSON
-    info!("\n=== Sample UGV TrackUpdate (for PEAT) ===");
+    info!("\n=== Sample UGV TrackUpdate (for Peat) ===");
     let ugv_track = ugv.get_position_update();
     println!("{}", serde_json::to_string_pretty(&ugv_track)?);
 

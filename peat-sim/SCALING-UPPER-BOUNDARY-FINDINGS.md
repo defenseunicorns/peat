@@ -1,4 +1,4 @@
-# PEAT Scaling Upper Boundary Investigation
+# Peat Scaling Upper Boundary Investigation
 ## Single-Machine Containerlab Deployment Limits
 
 **Date**: 2025-11-18
@@ -300,16 +300,16 @@ docker network create -d macvlan \
 | 1,501 - 5,000 | **macvlan/ipvlan** | Better performance, no bridge limit, acceptable complexity |
 | 5,000+ | **Multi-Host** | Scales indefinitely, production-grade, worth the setup overhead |
 
-### Recommendation for PEAT Baseline Testing
+### Recommendation for Peat Baseline Testing
 
 **Current maximum (1,000 nodes)** is sufficient for:
 - Traditional baseline validation
-- PEAT protocol comparison testing
+- Peat protocol comparison testing
 - Performance benchmarking at scale
 - Demonstrating architectural advantages
 
 **When to consider exceeding 1,000 nodes**:
-- Testing PEAT's hierarchical scaling beyond traditional limits
+- Testing Peat's hierarchical scaling beyond traditional limits
 - Stress testing command dissemination across large formations
 - Validating aggregation performance at battalion+ scale (1,500+ nodes)
 - Production deployment planning
@@ -318,7 +318,7 @@ docker network create -d macvlan \
 Start with **multi-bridge architecture** to test 1,500-node traditional baseline. This provides:
 1. Apples-to-apples comparison with current 1,000-node tests
 2. Proof that traditional architecture struggles at scale
-3. Foundation for demonstrating PEAT's hierarchical advantages
+3. Foundation for demonstrating Peat's hierarchical advantages
 4. Minimal infrastructure changes (single machine)
 
 ---
@@ -407,9 +407,9 @@ Deployment time scales roughly linearly with node count when using appropriate `
 
 ---
 
-## Comparison: Traditional Baseline vs. PEAT
+## Comparison: Traditional Baseline vs. Peat
 
-This investigation focused on Traditional Baseline (client-server architecture) as the upper-bound stress test. PEAT's hierarchical architecture should achieve **better** scalability characteristics:
+This investigation focused on Traditional Baseline (client-server architecture) as the upper-bound stress test. Peat's hierarchical architecture should achieve **better** scalability characteristics:
 
 ### Traditional Baseline (Tested)
 - Architecture: Hub-spoke (all clients → single server)
@@ -417,13 +417,13 @@ This investigation focused on Traditional Baseline (client-server architecture) 
 - Bottleneck: Server must handle N concurrent connections
 - Scaling: Linear degradation with node count
 
-### PEAT Protocol (Expected)
+### Peat Protocol (Expected)
 - Architecture: Hierarchical aggregation (distributed load)
 - Network: Peer-to-peer with delta sync
 - Bottleneck: Bridge port limit (same as Traditional)
 - Scaling: Sub-linear degradation due to hierarchy
 
-**Implication**: If Traditional Baseline achieves 1000 nodes, PEAT should match or exceed this with better performance characteristics.
+**Implication**: If Traditional Baseline achieves 1000 nodes, Peat should match or exceed this with better performance characteristics.
 
 ---
 

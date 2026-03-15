@@ -40,7 +40,7 @@ pub mod storage;
 pub mod sync; // Data synchronization abstraction layer
 pub mod testing;
 pub mod traits;
-pub mod transport; // Backend-agnostic transport abstraction for mesh topology // PEAT-specific adapters for peat-mesh
+pub mod transport; // Backend-agnostic transport abstraction for mesh topology // Peat-specific adapters for peat-mesh
 
 pub use error::{Error, Result};
 

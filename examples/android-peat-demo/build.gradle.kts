@@ -1,4 +1,4 @@
-// Top-level build file for PEAT BLE Demo app
+// Top-level build file for Peat BLE Demo app
 plugins {
     id("com.android.application") version "8.2.0" apply false
     id("com.android.library") version "8.2.0" apply false

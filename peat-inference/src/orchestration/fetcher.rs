@@ -2,7 +2,7 @@
 //!
 //! This module provides functionality to download AI models from various sources:
 //! - Direct HTTP/HTTPS URLs
-//! - PEAT blob references (content-addressed storage via iroh-blobs)
+//! - Peat blob references (content-addressed storage via iroh-blobs)
 //!
 //! ## Features
 //!
@@ -199,7 +199,7 @@ impl ModelFetcher {
         })
     }
 
-    /// Fetch a model from a PEAT blob reference
+    /// Fetch a model from a Peat blob reference
     ///
     /// Blob references use content-addressed storage via iroh-blobs.
     /// Format: `peat://blobs/sha256:<hash>`

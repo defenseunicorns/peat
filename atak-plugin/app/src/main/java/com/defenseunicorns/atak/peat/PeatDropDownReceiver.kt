@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ * Copyright (c) 2026 Defense Unicorns.  All rights reserved.
  */
 
 package com.defenseunicorns.atak.peat
@@ -34,9 +34,9 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * PEAT DropDown Receiver
+ * Peat DropDown Receiver
  *
- * Manages the side panel UI for the PEAT plugin using traditional Android Views
+ * Manages the side panel UI for the Peat plugin using traditional Android Views
  * to avoid lifecycle conflicts with ATAK's bundled androidx libraries.
  *
  * Implements PeerEventListener to receive peer connect/disconnect events and
@@ -113,7 +113,7 @@ class PeatDropDownReceiver(
         val action = intent.action ?: return
 
         if (action == SHOW_PLUGIN) {
-            Log.d(TAG, "Showing PEAT plugin dropdown")
+            Log.d(TAG, "Showing Peat plugin dropdown")
 
             // Register BLE observer if not already done
             if (!bleObserverRegistered) {
@@ -356,7 +356,7 @@ class PeatDropDownReceiver(
             container.addView(createSpacer(24))
         }
 
-        // PEAT Markers section (only in main view)
+        // Peat Markers section (only in main view)
         if (selectedCellId == null) {
             val meshMarkers = mapComponent.markers.values.toList()
             val markersTitle = TextView(pluginContext).apply {

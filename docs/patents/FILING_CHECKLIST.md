@@ -47,7 +47,7 @@ For each inventor, collect:
 ☐ Citizenship
 ☐ Contact information (email, phone)
 
-For applicant organization ((r)evolve LLC):
+For applicant organization (Defense Unicorns LLC):
 
 ☐ Legal entity name
 ☐ Business address
@@ -461,7 +461,7 @@ For now: Document all improvements in engineering logs and ADRs. Decide at utili
 **A**: We've addressed this proactively in Provisional #2:
 - Disclosed relationship to COD project
 - Documented differentiation (novel features not in COD)
-- Confirmed independent development at (r)evolve LLC
+- Confirmed independent development at Defense Unicorns LLC
 - No government rights claimed
 
 **Key**: The features we claim (authority-weighted election, cognitive load, MOS matching) were NOT in COD. This is documented in the application.

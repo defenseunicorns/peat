@@ -22,7 +22,7 @@ pub enum EchelonLevel {
 
 /// Aggregation policy for TAK publishing
 ///
-/// Controls how PEAT messages are filtered and aggregated before
+/// Controls how Peat messages are filtered and aggregated before
 /// being sent to TAK, optimizing bandwidth usage.
 #[derive(Debug, Clone, Default)]
 pub enum AggregationPolicy {
@@ -139,7 +139,7 @@ pub struct BridgeConfig {
     /// Flush interval for aggregated messages
     pub flush_interval: Duration,
 
-    /// Include PEAT extension in outgoing CoT
+    /// Include Peat extension in outgoing CoT
     pub include_peat_extension: bool,
 }
 

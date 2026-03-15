@@ -3,7 +3,7 @@
 //! This module provides conversion between peat-inference's AI-specific message types
 //! and peat-schema's generic proto-generated types. This enables:
 //!
-//! - Interoperability with other PEAT components using proto schemas
+//! - Interoperability with other Peat components using proto schemas
 //! - Schema validation against Core team's canonical definitions
 //! - Multi-language compatibility through protobuf serialization
 //!

@@ -12,7 +12,7 @@
 
 ### 🤔 Proposed Lab 3b (Optional)
 
-**Goal**: P2P Mesh with PEAT CRDT (flat - no hierarchy)
+**Goal**: P2P Mesh with Peat CRDT (flat - no hierarchy)
 
 **Why**: Isolate CRDT overhead vs hierarchical benefits
 - Lab 3 vs Lab 3b → Shows CRDT overhead
@@ -26,7 +26,7 @@
 
 | Lab | Architecture | Status | Priority |
 |-----|--------------|--------|----------|
-| Lab 4 | PEAT Hierarchical CRDT | Pending | **HIGH** - Main validation goal |
+| Lab 4 | Peat Hierarchical CRDT | Pending | **HIGH** - Main validation goal |
 
 ---
 
@@ -109,7 +109,7 @@
 **Option A (Skip Lab 3b)** is recommended because:
 
 1. **Lab 4 is the primary validation goal**
-   - Proving PEAT scales to 1000+ nodes
+   - Proving Peat scales to 1000+ nodes
    - This is what justifies the architecture
 
 2. **Strong baseline already exists**
@@ -158,4 +158,4 @@
 | **Option B2** | Lab 3b (new binary) + Lab 4 | 3-4 days |
 | **Option B3** | Lab 3b (minimal) + Lab 4 | 2 days |
 
-**Epic #132 goal**: Empirical validation that PEAT scales where other architectures fail ← **Lab 4 achieves this**
+**Epic #132 goal**: Empirical validation that Peat scales where other architectures fail ← **Lab 4 achieves this**

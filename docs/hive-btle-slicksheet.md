@@ -1,4 +1,4 @@
-# PEAT-BTLE
+# Peat-BTLE
 
 **Tactical BLE Mesh Networking for Disconnected Operations**
 
@@ -6,7 +6,7 @@
 
 ## What It Is
 
-PEAT-BTLE is a Bluetooth Low Energy mesh networking library that enables secure, resilient communication between devices when traditional infrastructure is unavailable. Built for tactical and field operations where connectivity cannot be guaranteed.
+Peat-BTLE is a Bluetooth Low Energy mesh networking library that enables secure, resilient communication between devices when traditional infrastructure is unavailable. Built for tactical and field operations where connectivity cannot be guaranteed.
 
 ---
 
@@ -124,8 +124,8 @@ Apache 2.0 License
 
 **Repository:** [Radicle](https://app.radicle.xyz/nodes/rosa.radicle.xyz/rad:z458mp9Um3AYNQQFMdHaNEUtmiohq)
 
-**Contact:** Revolve Team LLC
+**Contact:** Defense Unicorns
 
 ---
 
-*PEAT-BTLE: Mesh when it matters.*
+*Peat-BTLE: Mesh when it matters.*

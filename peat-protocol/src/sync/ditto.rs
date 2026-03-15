@@ -1,7 +1,7 @@
 //! Ditto backend implementation
 //!
 //! Wraps the Ditto SDK to implement the `DataSyncBackend` traits,
-//! providing a bridge between PEAT Protocol's abstraction layer
+//! providing a bridge between Peat Protocol's abstraction layer
 //! and Ditto's proprietary CRDT sync engine.
 
 use crate::storage::ditto_store::{DittoConfig, DittoStore};

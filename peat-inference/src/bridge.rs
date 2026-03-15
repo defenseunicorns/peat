@@ -1,6 +1,6 @@
-//! Bridge module - PEAT-TAK Bridge for CoT translation
+//! Bridge module - Peat-TAK Bridge for CoT translation
 //!
-//! Translates between PEAT messages and Cursor on Target (CoT) XML.
+//! Translates between Peat messages and Cursor on Target (CoT) XML.
 
 use serde::{Deserialize, Serialize};
 
@@ -17,13 +17,13 @@ pub struct CotMessage {
     pub lon: f64,
 }
 
-/// Bridge for PEAT-TAK translation
+/// Bridge for Peat-TAK translation
 pub struct PeatTakBridge {
     // TODO: Add TAK server connection details
 }
 
 impl PeatTakBridge {
-    /// Create a new PEAT-TAK bridge
+    /// Create a new Peat-TAK bridge
     pub fn new() -> Self {
         Self {}
     }

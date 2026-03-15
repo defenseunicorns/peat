@@ -1,4 +1,4 @@
-# PEAT Whitepaper Content Development Plan
+# Peat Whitepaper Content Development Plan
 
 ## Current Status
 
@@ -46,7 +46,7 @@
 
 ### Phase 2: Strategic Framing (Priority: High)
 
-**Goal:** Position PEAT in the broader context
+**Goal:** Position Peat in the broader context
 
 4. **Section V: Open Architecture Imperative** (~400 words)
    - Source: IP_OVERVIEW.md, PATENT_STRATEGY.md
@@ -54,7 +54,7 @@
    - Coalition requirements
 
 5. **Section II: Standards Paradox** (~400 words)
-   - Source: PEAT_Standards_Landscape_Analysis.md
+   - Source: Peat_Standards_Landscape_Analysis.md
    - Gap analysis visualization
    - Standards stack diagram
 
@@ -95,7 +95,7 @@
 - `docs/adr/011-ditto-vs-automerge-iroh.md` - Backend abstraction
 - `docs/adr/014-distributed-coordination-primitives.md` - Core mechanisms
 - `docs/adr/015-experimental-validation-hierarchical-aggregation.md` - Validation
-- `docs/standards/PEAT_Standards_Landscape_Analysis.md` - Standards context
+- `docs/standards/Peat_Standards_Landscape_Analysis.md` - Standards context
 - `docs/PATENT_STRATEGY.md` - IP positioning
 
 ### External Research Needed

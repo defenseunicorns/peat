@@ -7,7 +7,7 @@
 
 ## Context
 
-PEAT Protocol currently has a hard dependency on Ditto SDK for CRDT synchronization, peer discovery, and data persistence. While Ditto provides excellent P2P mesh capabilities, we've encountered several limitations:
+Peat Protocol currently has a hard dependency on Ditto SDK for CRDT synchronization, peer discovery, and data persistence. While Ditto provides excellent P2P mesh capabilities, we've encountered several limitations:
 
 ### Issues with Current Ditto Integration
 
@@ -33,7 +33,7 @@ The new `crdt-edge` implementation plan (see `CAP_Rust_Implementation_Plan.md`) 
 
 ## Decision
 
-We will define a **Data Synchronization Abstraction Layer** consisting of four core traits that completely isolate PEAT Protocol business logic from the underlying sync engine:
+We will define a **Data Synchronization Abstraction Layer** consisting of four core traits that completely isolate Peat Protocol business logic from the underlying sync engine:
 
 ### Core Abstraction Traits
 

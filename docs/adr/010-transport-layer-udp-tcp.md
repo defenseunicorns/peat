@@ -1,4 +1,4 @@
-# ADR-010: Transport Layer - UDP vs TCP for PEAT Protocol
+# ADR-010: Transport Layer - UDP vs TCP for Peat Protocol
 
 **Status**: Superseded by ADR-011 (Automerge + Iroh Integration)
 **Date**: 2025-11-05
@@ -32,7 +32,7 @@ ADR-011 adopts **Iroh** for networking, which provides:
 
 ## Context and Problem Statement (Original)
 
-The PEAT protocol currently assumes TCP as the primary transport layer (via Tokio TcpStream). However, different types of data in the CAP ecosystem have fundamentally different delivery requirements:
+The Peat protocol currently assumes TCP as the primary transport layer (via Tokio TcpStream). However, different types of data in the CAP ecosystem have fundamentally different delivery requirements:
 
 ### The Transport Mismatch Problem
 
@@ -152,7 +152,7 @@ System automatically chooses transport based on message characteristics.
 
 **Adopt Option 3: Hybrid Transport with Per-Message Selection**
 
-Extend PEAT protocol to support both UDP and TCP transports, with explicit application control over which transport is used for each message type.
+Extend Peat protocol to support both UDP and TCP transports, with explicit application control over which transport is used for each message type.
 
 ## Design Details
 
@@ -846,7 +846,7 @@ For position updates where loss is acceptable, UDP provides 2.5-8x latency reduc
 
 ## References
 
-1. ADR-001: PEAT Protocol POC Architecture
+1. ADR-001: Peat Protocol POC Architecture
 2. ADR-007: Automerge-Based Sync Engine
 3. ADR-009: Bidirectional Hierarchical Flows
 4. RFC 768: User Datagram Protocol

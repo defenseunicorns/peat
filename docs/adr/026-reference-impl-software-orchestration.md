@@ -8,11 +8,11 @@
 
 ## Document Classification
 
-> **⚠️ This is a REFERENCE IMPLEMENTATION guide, not a PEAT Protocol specification.**
+> **⚠️ This is a REFERENCE IMPLEMENTATION guide, not a Peat Protocol specification.**
 >
-> This ADR demonstrates how to build a software orchestration system on top of PEAT Protocol primitives. The patterns, traits, and implementations shown here are examples that users MAY adopt, adapt, or replace entirely.
+> This ADR demonstrates how to build a software orchestration system on top of Peat Protocol primitives. The patterns, traits, and implementations shown here are examples that users MAY adopt, adapt, or replace entirely.
 >
-> **PEAT Protocol primitives used:**
+> **Peat Protocol primitives used:**
 > - `BlobStore` / `BlobRef` (ADR-025)
 > - `CapabilityAdvertisement` (ADR-012)
 > - `PeatEvent` with `AggregationPolicy` (ADR-012)
@@ -26,11 +26,11 @@
 
 ## Context
 
-### Building on PEAT Primitives
+### Building on Peat Primitives
 
-PEAT Protocol provides foundational primitives for distributed coordination:
+Peat Protocol provides foundational primitives for distributed coordination:
 
-| PEAT Primitive | What It Does | ADR |
+| Peat Primitive | What It Does | ADR |
 |----------------|--------------|-----|
 | BlobRef / BlobStore | Content-addressed binary transfer | ADR-025 |
 | CapabilityAdvertisement | Nodes advertise what they can do | ADR-012 |
@@ -38,13 +38,13 @@ PEAT Protocol provides foundational primitives for distributed coordination:
 | DeploymentDirective | Commands flow through hierarchy | ADR-012 |
 | AggregationPolicy | Control event propagation | ADR-012 |
 
-**These primitives are runtime-agnostic** - PEAT doesn't know or care if you're deploying ONNX models, Docker containers, or configuration files.
+**These primitives are runtime-agnostic** - Peat doesn't know or care if you're deploying ONNX models, Docker containers, or configuration files.
 
 This reference implementation shows **one way** to build a software orchestration system that:
 - Deploys multiple artifact types (models, containers, binaries)
-- Reports health and status through PEAT events
-- Produces outputs that flow through PEAT's event routing
-- Uses PEAT's blob transfer for artifact distribution
+- Reports health and status through Peat events
+- Produces outputs that flow through Peat's event routing
+- Uses Peat's blob transfer for artifact distribution
 
 ### Why a Reference Implementation?
 
@@ -54,7 +54,7 @@ Different organizations will have different needs:
 - Military users may have specific runtime requirements (MOSA, certifications)
 
 By providing a reference implementation rather than mandating an approach, we:
-1. **Demonstrate** how to use PEAT primitives effectively
+1. **Demonstrate** how to use Peat primitives effectively
 2. **Provide** working code that can be adopted or adapted
 3. **Avoid** constraining users to our specific choices
 4. **Enable** innovation in the application layer
@@ -87,11 +87,11 @@ By providing a reference implementation rather than mandating an approach, we:
 └──────────────────────────┬──────────────────────────────────────┘
                            │ uses
 ═══════════════════════════╪═══════════════════════════════════════
-         PEAT PROTOCOL BOUNDARY
+         Peat PROTOCOL BOUNDARY
 ═══════════════════════════╪═══════════════════════════════════════
                            │
 ┌──────────────────────────┴──────────────────────────────────────┐
-│  PEAT PROTOCOL LAYER                                             │
+│  Peat PROTOCOL LAYER                                             │
 │  BlobStore, CapabilityAdvertisement, PeatEvent, DeploymentDir.  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -101,7 +101,7 @@ By providing a reference implementation rather than mandating an approach, we:
 **Artifact**: A deployable unit (blob) with type information
 ```rust
 struct Artifact {
-    blob_ref: BlobRef,           // PEAT primitive (ADR-025)
+    blob_ref: BlobRef,           // Peat primitive (ADR-025)
     artifact_type: ArtifactType, // Application-defined
     config: serde_json::Value,   // Runtime-specific config
 }
@@ -120,8 +120,8 @@ trait RuntimeAdapter {
 **OrchestrationService**: Coordinates deployment lifecycle
 ```rust
 struct OrchestrationService {
-    blob_store: Arc<dyn BlobStore>,        // PEAT primitive
-    peat_events: Arc<dyn PeatEventPublisher>, // PEAT primitive  
+    blob_store: Arc<dyn BlobStore>,        // Peat primitive
+    peat_events: Arc<dyn PeatEventPublisher>, // Peat primitive  
     adapters: Vec<Arc<dyn RuntimeAdapter>>, // Application-defined
 }
 ```
@@ -243,7 +243,7 @@ pub struct ProductOutput {
     pub routing: RoutingHint,
 }
 
-/// Hint for how this product should be routed through PEAT
+/// Hint for how this product should be routed through Peat
 #[derive(Clone, Debug, Default)]
 pub struct RoutingHint {
     /// Map to PeatEvent.AggregationPolicy
@@ -326,7 +326,7 @@ pub trait RuntimeAdapter: Send + Sync {
     /// Subscribe to product outputs from this instance
     ///
     /// Products are runtime-specific outputs (detections, classifications, etc.)
-    /// The orchestration service will route these through PEAT events.
+    /// The orchestration service will route these through Peat events.
     async fn subscribe_products(
         &self,
         instance_id: &InstanceId,
@@ -735,7 +735,7 @@ impl RuntimeAdapter for ContainerAdapter {
 
 ### OrchestrationService
 
-Coordinates deployment using PEAT primitives:
+Coordinates deployment using Peat primitives:
 
 ```rust
 use crate::storage::{BlobStore, BlobRef};
@@ -744,16 +744,16 @@ use crate::protocol::{PeatEventPublisher, CapabilityPublisher};
 /// Orchestration service coordinating software lifecycle
 ///
 /// This is the main entry point for deploying and managing software.
-/// It uses PEAT primitives (BlobStore, Events) and delegates runtime
+/// It uses Peat primitives (BlobStore, Events) and delegates runtime
 /// specifics to RuntimeAdapter implementations.
 pub struct OrchestrationService {
-    /// PEAT blob store for artifact retrieval
+    /// Peat blob store for artifact retrieval
     blob_store: Arc<dyn BlobStore>,
     
-    /// PEAT event publisher for products/anomalies
+    /// Peat event publisher for products/anomalies
     event_publisher: Arc<dyn PeatEventPublisher>,
     
-    /// PEAT capability publisher for status
+    /// Peat capability publisher for status
     capability_publisher: Arc<dyn CapabilityPublisher>,
     
     /// Available runtime adapters
@@ -794,11 +794,11 @@ impl OrchestrationService {
     
     /// Deploy an artifact locally
     ///
-    /// 1. Fetches blob via BlobStore (PEAT primitive)
+    /// 1. Fetches blob via BlobStore (Peat primitive)
     /// 2. Selects appropriate RuntimeAdapter
     /// 3. Activates via adapter
     /// 4. Subscribes to products/anomalies
-    /// 5. Publishes capability advertisement (PEAT primitive)
+    /// 5. Publishes capability advertisement (Peat primitive)
     pub async fn deploy(
         &self,
         blob_ref: BlobRef,
@@ -806,7 +806,7 @@ impl OrchestrationService {
         config: serde_json::Value,
         capabilities: Vec<String>,
     ) -> Result<InstanceId> {
-        // Step 1: Fetch blob (PEAT primitive)
+        // Step 1: Fetch blob (Peat primitive)
         let local_blob = self.blob_store.fetch(&blob_ref, |progress| {
             // Could emit progress events here
             tracing::debug!(?progress, "Blob fetch progress");
@@ -830,7 +830,7 @@ impl OrchestrationService {
         // Step 4: Subscribe to outputs
         self.start_monitoring(&instance_id, &adapter).await?;
         
-        // Step 5: Publish capability (PEAT primitive)
+        // Step 5: Publish capability (Peat primitive)
         self.publish_capability(&instance_id, &capabilities, InstanceState::Running).await?;
         
         // Record instance
@@ -883,7 +883,7 @@ impl OrchestrationService {
         instance_id: &InstanceId,
         adapter: &Arc<dyn RuntimeAdapter>,
     ) -> Result<()> {
-        // Subscribe to products and route through PEAT events
+        // Subscribe to products and route through Peat events
         let mut products = adapter.subscribe_products(instance_id).await?;
         let event_pub = self.event_publisher.clone();
         let iid = instance_id.clone();
@@ -958,7 +958,7 @@ impl OrchestrationService {
         capabilities: &[String],
         state: InstanceState,
     ) -> Result<()> {
-        // Build PEAT CapabilityAdvertisement
+        // Build Peat CapabilityAdvertisement
         let advertisement = CapabilityAdvertisement {
             capabilities: capabilities.iter().map(|c| Capability {
                 capability_type: "software".into(),
@@ -1038,17 +1038,17 @@ pub struct Waypoint {
 }
 ```
 
-## Integration with PEAT Protocol
+## Integration with Peat Protocol
 
-### Using PEAT Primitives
+### Using Peat Primitives
 
 ```rust
-// Example: Full deployment flow using PEAT primitives
+// Example: Full deployment flow using Peat primitives
 
 async fn deploy_model(
     orchestration: &OrchestrationService,
-    peat_storage: &dyn StorageBackend,  // PEAT document storage
-    blob_store: &dyn BlobStore,          // PEAT blob storage (ADR-025)
+    peat_storage: &dyn StorageBackend,  // Peat document storage
+    blob_store: &dyn BlobStore,          // Peat blob storage (ADR-025)
 ) -> Result<()> {
     // 1. Model blob already stored (maybe by C2 node)
     let model_ref = BlobRef {
@@ -1068,7 +1068,7 @@ async fn deploy_model(
         vec!["target_recognition".into()],
     ).await?;
     
-    // 3. Capability is automatically advertised via PEAT
+    // 3. Capability is automatically advertised via Peat
     // 4. Products/anomalies automatically flow via PeatEvent
     
     Ok(())
@@ -1078,10 +1078,10 @@ async fn deploy_model(
 ### Receiving Deployment Commands
 
 ```rust
-// Example: Handling DeploymentDirective from PEAT
+// Example: Handling DeploymentDirective from Peat
 
 async fn handle_deployment_directive(
-    directive: DeploymentDirective,  // PEAT protocol message
+    directive: DeploymentDirective,  // Peat protocol message
     orchestration: &OrchestrationService,
 ) -> Result<()> {
     // Extract application-specific config from directive
@@ -1095,7 +1095,7 @@ async fn handle_deployment_directive(
     
     // Deploy using orchestration service
     orchestration.deploy(
-        directive.artifact,  // BlobRef from PEAT
+        directive.artifact,  // BlobRef from Peat
         artifact_type,
         directive.config,
         capabilities,
@@ -1139,7 +1139,7 @@ These are valid extensions you may need - this reference focuses on the core lif
 
 ## References
 
-### PEAT Protocol ADRs
+### Peat Protocol ADRs
 - ADR-012: Schema Definition (CapabilityAdvertisement, PeatEvent)
 - ADR-025: Blob Transfer Protocol (BlobStore, BlobRef)
 
@@ -1154,4 +1154,4 @@ These are valid extensions you may need - this reference focuses on the core lif
 
 ---
 
-**This reference implementation demonstrates how to build software orchestration on PEAT Protocol primitives. Adopt, adapt, or replace as needed for your use case.**
+**This reference implementation demonstrates how to build software orchestration on Peat Protocol primitives. Adopt, adapt, or replace as needed for your use case.**

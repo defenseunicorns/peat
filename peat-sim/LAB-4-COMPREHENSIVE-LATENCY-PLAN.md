@@ -223,7 +223,7 @@
 **Rationale**:
 - Platoon→Company we already have
 - Soldier→Squad is the critical first hop
-- Peer-to-peer shows PEAT vs flat mesh difference
+- Peer-to-peer shows Peat vs flat mesh difference
 
 ### Option 3: Use Existing Metrics + Inference (Fastest)
 

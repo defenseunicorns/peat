@@ -24,7 +24,7 @@ exclude = ["examples/m5stack-core2-peat"]
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-authors = ["Kit Plummer <kit@revolveteam.com>"]
+authors = ["Kit Plummer <kitplummer@defenseunicorns.com>"]
 license = "Apache-2.0"
 repository = "https://github.com/defenseunicorns/peat"
 

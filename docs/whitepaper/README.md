@@ -1,6 +1,6 @@
-# PEAT Whitepaper Build System
+# Peat Whitepaper Build System
 
-This directory contains the source files and build system for the PEAT Protocol whitepaper.
+This directory contains the source files and build system for the Peat Protocol whitepaper.
 
 ## Structure
 
@@ -25,8 +25,8 @@ whitepaper/
 │   ├── latex.template     # PDF/LaTeX template
 │   └── style.css          # HTML styles
 └── build/                 # Generated output (gitignored)
-    ├── PEAT_Whitepaper.html
-    └── PEAT_Whitepaper.pdf
+    ├── Peat_Whitepaper.html
+    └── Peat_Whitepaper.pdf
 ```
 
 ## Prerequisites
@@ -76,9 +76,9 @@ make wordcount
 ## Output
 
 Generated files are placed in `build/`:
-- `PEAT_Whitepaper.html` - Self-contained HTML with embedded styles
-- `PEAT_Whitepaper.pdf` - Professional PDF document
-- `PEAT_Whitepaper.docx` - Word document (if built)
+- `Peat_Whitepaper.html` - Self-contained HTML with embedded styles
+- `Peat_Whitepaper.pdf` - Professional PDF document
+- `Peat_Whitepaper.docx` - Word document (if built)
 
 ## Writing Content
 

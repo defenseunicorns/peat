@@ -1,7 +1,7 @@
-//! Model distribution and management for PEAT
+//! Model distribution and management for Peat
 //!
 //! This module re-exports types from `peat_protocol::distribution` for AI model
-//! distribution across the PEAT network.
+//! distribution across the Peat network.
 //!
 //! ## Usage
 //!
@@ -19,7 +19,7 @@
 //! .with_blob_hash("bafkreihdwdcef...")
 //! .with_size_bytes(2_000_000_000);
 //!
-//! // Broadcast manifest to PEAT network
+//! // Broadcast manifest to Peat network
 //! peat.broadcast_model_manifest(&manifest).await?;
 //! ```
 

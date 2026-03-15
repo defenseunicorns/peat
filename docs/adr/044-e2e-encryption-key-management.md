@@ -7,7 +7,7 @@
 
 ## Context
 
-PEAT Protocol has a solid security foundation (ADR-006) with:
+Peat Protocol has a solid security foundation (ADR-006) with:
 - Device identity (Ed25519 keypairs)
 - Peer-to-peer encryption (X25519 + ChaCha20-Poly1305)
 - Formation keys (pre-shared secret authentication)
@@ -27,7 +27,7 @@ The current `GroupKey` implementation can generate and rotate keys, but has no p
 Kerkour's research notes highlight a critical insight:
 > "Removing server-side validation creates vulnerability where malicious clients could introduce invalid mutations, compromising data structure integrity."
 
-In PEAT's mesh topology:
+In Peat's mesh topology:
 - Any node can propose CRDT mutations
 - Compromised nodes could inject malformed documents
 - Replay attacks could revert document state
@@ -70,7 +70,7 @@ We will integrate the Messaging Layer Security protocol for cell-level key manag
 | X.509 Support | Limited | Full |
 | Audit Status | Partial | None |
 
-OpenMLS aligns with PEAT's existing crypto (ChaCha20-Poly1305, Ed25519) and has more real-world deployment experience.
+OpenMLS aligns with Peat's existing crypto (ChaCha20-Poly1305, Ed25519) and has more real-world deployment experience.
 
 ### Architecture
 
@@ -426,7 +426,7 @@ pub enum BypassAuthMode {
 | **Simplicity** | Just a keypair | Certificate chains, CAs, validity periods |
 | **Key size** | 32 bytes public | ~1-2KB per cert |
 | **Revocation** | Manual tracking | CRL/OCSP infrastructure |
-| **Interop** | PEAT-specific | DoD PKI, NATO systems |
+| **Interop** | Peat-specific | DoD PKI, NATO systems |
 | **Metadata** | None built-in | Org unit, clearance, role in cert |
 | **Offline validation** | Always works | Needs cached CRLs |
 
@@ -444,7 +444,7 @@ pub enum PeatCredential {
 
 ## Hardware Root of Trust
 
-For tactical deployment, software-only keys are insufficient. Captured devices could have keys extracted. PEAT should support hardware-backed identity where available.
+For tactical deployment, software-only keys are insufficient. Captured devices could have keys extracted. Peat should support hardware-backed identity where available.
 
 ### Physical Unclonable Functions (PUFs)
 
@@ -571,7 +571,7 @@ pub enum AttestationProof {
 
 ### Hardware Support Matrix
 
-| Platform | PUF | TPM | Secure Enclave | PEAT Target |
+| Platform | PUF | TPM | Secure Enclave | Peat Target |
 |----------|-----|-----|----------------|-------------|
 | NXP i.MX RT | ✅ SRAM PUF | ❌ | ✅ TrustZone | UAVs, edge |
 | Microchip ATECC608 | ✅ Built-in | ❌ | ✅ Secure element | Small UAS, sensors |

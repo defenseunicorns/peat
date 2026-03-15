@@ -1,14 +1,14 @@
 # Network Simulator Evaluation
 
 **Date**: November 2024
-**Purpose**: Evaluate network simulation alternatives for PEAT Protocol validation
+**Purpose**: Evaluate network simulation alternatives for Peat Protocol validation
 **Context**: Shadow network simulator proved incompatible with Ditto SDK
 
 ---
 
 ## Requirements
 
-For PEAT Protocol E8 network simulation, we need:
+For Peat Protocol E8 network simulation, we need:
 
 1. **Run Real Ditto Binaries**: Must execute unmodified Ditto SDK (Rust application with complex networking)
 2. **Network Constraints**: Bandwidth limiting, latency injection, packet loss, jitter

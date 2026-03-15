@@ -1,4 +1,4 @@
-# PEAT Protocol Interface Control Document (ICD)
+# Peat Protocol Interface Control Document (ICD)
 
 **Document Number**: CAP-ICD-001
 **Version**: 0.0.1
@@ -38,7 +38,7 @@
 
 This Interface Control Document (ICD) defines the message schemas, data formats, and protocol interfaces for the **Capability Aggregation Protocol (CAP)**. It establishes the contractual interface between:
 
-- PEAT Protocol implementations (Rust, Python, Java, C++)
+- Peat Protocol implementations (Rust, Python, Java, C++)
 - External systems integrating with CAP (ROS2, gRPC, C2 systems)
 - Storage backends (Ditto, Automerge, custom implementations)
 - Transport layers (HTTP, gRPC, WebSocket, MQTT, ROS2 DDS)
@@ -65,7 +65,7 @@ This ICD does **not** cover:
 |-------------|-------|---------|------|
 | ADR-012 | Schema Definition and Protocol Extensibility | 1.0 | 2025-11-06 |
 | ADR-011 | CRDT + Networking Stack Selection | 1.0 | 2025-11-06 |
-| SCHEMAS.md | PEAT Protocol Schema Reference | 1.0 | 2025-11-06 |
+| SCHEMAS.md | Peat Protocol Schema Reference | 1.0 | 2025-11-06 |
 | README.md | peat-schema Documentation | 1.0 | 2025-11-06 |
 
 ### 1.4 Points of Contact
@@ -80,7 +80,7 @@ This ICD does **not** cover:
 
 ## 2. System Overview
 
-### 2.1 PEAT Protocol Architecture
+### 2.1 Peat Protocol Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -107,7 +107,7 @@ This ICD does **not** cover:
                       │ Implemented by:
                       ↓
 ┌─────────────────────────────────────────────────────────────┐
-│              PEAT Protocol Implementations                    │
+│              Peat Protocol Implementations                    │
 │    (peat-protocol, peat-transport, peat-persistence)           │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -301,7 +301,7 @@ impl From<cap::node::v1::NodeConfig> for cap::node::v2::NodeConfig {
 
 ## 5. CRDT Semantics
 
-PEAT Protocol uses **Conflict-free Replicated Data Types (CRDTs)** for distributed consistency.
+Peat Protocol uses **Conflict-free Replicated Data Types (CRDTs)** for distributed consistency.
 
 ### 5.1 CRDT Operations by Schema
 
@@ -579,7 +579,7 @@ This ICD and all associated schema files are released under:
 
 **License**: Apache 2.0 (or as determined by governing foundation)
 
-**Copyright**: © 2025 PEAT Protocol Contributors
+**Copyright**: © 2025 Peat Protocol Contributors
 
 ---
 

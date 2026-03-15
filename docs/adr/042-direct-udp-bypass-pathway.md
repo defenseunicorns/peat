@@ -15,7 +15,7 @@
 
 ### Problem Statement
 
-PEAT Protocol uses CRDT-based synchronization (Automerge over Iroh/QUIC) for data consistency across mesh networks. This approach provides:
+Peat Protocol uses CRDT-based synchronization (Automerge over Iroh/QUIC) for data consistency across mesh networks. This approach provides:
 - Conflict-free eventual consistency
 - Automatic merge of concurrent updates
 - Reliable, ordered delivery via QUIC
@@ -378,7 +378,7 @@ Bypass messages use a compact header for identification and TTL:
 /// Bypass message header (12 bytes)
 #[repr(C, packed)]
 struct BypassHeader {
-    /// Magic number (0xPEAT)
+    /// Magic number (0xPeat)
     magic: [u8; 4],
 
     /// Message type/collection hash (4 bytes)
@@ -395,7 +395,7 @@ struct BypassHeader {
 }
 
 impl BypassHeader {
-    const MAGIC: [u8; 4] = [0x48, 0x49, 0x56, 0x45]; // "PEAT"
+    const MAGIC: [u8; 4] = [0x48, 0x49, 0x56, 0x45]; // "Peat"
 
     fn is_valid(&self) -> bool {
         self.magic == Self::MAGIC

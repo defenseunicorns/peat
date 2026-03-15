@@ -1,6 +1,6 @@
 # Storage and Persistence Layer Due Diligence
 
-**Purpose**: Evaluate embedded database options for PEAT Protocol's Automerge + Iroh storage layer
+**Purpose**: Evaluate embedded database options for Peat Protocol's Automerge + Iroh storage layer
 **Context**: ADR-011 E11.2 - Production storage implementation
 **Date**: 2025-11-12
 **Status**: Research Phase
@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-PEAT Protocol needs a production-grade embedded storage layer to persist Automerge CRDT documents on tactical edge devices. This document evaluates options for replacing Ditto's proprietary storage with an open-source alternative.
+Peat Protocol needs a production-grade embedded storage layer to persist Automerge CRDT documents on tactical edge devices. This document evaluates options for replacing Ditto's proprietary storage with an open-source alternative.
 
 **Key Requirements**:
 - Embedded (no separate server process)

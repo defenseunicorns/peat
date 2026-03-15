@@ -1,4 +1,4 @@
-//! PEAT-specific packet aggregation for hierarchical telemetry summarization
+//! Peat-specific packet aggregation for hierarchical telemetry summarization
 //!
 //! This module provides the `PacketAggregator` which bridges the gap between:
 //! - **peat-mesh routing**: DataPacket flowing through hierarchy (packets in flight)
@@ -47,7 +47,7 @@ impl TelemetryPayload {
     }
 }
 
-/// PEAT-specific packet aggregator for hierarchical telemetry summarization
+/// Peat-specific packet aggregator for hierarchical telemetry summarization
 ///
 /// Bridges peat-mesh routing layer with peat-protocol aggregation logic.
 pub struct PacketAggregator;

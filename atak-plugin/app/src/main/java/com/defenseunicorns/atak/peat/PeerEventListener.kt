@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ * Copyright (c) 2026 Defense Unicorns.  All rights reserved.
  */
 
 package com.defenseunicorns.atak.peat
@@ -8,7 +8,7 @@ package com.defenseunicorns.atak.peat
  * Listener interface for peer connection events.
  *
  * Implement this interface to receive notifications when peers
- * connect or disconnect from the PEAT network.
+ * connect or disconnect from the Peat network.
  */
 interface PeerEventListener {
     /**

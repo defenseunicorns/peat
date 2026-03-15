@@ -1,6 +1,6 @@
-# PEAT Protocol - M5Stack Core2 Demo
+# Peat Protocol - M5Stack Core2 Demo
 
-Demonstration of PEAT-Lite mesh networking on ESP32 using BLE.
+Demonstration of Peat-Lite mesh networking on ESP32 using BLE.
 
 ## Hardware
 
@@ -57,22 +57,22 @@ espflash flash --monitor target/xtensa-esp32-espidf/release/m5stack-core2-peat
 
 ## What It Does
 
-1. **Advertises** as a PEAT node via BLE beacons
-2. **Exposes** GATT service with PEAT characteristics
+1. **Advertises** as a Peat node via BLE beacons
+2. **Exposes** GATT service with Peat characteristics
 3. **Reads** sensor data (buttons, accelerometer, battery)
 4. **Syncs** CRDT state with connected nodes
 
-## PEAT Beacon Format
+## Peat Beacon Format
 
 The node advertises with:
-- Service UUID: `0xF47A` (16-bit alias for PEAT)
+- Service UUID: `0xF47A` (16-bit alias for Peat)
 - Compact beacon: Node ID, hierarchy level, battery, connection capacity
 
 ## Testing with Android
 
 1. Flash two M5Stack Core2 units with unique node IDs
-2. Install PEAT ATAK plugin on Android tablet
-3. Scan for PEAT nodes
+2. Install Peat ATAK plugin on Android tablet
+3. Scan for Peat nodes
 4. Connect and observe sync
 
 ## Configuration

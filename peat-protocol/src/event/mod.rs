@@ -5,7 +5,7 @@
 //!
 //! ## Overview
 //!
-//! Events flow upward through the PEAT hierarchy (platform → squad → platoon → company).
+//! Events flow upward through the Peat hierarchy (platform → squad → platoon → company).
 //! Each echelon applies aggregation policies to reduce bandwidth while preserving
 //! critical information.
 //!

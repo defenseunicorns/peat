@@ -1,7 +1,7 @@
 //! Message types for M1 vignette
 //!
 //! Defines the core data structures for the M1 object tracking vignette.
-//! These messages flow through the PEAT network hierarchy.
+//! These messages flow through the Peat network hierarchy.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -502,7 +502,7 @@ pub enum TrackStatus {
 ///
 /// A chipout is extracted from a video frame when specific detection triggers
 /// occur (new track, reacquisition, high confidence, etc.). Chipouts are
-/// published to PEAT for consumption by ATAK and TAK Server.
+/// published to Peat for consumption by ATAK and TAK Server.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ChipoutDocument {
     /// Unique chipout identifier (format: "CHIP-{track_id}-{timestamp}")

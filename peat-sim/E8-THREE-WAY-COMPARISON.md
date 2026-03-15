@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document outlines the strategy for measuring PEAT Protocol's performance impact and benefits through a comprehensive three-way comparison across bandwidth-constrained networks.
+This document outlines the strategy for measuring Peat Protocol's performance impact and benefits through a comprehensive three-way comparison across bandwidth-constrained networks.
 
 ## Test Configurations
 
@@ -10,7 +10,7 @@ This document outlines the strategy for measuring PEAT Protocol's performance im
 **Binary:** `ditto_baseline` (renamed from `shadow_poc`)
 **Configuration:** `USE_BASELINE=true`
 **Behavior:**
-- Pure Ditto SDK without PEAT Protocol layer
+- Pure Ditto SDK without Peat Protocol layer
 - Full n-squared replication (all nodes sync all data)
 - No authorization checks
 - No capability metadata overhead
@@ -21,18 +21,18 @@ This document outlines the strategy for measuring PEAT Protocol's performance im
 **Binary:** `cap_sim_node`
 **Configuration:** `CAP_FILTER_ENABLED=false` (default)
 **Behavior:**
-- PEAT Protocol layer on top of Ditto
+- Peat Protocol layer on top of Ditto
 - Uses `Query::All` - subscribes to all documents
 - Full n-squared replication (same data volume as baseline)
 - Authorization checks performed but all data synced
 
-**Purpose:** Measures pure PEAT Protocol overhead without differential update benefits
+**Purpose:** Measures pure Peat Protocol overhead without differential update benefits
 
 ### 3. CAP Differential Updates (CAP with filtered replication)
 **Binary:** `cap_sim_node`
 **Configuration:** `CAP_FILTER_ENABLED=true`
 **Behavior:**
-- PEAT Protocol layer on top of Ditto
+- Peat Protocol layer on top of Ditto
 - Uses capability-filtered queries: `public == true OR CONTAINS(authorized_roles, '<node_type>')`
 - Differential replication (only authorized data synced)
 - Authorization checks performed AND data volume reduced
@@ -65,7 +65,7 @@ Each configuration tested across:
   - Authorization check logic
   - Additional abstraction layers
 
-**What This Measures:** Pure cost of PEAT Protocol authorization
+**What This Measures:** Pure cost of Peat Protocol authorization
 
 ### Hypothesis 2: Differential Update Benefits
 **Comparison:** CAP Full vs CAP Differential
@@ -125,7 +125,7 @@ CAP_Net_Impact = (CAP_Differential - Ditto_Baseline) / Ditto_Baseline
 
 ### Success Criteria
 
-**PEAT Protocol is viable if:**
+**Peat Protocol is viable if:**
 - Authorization overhead < 10% in realistic scenarios
 - Differential updates provide measurable bandwidth savings (future tests)
 - Net impact acceptable given security benefits
@@ -155,7 +155,7 @@ Before merging this work:
 
 ### Binaries
 - `ditto_baseline` - Pure Ditto (no CAP)
-- `cap_sim_node` - PEAT Protocol (configurable filtering)
+- `cap_sim_node` - Peat Protocol (configurable filtering)
 
 ## Next Steps
 

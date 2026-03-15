@@ -11,7 +11,7 @@
 
 ### The GPS Dependency Problem
 
-PEAT Protocol currently assumes GPS availability for:
+Peat Protocol currently assumes GPS availability for:
 - **Geographic beacons** (ADR-024) - nodes advertise lat/long/altitude
 - **Distance-based hierarchy** - parent selection based on proximity
 - **Range mode selection** (ADR-032) - transport config based on peer distance
@@ -30,7 +30,7 @@ PEAT Protocol currently assumes GPS availability for:
 
 ### The Timing Problem
 
-Beyond positioning, GPS provides precise timing (PPS - Pulse Per Second). PEAT needs time sync for:
+Beyond positioning, GPS provides precise timing (PPS - Pulse Per Second). Peat needs time sync for:
 - **CRDT ordering** - Automerge uses timestamps for conflict resolution
 - **Event sequencing** - Telemetry and command ordering
 - **TTL enforcement** - Document expiration
@@ -570,7 +570,7 @@ impl MeshTimeSync {
 }
 ```
 
-### 5. Integration with PEAT Components
+### 5. Integration with Peat Components
 
 ```rust
 /// Central positioning and timing service

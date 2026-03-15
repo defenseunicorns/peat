@@ -8,7 +8,7 @@
 //!
 //! - **QoSClass**: 5-level priority classification (P1 Critical → P5 Bulk)
 //! - **QoSPolicy**: Per-data-type policy with latency, TTL, retention parameters
-//! - **QoSRegistry**: Maps PEAT data types to their QoS policies
+//! - **QoSRegistry**: Maps Peat data types to their QoS policies
 //!
 //! # Storage Management (Phase 4)
 //!
@@ -80,7 +80,7 @@ pub mod storage;
 pub mod sync_mode;
 
 // ============================================================================
-// PEAT-specific modules (depend on military domain types)
+// Peat-specific modules (depend on military domain types)
 // ============================================================================
 
 pub mod classification;
@@ -123,7 +123,7 @@ pub use storage::{
 pub use sync_mode::{SyncMode, SyncModeRegistry};
 
 // ============================================================================
-// PEAT-specific re-exports
+// Peat-specific re-exports
 // ============================================================================
 
 pub use classification::DataType;
@@ -134,7 +134,7 @@ pub use registry::QoSRegistry;
 pub use sync_queue::{PendingSync, PrioritySyncQueue, QueueStats};
 
 // ============================================================================
-// Conversions to/from existing priority types (PEAT-specific)
+// Conversions to/from existing priority types (Peat-specific)
 // ============================================================================
 
 use crate::cell::messaging::MessagePriority;

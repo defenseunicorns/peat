@@ -65,7 +65,7 @@ Open `/Users/kit/Code/peat/docs/PATENT_PLEDGE.md` and update:
 ```markdown
 **Signed**:
 Kit Plummer, [Title]
-(r)evolve LLC
+Defense Unicorns LLC
 November XX, 2025
 ```
 
@@ -76,14 +76,14 @@ Create a simple notice for GitHub:
 ```markdown
 # Patent Notice
 
-PEAT Protocol includes innovations covered by pending patent applications:
+Peat Protocol includes innovations covered by pending patent applications:
 
 - **US Provisional 63/XXX,XXX**: Hierarchical Capability Composition
 - **US Provisional 63/XXX,XXX**: Graduated Human Authority Control
 
 ## Patent Pledge
 
-(r)evolve LLC pledges not to assert these patents against:
+Defense Unicorns LLC pledges not to assert these patents against:
 - NATO allies and defense organizations
 - Academic and research institutions
 - Open-source contributors
@@ -105,7 +105,7 @@ Add near the top (after project description):
 ```markdown
 ## Patent Notice
 
-PEAT Protocol includes innovations covered by pending U.S. patent applications. We pledge not to assert these patents against NATO allies, academic institutions, open-source contributors, or non-commercial use. See [PATENT_PLEDGE.md](docs/PATENT_PLEDGE.md) for details.
+Peat Protocol includes innovations covered by pending U.S. patent applications. We pledge not to assert these patents against NATO allies, academic institutions, open-source contributors, or non-commercial use. See [PATENT_PLEDGE.md](docs/PATENT_PLEDGE.md) for details.
 
 **Status**: Patent Pending
 ```
@@ -117,9 +117,9 @@ Add the same notice, emphasizing that infrastructure components are NOT patented
 ```markdown
 ## Patent Notice
 
-PEAT Protocol (which uses automerge-edge) includes patented innovations related to hierarchical capability composition and human authority control. **These infrastructure components (storage, discovery, transport) are NOT covered by patents** and remain fully open-source.
+Peat Protocol (which uses automerge-edge) includes patented innovations related to hierarchical capability composition and human authority control. **These infrastructure components (storage, discovery, transport) are NOT covered by patents** and remain fully open-source.
 
-See [PEAT Protocol Patent Pledge](../peat-protocol/docs/PATENT_PLEDGE.md) for details.
+See [Peat Protocol Patent Pledge](../peat-protocol/docs/PATENT_PLEDGE.md) for details.
 ```
 
 ---
@@ -137,7 +137,7 @@ If you have a company website, create page at:
 **Twitter/LinkedIn/Blog Post**:
 
 ```
-🚀 Big news: (r)evolve has filed patent applications for PEAT Protocol innovations
+🚀 Big news: Defense Unicorns has filed patent applications for Peat Protocol innovations
 in autonomous system coordination!
 
 But here's what makes this different: We're pledging NOT to assert these patents
@@ -158,13 +158,13 @@ Send to:
 - Open-source community leaders
 - Investors
 
-**Subject**: PEAT Protocol Patent Pledge - Defensive Use Only
+**Subject**: Peat Protocol Patent Pledge - Defensive Use Only
 
 **Body**:
 ```
 Hi [Name],
 
-I wanted to share an important update on PEAT Protocol's intellectual property strategy.
+I wanted to share an important update on Peat Protocol's intellectual property strategy.
 
 We've filed provisional patent applications covering our core innovations in
 hierarchical capability composition and human authority control for autonomous systems.
@@ -177,7 +177,7 @@ a Patent Pledge guaranteeing that we will NOT assert these patents against:
 - Open-source contributors
 - Non-commercial use
 
-This means you can use, study, and build on PEAT Protocol without patent concerns.
+This means you can use, study, and build on Peat Protocol without patent concerns.
 
 Read the full pledge: [link to PATENT_PLEDGE.md]
 
@@ -210,11 +210,11 @@ If private:
 **Blog post / Press release**:
 
 ```
-PEAT Protocol: Open Source Autonomous Coordination for Defense
+Peat Protocol: Open Source Autonomous Coordination for Defense
 
-We're excited to announce that PEAT Protocol is now open source!
+We're excited to announce that Peat Protocol is now open source!
 
-PEAT Protocol enables hierarchical coordination of autonomous platforms using
+Peat Protocol enables hierarchical coordination of autonomous platforms using
 CRDTs for partition-tolerant, eventually-consistent state management.
 
 Key innovations (patent pending):
@@ -232,7 +232,7 @@ Read our Patent Pledge: [link]
 
 ### 5c. Submit to Communities
 
-- [ ] Hacker News: "Show HN: PEAT Protocol - Open source autonomous coordination with defensive patents"
+- [ ] Hacker News: "Show HN: Peat Protocol - Open source autonomous coordination with defensive patents"
 - [ ] r/rust: Announce Rust implementation
 - [ ] r/robotics: Cross-post for robotics community
 - [ ] Defense tech newsletters / blogs
@@ -297,7 +297,7 @@ Create a document to track evidence for Month 12 decision:
 - [Date] [Company] wanted to: [use case]
 
 ## Open Source Adoption
-- [Date] [Organization] forked PEAT Protocol
+- [Date] [Organization] forked Peat Protocol
 - [Date] [University] published paper using CAP
 - [Date] GitHub stars reached: [number]
 
@@ -340,7 +340,7 @@ If budget allows:
 | **Within 1 hour** | Save filing receipts securely |
 | **Within 24 hours** | Update PATENT_STRATEGY.md and PATENT_PLEDGE.md |
 | **Within 48 hours** | Publish Patent Pledge on website, announce publicly |
-| **Within 1 week** | Open-source PEAT Protocol repository |
+| **Within 1 week** | Open-source Peat Protocol repository |
 | **Within 2 weeks** | Optional legal review of pledge |
 | **Month 1-11** | Track evidence, monitor competitors |
 | **Month 11** | Schedule Month 12 decision meeting |
@@ -375,4 +375,4 @@ If budget allows:
 
 **Status**: Action Required (Complete Steps 1-5 within 48 hours)
 **Priority**: High
-**Owner**: Kit Plummer / (r)evolve LLC
+**Owner**: Kit Plummer / Defense Unicorns LLC

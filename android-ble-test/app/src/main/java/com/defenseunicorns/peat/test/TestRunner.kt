@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ * Copyright (c) 2026 Defense Unicorns.  All rights reserved.
  */
 
 package com.defenseunicorns.peat.test
@@ -88,12 +88,12 @@ class TestRunner(
 
         log("================================================")
         if (isDualTransport) {
-            log("PEAT Dual-Transport Test (BLE + QUIC)")
+            log("Peat Dual-Transport Test (BLE + QUIC)")
             log("  Run: $now  Build: $buildInfo")
             log("  Expected QUIC peer: ${quicNodeId?.take(16)}...")
             log("  Discovery: BLE advertisements + mDNS")
         } else {
-            log("PEAT Pi-to-Android BLE Functional Test")
+            log("Peat Pi-to-Android BLE Functional Test")
             log("  Run: $now  Build: $buildInfo")
         }
         log("================================================")

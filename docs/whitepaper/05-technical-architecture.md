@@ -1,6 +1,6 @@
 ## IV. TECHNICAL ARCHITECTURE
 
-**Thesis:** PEAT achieves scalable coordination through CRDT-based eventual consistency, hierarchical aggregation, and edge-native design.
+**Thesis:** Peat achieves scalable coordination through CRDT-based eventual consistency, hierarchical aggregation, and edge-native design.
 
 ---
 
@@ -10,7 +10,7 @@ Coordination at scale requires different foundations than traditional distribute
 
 #### CRDTs for Eventual Consistency
 
-PEAT uses Conflict-free Replicated Data Types (CRDTs), specifically Automerge documents, for all shared state. CRDTs guarantee:
+Peat uses Conflict-free Replicated Data Types (CRDTs), specifically Automerge documents, for all shared state. CRDTs guarantee:
 
 - **Merge without coordination**: Any two replicas can merge deterministically
 - **No consensus required**: Critical for intermittent connectivity
@@ -34,11 +34,11 @@ Traditional distributed consensus (Paxos, Raft, 2PC) requires majority availabil
 | Consensus | Blocks until quorum | Always-connected only |
 | CRDTs | Proceeds locally, merges later | Partition-tolerant |
 
-PEAT assumes partitions. Nodes operate autonomously during disconnection and deterministically merge on reconnection.
+Peat assumes partitions. Nodes operate autonomously during disconnection and deterministically merge on reconnection.
 
 #### Synchronization Protocol
 
-PEAT uses Negentropy for efficient set reconciliation:
+Peat uses Negentropy for efficient set reconciliation:
 
 1. **Range-based comparison**: Nodes exchange fingerprints of document ranges
 2. **Bisection**: Disagreements narrow recursively to specific changes
@@ -79,20 +79,20 @@ A coordinator at level 3 sees 3 team summaries instead of 12 individual node sta
 
 Laboratory validation confirms the architecture:
 
-| Metric | Mesh Approach | PEAT Hierarchical |
+| Metric | Mesh Approach | Peat Hierarchical |
 |--------|--------------|-------------------|
 | Bandwidth scaling | O(n²) | O(n log n) |
 | Messages (100 nodes) | 10,000/cycle | ~700/cycle |
 | Bandwidth reduction | Baseline | 93-99% |
 | Partition recovery | Conflict resolution | Automatic merge |
 
-Networks that saturate at 50 nodes with mesh coordination support 1,000+ with PEAT.
+Networks that saturate at 50 nodes with mesh coordination support 1,000+ with Peat.
 
 ---
 
 ### 4.3 Five-Layer Architecture
 
-PEAT separates concerns for flexibility and integration.
+Peat separates concerns for flexibility and integration.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -115,7 +115,7 @@ PEAT separates concerns for flexibility and integration.
 
 #### Layer 1: Schema (peat-schema)
 
-Protocol buffer definitions for all PEAT messages:
+Protocol buffer definitions for all Peat messages:
 - Beacons and capability advertisements
 - Hierarchical commands and acknowledgments
 - Track and mission data
@@ -164,7 +164,7 @@ AI participates in the hierarchy, not just at the edge.
 
 **Traditional Model**: AI for perception on individual platforms. Each node runs inference locally; coordination is separate.
 
-**PEAT Model**: AI as team member at every level:
+**Peat Model**: AI as team member at every level:
 
 | Level | AI Role |
 |-------|---------|
@@ -201,6 +201,6 @@ AI participates in the hierarchy, not just at the edge.
 
 ### Key Finding: Section IV
 
-> "PEAT achieves O(n log n) scaling through hierarchical CRDT-based coordination—enabling 1,000+ node operations on networks that saturate at 50 with mesh approaches. The five-layer architecture enables flexible integration from embedded devices to enterprise systems."
+> "Peat achieves O(n log n) scaling through hierarchical CRDT-based coordination—enabling 1,000+ node operations on networks that saturate at 50 with mesh approaches. The five-layer architecture enables flexible integration from embedded devices to enterprise systems."
 
 ---

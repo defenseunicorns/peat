@@ -166,6 +166,6 @@ Based on design predictions:
 
 ## Conclusion
 
-The Traditional IoT Baseline infrastructure is complete and validated. Results demonstrate the expected behavior of periodic full-state messaging architecture. The framework is ready for direct comparison with PEAT Protocol variants to quantify the architectural advantages of CRDT delta-state sync and capability-based filtering.
+The Traditional IoT Baseline infrastructure is complete and validated. Results demonstrate the expected behavior of periodic full-state messaging architecture. The framework is ready for direct comparison with Peat Protocol variants to quantify the architectural advantages of CRDT delta-state sync and capability-based filtering.
 
 **Ready for:** Three-way architectural comparison once CAP Full and CAP Differential tests are run with equivalent topology configurations.

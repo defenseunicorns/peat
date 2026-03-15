@@ -63,7 +63,7 @@
 //! while let Some(frame) = video.next_frame().await? {
 //!     let output = pipeline.process(&frame).await?;
 //!     for update in output.track_updates {
-//!         // Send to PEAT network
+//!         // Send to Peat network
 //!     }
 //! }
 //! ```

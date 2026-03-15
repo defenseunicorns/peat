@@ -100,7 +100,7 @@ We conducted a comprehensive survey of existing AI/ML metadata standards and mil
 
 ### Key Findings
 
-**No existing standard addresses the PEAT use case:**
+**No existing standard addresses the Peat use case:**
 
 1. **Industry standards** (Model Cards, ONNX, MLflow) provide good **static documentation** but lack:
    - Operational status tracking (is the model actually running?)
@@ -150,7 +150,7 @@ We conducted a comprehensive survey of existing AI/ML metadata standards and mil
 
 ### Core Principle: Capability-Centric AI Model Advertisement
 
-We will create a **PEAT AI Model Capability Advertisement Schema** that shifts focus from "what models are installed" to "what AI capabilities are operationally available" across the distributed system.
+We will create a **Peat AI Model Capability Advertisement Schema** that shifts focus from "what models are installed" to "what AI capabilities are operationally available" across the distributed system.
 
 **Design Philosophy:**
 1. **Operational First**: Track runtime status, not just deployment state
@@ -165,7 +165,7 @@ We will create a **PEAT AI Model Capability Advertisement Schema** that shifts f
 
 #### Level 1: Platform AI Capability Advertisement
 
-Each platform advertises its AI capabilities using a standardized schema integrated into the PEAT capability advertisement protocol:
+Each platform advertises its AI capabilities using a standardized schema integrated into the Peat capability advertisement protocol:
 
 ```protobuf
 syntax = "proto3";
@@ -747,7 +747,7 @@ Following ADR-007 Automerge principles, AI capability advertisements are synchro
 The `ModelMetadata` message is designed for **bidirectional mapping** with Model Card schemas:
 
 ```python
-# Export PEAT AI capability to Model Card format
+# Export Peat AI capability to Model Card format
 def export_model_card(ai_model_instance):
     return {
         "model_details": {
@@ -776,7 +776,7 @@ def export_model_card(ai_model_instance):
         }
     }
 
-# Import Model Card to PEAT format
+# Import Model Card to Peat format
 def import_model_card(model_card_json):
     metadata = ModelMetadata()
     metadata.model_name = model_card_json["model_details"]["name"]
@@ -788,13 +788,13 @@ def import_model_card(model_card_json):
 #### ONNX Metadata Integration
 
 ```python
-# Augment ONNX model with PEAT metadata
+# Augment ONNX model with Peat metadata
 import onnx
 import json
 
 model = onnx.load('target_recognition_v4.2.1.onnx')
 
-# Add PEAT metadata to ONNX metadata_props
+# Add Peat metadata to ONNX metadata_props
 peat_meta = model.metadata_props.add()
 peat_meta.key = 'peat_model_metadata'
 peat_meta.value = json.dumps({
@@ -815,11 +815,11 @@ onnx.save(model, f'target_recognition_v4.2.1.onnx')
 #### MLflow Registry Synchronization
 
 ```python
-# Register PEAT-tracked model in MLflow
+# Register Peat-tracked model in MLflow
 import mlflow
 
 def register_peat_model_to_mlflow(ai_model_instance, model_artifact_path):
-    # Create MLflow signature from PEAT ModelSignature
+    # Create MLflow signature from Peat ModelSignature
     from mlflow.models import infer_signature
     signature = convert_peat_signature_to_mlflow(ai_model_instance.signature)
     
@@ -853,7 +853,7 @@ def register_peat_model_to_mlflow(ai_model_instance, model_artifact_path):
 
 **STANAG 4778 Metadata Binding:**
 ```python
-# Cryptographically bind PEAT metadata to model artifact
+# Cryptographically bind Peat metadata to model artifact
 def bind_metadata_stanag_4778(model_artifact_bytes, ai_model_instance):
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import ed25519
@@ -880,7 +880,7 @@ def bind_metadata_stanag_4778(model_artifact_bytes, ai_model_instance):
 
 **STANAG 5636 NCMS Searchability:**
 ```xml
-<!-- Map PEAT AI capabilities to NATO Core Metadata Specification -->
+<!-- Map Peat AI capabilities to NATO Core Metadata Specification -->
 <NCMS:Resource xmlns:NCMS="urn:nato:stanag:5636">
     <NCMS:Identifier>urn:peat:model:target_recognition:4.2.1</NCMS:Identifier>
     <NCMS:Title>Target Recognition Model v4.2.1</NCMS:Title>
@@ -1143,7 +1143,7 @@ impl PerformanceDegradationDetector {
 **Standards Evolution Risk**
 - Model Card, ONNX, MLflow standards may evolve incompatibly
 - NATO STANAGs update on multi-year cycles
-- PEAT schema may need versioning strategy to handle changes
+- Peat schema may need versioning strategy to handle changes
 - Risk of becoming tied to deprecated standards
 
 **Performance Measurement Challenges**
@@ -1206,7 +1206,7 @@ impl PerformanceDegradationDetector {
 - ONNX metadata integration
 - MLflow registry synchronization
 - STANAG 4778/5636 compliance validation
-- **Deliverable**: PEAT AI capabilities compatible with industry/military standards
+- **Deliverable**: Peat AI capabilities compatible with industry/military standards
 
 ### Phase 5: Security and Governance (Months 8-10)
 - Implement cryptographic provenance verification

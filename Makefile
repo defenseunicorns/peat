@@ -272,10 +272,10 @@ baseline-mesh:
 	@echo ""
 	@cd peat-sim && ./test-traditional-mesh-suite.sh
 
-# PEAT Hierarchical - Shows O(n log n) scaling
+# Peat Hierarchical - Shows O(n log n) scaling
 peat-hierarchical:
 	@echo "╔════════════════════════════════════════════════════════════╗"
-	@echo "║  PEAT Hierarchical Protocol                               ║"
+	@echo "║  Peat Hierarchical Protocol                               ║"
 	@echo "║  Hierarchical aggregation with differential filtering     ║"
 	@echo "║  Expected: O(n log n) message volume via aggregation      ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
