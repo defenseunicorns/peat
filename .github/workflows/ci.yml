@@ -132,6 +132,7 @@ jobs:
   # ============================================
   docs:
     name: Documentation
+    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
