@@ -128,6 +128,22 @@ jobs:
           cargo nextest run --all-features --workspace --exclude peat-ffi --exclude peat-inference -E 'test(e2e)'
 
   # ============================================
+  # Documentation Build (#702)
+  # ============================================
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler mold clang libdbus-1-dev
+      - name: Build docs
+        run: cargo doc --no-deps --workspace --exclude peat-ffi --exclude peat-inference
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+
+  # ============================================
   # Feature Combinations (#699)
   # ============================================
   feature-matrix:
