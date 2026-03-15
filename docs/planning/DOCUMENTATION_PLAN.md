@@ -1,4 +1,4 @@
-# PEAT Documentation Plan
+# Peat Documentation Plan
 
 > **Version**: 1.0
 > **Status**: Active
@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-This document outlines the comprehensive documentation strategy for PEAT (Hierarchical Intelligence for Versatile Entities), targeting two primary personas: **Operators** and **Developers**. The goal is to transform existing technical documentation into accessible, production-grade guides that enable successful adoption and contribution.
+This document outlines the comprehensive documentation strategy for Peat (Hierarchical Intelligence for Versatile Entities), targeting two primary personas: **Operators** and **Developers**. The goal is to transform existing technical documentation into accessible, production-grade guides that enable successful adoption and contribution.
 
 ---
 
@@ -14,14 +14,14 @@ This document outlines the comprehensive documentation strategy for PEAT (Hierar
 
 ### 1.1 Operator Persona
 
-**Profile**: System administrators, DevOps engineers, and mission operators who deploy, configure, and maintain PEAT systems in production environments.
+**Profile**: System administrators, DevOps engineers, and mission operators who deploy, configure, and maintain Peat systems in production environments.
 
 **Goals**:
-- Deploy PEAT networks quickly and reliably
+- Deploy Peat networks quickly and reliably
 - Configure systems for specific operational requirements
 - Monitor system health and performance
 - Troubleshoot issues without deep code knowledge
-- Integrate PEAT with existing infrastructure (TAK, ATAK, C2 systems)
+- Integrate Peat with existing infrastructure (TAK, ATAK, C2 systems)
 
 **Knowledge Level**:
 - Strong Linux/system administration skills
@@ -31,13 +31,13 @@ This document outlines the comprehensive documentation strategy for PEAT (Hierar
 
 ### 1.2 Developer Persona
 
-**Profile**: Software engineers who build applications using PEAT, contribute to the core protocol, or integrate PEAT into existing systems.
+**Profile**: Software engineers who build applications using Peat, contribute to the core protocol, or integrate Peat into existing systems.
 
 **Goals**:
-- Understand PEAT architecture and internals
-- Build applications using the PEAT SDK
+- Understand Peat architecture and internals
+- Build applications using the Peat SDK
 - Contribute features and fixes to the protocol
-- Extend PEAT with custom capabilities, policies, and integrations
+- Extend Peat with custom capabilities, policies, and integrations
 - Run and write tests effectively
 
 **Knowledge Level**:
@@ -75,7 +75,7 @@ docs/
 │
 ├── tutorials/
 │   ├── quickstart-simulation.md        # First simulation in 10 minutes
-│   ├── build-first-application.md      # Build a PEAT application
+│   ├── build-first-application.md      # Build a Peat application
 │   └── custom-capabilities.md          # Add custom capabilities
 │
 ├── reference/
@@ -114,7 +114,7 @@ docs/
 | **Getting Started** | Dev environment setup, first build, run tests | P0 |
 | **Core Concepts** | Three-phase protocol, capabilities, cells, zones | P0 |
 | **API Reference** | Public APIs with examples, trait documentation | P0 |
-| **Extending PEAT** | Custom capabilities, discovery strategies, policies | P1 |
+| **Extending Peat** | Custom capabilities, discovery strategies, policies | P1 |
 | **Backend Abstraction** | Ditto vs Automerge, switching backends | P1 |
 | **Testing** | Unit/integration/E2E tests, test fixtures, mocking | P0 |
 | **Contributing** | Code style, PR process, review guidelines | P1 |
@@ -188,7 +188,7 @@ The following GitHub Issues should be created to track documentation work:
 ### Issue 1: Create Comprehensive Operator Guide
 **Labels**: documentation, operator, priority:high
 
-**Description**: Create a production-grade operator guide covering installation, configuration, deployment, monitoring, and troubleshooting for PEAT systems.
+**Description**: Create a production-grade operator guide covering installation, configuration, deployment, monitoring, and troubleshooting for Peat systems.
 
 **Acceptance Criteria**:
 - Complete installation guide with all prerequisites
@@ -216,7 +216,7 @@ The following GitHub Issues should be created to track documentation work:
 ### Issue 3: Create Tutorial Series
 **Labels**: documentation, tutorials, priority:medium
 
-**Description**: Create hands-on tutorials for common PEAT use cases.
+**Description**: Create hands-on tutorials for common Peat use cases.
 
 **Acceptance Criteria**:
 - Quickstart simulation tutorial (10 minutes)
@@ -321,7 +321,7 @@ How to confirm the procedure was successful.
 
 ## Overview
 
-What this section covers and its importance in the PEAT architecture.
+What this section covers and its importance in the Peat architecture.
 
 ## Concepts
 
@@ -363,6 +363,6 @@ let result = function_name(value)?;
 
 ---
 
-**Document Owner**: PEAT Documentation Team
+**Document Owner**: Peat Documentation Team
 **Review Cycle**: Quarterly
 **Next Review**: 2026-03-01

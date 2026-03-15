@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ * Copyright (c) 2026 Defense Unicorns.  All rights reserved.
  */
 
 package com.defenseunicorns.atak.peat
@@ -30,9 +30,9 @@ import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * PEAT Map Component
+ * Peat Map Component
  *
- * Main component for the PEAT plugin. Extends DropDownMapComponent
+ * Main component for the Peat plugin. Extends DropDownMapComponent
  * to integrate with ATAK's dropdown system.
  *
  * NOTE: This is a simplified version without coroutines/Flow to avoid
@@ -265,7 +265,7 @@ class PeatMapComponent : DropDownMapComponent() {
         // Register observer for BLE peer connectivity changes to update cell composition immediately
         registerBlePeerConnectivityObserver()
 
-        // Update connection status based on PEAT node availability
+        // Update connection status based on Peat node availability
         updateConnectionStatus()
 
         // Broadcast initial position to BLE mesh so the tablet's callsign is visible to watches
@@ -707,7 +707,7 @@ class PeatMapComponent : DropDownMapComponent() {
     /**
      * Ensure a cell exists for the given cell ID (NATO phonetic: ALPHA, BRAVO, etc.).
      * Creates a cell if one doesn't exist.
-     * The tablet (full PEAT node) auto-assigns itself as cell leader.
+     * The tablet (full Peat node) auto-assigns itself as cell leader.
      *
      * Cells are organizational units within the mesh - squads/teams working together.
      * The mesh provides connectivity; the cell provides command structure.
@@ -715,7 +715,7 @@ class PeatMapComponent : DropDownMapComponent() {
     private fun ensureCellExists(cellId: String) {
         if (_cells.any { it.id == cellId }) return
 
-        // Get self marker to set as leader (tablet running full PEAT is the leader)
+        // Get self marker to set as leader (tablet running full Peat is the leader)
         val selfMarker = mapView.selfMarker
         val selfUid = selfMarker?.uid
         val selfCallsign = selfMarker?.getMetaString("callsign", null)
@@ -980,7 +980,7 @@ class PeatMapComponent : DropDownMapComponent() {
     }
 
     /**
-     * Update connection status based on PEAT node availability and peer count
+     * Update connection status based on Peat node availability and peer count
      */
     private fun updateConnectionStatus() {
         val lifecycle = PeatPluginLifecycle.getInstance()
@@ -998,16 +998,16 @@ class PeatMapComponent : DropDownMapComponent() {
     }
 
     /**
-     * Refresh data from PEAT network
+     * Refresh data from Peat network
      */
     fun refreshData() {
-        Log.d(TAG, "Refreshing PEAT data")
+        Log.d(TAG, "Refreshing Peat data")
         updateConnectionStatus()
 
         val lifecycle = PeatPluginLifecycle.getInstance()
         val node = lifecycle?.getPeatNodeJni()
         if (node == null) {
-            Log.d(TAG, "No PEAT FFI node - running BLE-only mode")
+            Log.d(TAG, "No Peat FFI node - running BLE-only mode")
             // In BLE-only mode, don't clear cells/platforms - they're managed by BLE callbacks
             // Only clear FFI-sourced data (_platforms and _tracks from JSON), preserve BLE data
             _platforms.clear()
@@ -1016,7 +1016,7 @@ class PeatMapComponent : DropDownMapComponent() {
             return  // Skip FFI calls, BLE data is managed by callbacks
         }
 
-        // Fetch cells from PEAT sync (only when FFI node is available)
+        // Fetch cells from Peat sync (only when FFI node is available)
         try {
             val cellsJson = node.getCellsJson()
             Log.d(TAG, "Cells JSON: $cellsJson")
@@ -1030,29 +1030,29 @@ class PeatMapComponent : DropDownMapComponent() {
                     _cells.add(bleCell)
                 }
             }
-            Log.i(TAG, "Loaded ${_cells.size} cells from PEAT (+ ${bleCells.size} BLE cells)")
+            Log.i(TAG, "Loaded ${_cells.size} cells from Peat (+ ${bleCells.size} BLE cells)")
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching cells: ${e.message}", e)
         }
 
-        // Fetch tracks from PEAT sync
+        // Fetch tracks from Peat sync
         try {
             val tracksJson = node.getTracksJson()
             Log.d(TAG, "Tracks JSON: $tracksJson")
             _tracks.clear()
             _tracks.addAll(parseTracksJson(tracksJson))
-            Log.i(TAG, "Loaded ${_tracks.size} tracks from PEAT")
+            Log.i(TAG, "Loaded ${_tracks.size} tracks from Peat")
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching tracks: ${e.message}", e)
         }
 
-        // Fetch platforms from PEAT sync
+        // Fetch platforms from Peat sync
         try {
             val platformsJson = node.getPlatformsJson()
             Log.d(TAG, "Platforms JSON: $platformsJson")
             _platforms.clear()
             _platforms.addAll(parsePlatformsJson(platformsJson))
-            Log.i(TAG, "Loaded ${_platforms.size} platforms from PEAT")
+            Log.i(TAG, "Loaded ${_platforms.size} platforms from Peat")
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching platforms: ${e.message}", e)
         }
@@ -1320,7 +1320,7 @@ class PeatMapComponent : DropDownMapComponent() {
     }
 
     /**
-     * Enable or disable PLI (self-position) broadcasting to PEAT network.
+     * Enable or disable PLI (self-position) broadcasting to Peat network.
      * @param enabled true to start broadcasting, false to stop
      */
     fun setPliBroadcastEnabled(enabled: Boolean) {

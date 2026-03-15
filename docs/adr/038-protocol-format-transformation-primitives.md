@@ -1,4 +1,4 @@
-# ADR-026: Protocol-Level Format Transformation Primitives
+# ADR-038: Protocol-Level Format Transformation Primitives
 
 **Status**: Proposed  
 **Date**: 2025-12-11  
@@ -26,20 +26,20 @@ Current Architecture Problem:
                           │ ??? Integration Point
                           ▼
                     ┌─────────────┐
-                    │ PEAT Node   │
+                    │ Peat Node   │
                     │ (CRDT docs) │
                     └─────────────┘
 
 Questions:
-1. Where does PEAT ↔ CoT transformation happen?
+1. Where does Peat ↔ CoT transformation happen?
 2. Who owns the transformation logic?
-3. How does a WearTAK device join a PEAT hierarchy?
-4. Can a node speak CoT natively without full PEAT stack?
+3. How does a WearTAK device join a Peat hierarchy?
+4. Can a node speak CoT natively without full Peat stack?
 ```
 
 ### The Deeper Issue: Format Interoperability at Scale
 
-PEAT will integrate with multiple format ecosystems:
+Peat will integrate with multiple format ecosystems:
 
 | Format | Use Case | Characteristics |
 |--------|----------|-----------------|
@@ -53,21 +53,21 @@ PEAT will integrate with multiple format ecosystems:
 
 Each requires bidirectional transformation. If transformation remains an ad-hoc concern, we get:
 - **N×M integration matrix** - every format pair needs custom code
-- **No composability** - can't chain PEAT → CoT → Link 16
+- **No composability** - can't chain Peat → CoT → Link 16
 - **No negotiation** - nodes can't discover compatible formats
 - **No optimization** - constrained devices can't skip unused transforms
 
 ### WearTAK Integration Requirements
 
-For Samsung watches running WearTAK to participate in PEAT hierarchies:
+For Samsung watches running WearTAK to participate in Peat hierarchies:
 
-1. **Minimal footprint** - Watch can't run full PEAT stack
+1. **Minimal footprint** - Watch can't run full Peat stack
 2. **CoT native** - WearTAK already speaks CoT to ATAK
-3. **Hierarchy participation** - Watch is a leaf node in PEAT hierarchy
+3. **Hierarchy participation** - Watch is a leaf node in Peat hierarchy
 4. **Bidirectional** - Receive commands, send position/health/alerts
 5. **Battery efficient** - Transform overhead must be minimal
 
-**Key Insight**: The watch shouldn't need to understand PEAT's CRDT internals. It should speak CoT, and PEAT should accept CoT as a valid input format at the protocol level.
+**Key Insight**: The watch shouldn't need to understand Peat's CRDT internals. It should speak CoT, and Peat should accept CoT as a valid input format at the protocol level.
 
 ## Decision
 
@@ -77,7 +77,7 @@ We introduce **Format Adapters** as first-class protocol elements:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    PEAT Protocol Stack                          │
+│                    Peat Protocol Stack                          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ┌───────────────────────────────────────────────────────────┐  │
@@ -93,7 +93,7 @@ We introduce **Format Adapters** as first-class protocol elements:
 │  ┌───────────────────────────────────────────────────────────┐  │
 │  │         ★ FORMAT ADAPTER LAYER ★ (NEW)                    │  │
 │  │  • Schema-declared transformations                        │  │
-│  │  • Bidirectional PEAT ↔ External format mapping          │  │
+│  │  • Bidirectional Peat ↔ External format mapping          │  │
 │  │  • Format capability advertisement                        │  │
 │  │  • Automatic format negotiation                           │  │
 │  └───────────────────────────────────────────────────────────┘  │
@@ -126,7 +126,7 @@ We introduce **Format Adapters** as first-class protocol elements:
 │                          │                                      │
 │                          ▼                                      │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │              Canonical PEAT Document Model                │  │
+│  │              Canonical Peat Document Model                │  │
 │  │  • Position, Health, Capability, Command, Alert           │  │
 │  │  • Hierarchical relationships (parent, children)          │  │
 │  │  • CRDT-native (Automerge compatible)                     │  │
@@ -153,8 +153,8 @@ message FormatAdapterCapability {
 
 enum TransformDirection {
   BIDIRECTIONAL = 0;
-  ENCODE_ONLY = 1;   // PEAT → External
-  DECODE_ONLY = 2;   // External → PEAT
+  ENCODE_ONLY = 1;   // Peat → External
+  DECODE_ONLY = 2;   // External → Peat
 }
 
 // Schema-level type mapping declaration
@@ -188,7 +188,7 @@ message FieldTransform {
 
 // Declare what information is lost in transformation
 message LossInfo {
-  repeated string peat_fields_not_mapped = 1;   // PEAT fields with no external equivalent
+  repeated string peat_fields_not_mapped = 1;   // Peat fields with no external equivalent
   repeated string external_fields_ignored = 2;  // External fields we don't import
   string semantic_notes = 3;                    // Human-readable loss description
 }
@@ -202,7 +202,7 @@ pub struct CotFormatAdapter {
     /// Supported CoT protocol versions
     supported_versions: Vec<CotVersion>,
     
-    /// Type mappings (PEAT type → CoT type code)
+    /// Type mappings (Peat type → CoT type code)
     type_mappings: HashMap<PeatType, CotTypeMapping>,
     
     /// Field-level transformations
@@ -251,7 +251,7 @@ impl FormatAdapter for CotFormatAdapter {
         }
     }
     
-    /// Encode PEAT document to CoT event
+    /// Encode Peat document to CoT event
     fn encode(&self, doc: &PeatDocument) -> Result<EncodedMessage, TransformError> {
         let cot_event = match doc.doc_type() {
             PeatDocType::Position => self.encode_position(doc)?,
@@ -280,7 +280,7 @@ impl FormatAdapter for CotFormatAdapter {
         })
     }
     
-    /// Decode CoT event to PEAT document
+    /// Decode CoT event to Peat document
     fn decode(&self, msg: &EncodedMessage) -> Result<PeatDocument, TransformError> {
         // Parse CoT event
         let cot_event = self.parse_cot(&msg.payload, &msg.encoding)?;
@@ -288,7 +288,7 @@ impl FormatAdapter for CotFormatAdapter {
         // Validate against CoT schema
         self.validator.validate(&cot_event)?;
         
-        // Map to PEAT document based on CoT type
+        // Map to Peat document based on CoT type
         let peat_doc = match self.classify_cot_type(&cot_event.event_type) {
             CotClassification::Position => self.decode_position(&cot_event)?,
             CotClassification::Track => self.decode_track(&cot_event)?,
@@ -313,10 +313,10 @@ impl FormatAdapter for CotFormatAdapter {
 }
 ```
 
-### Type Mapping: PEAT ↔ CoT
+### Type Mapping: Peat ↔ CoT
 
 ```rust
-/// PEAT to CoT type mapping definitions
+/// Peat to CoT type mapping definitions
 impl CotFormatAdapter {
     fn init_type_mappings() -> HashMap<PeatType, CotTypeMapping> {
         let mut mappings = HashMap::new();
@@ -400,7 +400,7 @@ impl CotFormatAdapter {
 
 ### Format Capability Advertisement
 
-Nodes advertise their format capabilities as part of PEAT discovery:
+Nodes advertise their format capabilities as part of Peat discovery:
 
 ```protobuf
 // Extend beacon to include format capabilities
@@ -486,7 +486,7 @@ impl FormatNegotiator {
             .ok_or(NegotiationError::NoCommonFormat)
     }
     
-    /// Handle PEAT-native peer (no format adapter needed)
+    /// Handle Peat-native peer (no format adapter needed)
     pub fn is_peat_native(peer_capabilities: &[FormatAdapterCapability]) -> bool {
         peer_capabilities.iter().any(|c| c.format_id == "peat-native")
     }
@@ -502,7 +502,7 @@ pub struct NegotiatedFormat {
 
 ### Transform Pipeline (Chained Transformations)
 
-For multi-hop scenarios (e.g., PEAT → CoT → Link 16 gateway):
+For multi-hop scenarios (e.g., Peat → CoT → Link 16 gateway):
 
 ```rust
 /// Transform pipeline for chained format conversion
@@ -518,18 +518,18 @@ impl TransformPipeline {
         registry: &FormatAdapterRegistry
     ) -> Result<Self, PipelineError> {
         // Find path through registered adapters
-        // All adapters convert to/from canonical PEAT format
+        // All adapters convert to/from canonical Peat format
         
         let mut stages: Vec<Box<dyn FormatAdapter>> = vec![];
         
-        // If source isn't PEAT-native, add decode stage
+        // If source isn't Peat-native, add decode stage
         if source_format != "peat-native" {
             let decoder = registry.get(source_format)
                 .ok_or(PipelineError::AdapterNotFound(source_format.into()))?;
             stages.push(decoder);
         }
         
-        // If dest isn't PEAT-native, add encode stage
+        // If dest isn't Peat-native, add encode stage
         if dest_format != "peat-native" {
             let encoder = registry.get(dest_format)
                 .ok_or(PipelineError::AdapterNotFound(dest_format.into()))?;
@@ -544,14 +544,14 @@ impl TransformPipeline {
         let mut current = input.clone();
         
         for stage in &self.stages {
-            // Decode to PEAT doc
+            // Decode to Peat doc
             let doc = stage.decode(&current)?;
             
             // If more stages, encode to next format
             if let Some(next_stage) = self.stages.get(1) {
                 current = next_stage.encode(&doc)?;
             } else {
-                // Final stage - return as PEAT doc or re-encode
+                // Final stage - return as Peat doc or re-encode
                 return stage.encode(&doc);
             }
         }
@@ -560,19 +560,19 @@ impl TransformPipeline {
     }
 }
 
-// Example: CoT → PEAT → Link 16 (via gateway)
+// Example: CoT → Peat → Link 16 (via gateway)
 // let pipeline = TransformPipeline::build("cot", "link16", &registry)?;
 // let link16_msg = pipeline.transform(&cot_message)?;
 ```
 
 ### WearTAK Integration Mode
 
-For WearTAK devices, PEAT Lite can operate in **CoT-Native Mode**:
+For WearTAK devices, Peat Lite can operate in **CoT-Native Mode**:
 
 ```rust
-/// PEAT Lite operating modes for format handling
+/// Peat Lite operating modes for format handling
 pub enum LiteFormatMode {
-    /// Full PEAT protocol with optional format adapters
+    /// Full Peat protocol with optional format adapters
     PeatNative {
         adapters: Vec<FormatAdapterCapability>,
     },
@@ -580,7 +580,7 @@ pub enum LiteFormatMode {
     /// Speak external format natively, parent handles conversion
     ExternalNative {
         format: String,          // "cot", "mqtt", etc.
-        parent_converts: bool,   // Parent handles PEAT ↔ format conversion
+        parent_converts: bool,   // Parent handles Peat ↔ format conversion
     },
     
     /// Minimal: Only send raw data, parent handles everything
@@ -607,14 +607,14 @@ pub fn weartk_config() -> LiteNodeConfig {
 }
 ```
 
-### Parent-Side CoT Bridge for PEAT Lite
+### Parent-Side CoT Bridge for Peat Lite
 
-The ATAK phone (PEAT Edge node) handles CoT ↔ PEAT transformation for its leaf children:
+The ATAK phone (Peat Edge node) handles CoT ↔ Peat transformation for its leaf children:
 
 ```rust
-/// ATAK/PEAT Edge node handling WearTAK children
+/// ATAK/Peat Edge node handling WearTAK children
 pub struct AtakPeatBridge {
-    /// Local PEAT node
+    /// Local Peat node
     peat_node: PeatEdgeNode,
     
     /// CoT format adapter
@@ -633,7 +633,7 @@ impl AtakPeatBridge {
         child_id: &NodeId, 
         cot_bytes: &[u8]
     ) -> Result<(), BridgeError> {
-        // Decode CoT to PEAT document
+        // Decode CoT to Peat document
         let encoded = EncodedMessage {
             format: "cot".into(),
             encoding: "protobuf".into(),
@@ -643,7 +643,7 @@ impl AtakPeatBridge {
         
         let peat_doc = self.cot_adapter.decode(&encoded)?;
         
-        // Inject into PEAT as child's document
+        // Inject into Peat as child's document
         let doc_with_hierarchy = peat_doc.with_parent(self.peat_node.node_id());
         self.peat_node.merge_child_document(child_id, doc_with_hierarchy).await?;
         
@@ -660,7 +660,7 @@ impl AtakPeatBridge {
         child_id: &NodeId,
         command: PeatCommand
     ) -> Result<(), BridgeError> {
-        // Encode PEAT command to CoT
+        // Encode Peat command to CoT
         let peat_doc = command.to_document();
         let cot_msg = self.cot_adapter.encode(&peat_doc)?;
         
@@ -680,7 +680,7 @@ impl AtakPeatBridge {
 Constrained devices only need a subset of CoT:
 
 ```protobuf
-// Minimal CoT for PEAT Lite wearables
+// Minimal CoT for Peat Lite wearables
 // Subset of full CoT schema
 
 message MinimalCotEvent {
@@ -737,12 +737,12 @@ message AckDetail {
 
 ### Positive
 
-1. **Native format support**: Devices can speak CoT (or other formats) without full PEAT stack
+1. **Native format support**: Devices can speak CoT (or other formats) without full Peat stack
 2. **Negotiated interoperability**: Peers automatically discover compatible formats
 3. **Composable transforms**: Multi-hop bridging becomes straightforward
 4. **Explicit semantics**: Schema-declared mappings document what's preserved/lost
 5. **Optimized for constraints**: Lite nodes can skip transformation overhead
-6. **Ecosystem integration**: TAK, ROS2, MQTT devices join PEAT naturally
+6. **Ecosystem integration**: TAK, ROS2, MQTT devices join Peat naturally
 
 ### Negative
 
@@ -753,7 +753,7 @@ message AckDetail {
 
 ### Risks
 
-1. **Semantic drift**: PEAT concepts may not map cleanly to all formats
+1. **Semantic drift**: Peat concepts may not map cleanly to all formats
 2. **Performance**: Transform overhead in hot paths (mitigated by caching)
 3. **Security**: Malformed external messages could exploit transform bugs
 
@@ -766,13 +766,13 @@ message AckDetail {
 4. Basic pipeline infrastructure
 
 ### Phase 2: CoT Reference Adapter (Q1 2026)
-1. Full PEAT ↔ CoT type mappings
+1. Full Peat ↔ CoT type mappings
 2. XML and Protobuf encoding
 3. Schema validation
 4. Integration tests with TAK
 
 ### Phase 3: WearTAK Integration (Q1 2026)
-1. CoT-native mode for PEAT Lite
+1. CoT-native mode for Peat Lite
 2. ATAK bridge implementation
 3. Minimal CoT schema for wearables
 4. Field testing with Ascent
@@ -826,15 +826,15 @@ Examples:
 
 ## Appendix B: Transform Loss Documentation
 
-| PEAT → CoT | Lost Information | Mitigation |
+| Peat → CoT | Lost Information | Mitigation |
 |------------|------------------|------------|
 | Capability | Rich capability taxonomy | Encode in detail/peat_capabilities extension |
 | Hierarchy | Multi-parent relationships | Use CoT link elements for primary parent |
 | CRDT metadata | Vector clocks, merge history | Not needed for TAK display |
-| TTL semantics | PEAT's flexible TTL tiers | Map to CoT stale time |
+| TTL semantics | Peat's flexible TTL tiers | Map to CoT stale time |
 
-| CoT → PEAT | Lost Information | Mitigation |
+| CoT → Peat | Lost Information | Mitigation |
 |------------|------------------|------------|
 | Symbology detail | MIL-STD-2525 specifics | Preserve in opaque detail field |
-| Contact chains | CoT contact references | Parse and map to PEAT relationships |
+| Contact chains | CoT contact references | Parse and map to Peat relationships |
 | Custom detail schemas | Domain-specific extensions | Preserve as opaque JSON |

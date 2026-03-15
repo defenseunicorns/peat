@@ -123,7 +123,7 @@ Citizenship: [Country]
 
 **Applicant** (company):
 ```
-Name: (r)evolve LLC
+Name: Defense Unicorns LLC
 Address: [Full address with ZIP]
 ```
 
@@ -165,7 +165,7 @@ Address: [Full address with ZIP]
 **Assignee** (company):
 - Click **"Add Assignee"**
 - Assignee Type: **"Company or Organization"**
-- Name: `(r)evolve LLC`
+- Name: `Defense Unicorns LLC`
 - Address: [Company address]
 
 ### 3.4 Upload Documents
@@ -276,7 +276,7 @@ Create secure folder structure:
 
 ## Step 6: Update Documentation (30 minutes)
 
-Now update your PEAT Protocol docs with filing information:
+Now update your Peat Protocol docs with filing information:
 
 ### 6.1 Update PATENT_STRATEGY.md
 
@@ -320,7 +320,7 @@ And at bottom:
 ```markdown
 **Signed**:
 Kit Plummer, [Title]
-(r)evolve LLC
+Defense Unicorns LLC
 November XX, 2025
 ```
 
@@ -422,7 +422,7 @@ Notes:
 ### Week 1-2
 - Follow POST_FILING_CHECKLIST.md
 - Publish Patent Pledge
-- Open-source PEAT Protocol
+- Open-source Peat Protocol
 
 ### Month 1-11
 - Track evidence for utility decision

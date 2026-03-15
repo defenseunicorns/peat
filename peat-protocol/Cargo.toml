@@ -60,7 +60,7 @@ negentropy = { version = "0.5", optional = true }  # Set reconciliation protocol
 # TAK/CoT Integration (ADR-020, ADR-028)
 quick-xml = { version = "0.37", features = ["serialize"] }  # CoT XML encoding/decoding
 
-# PEAT-Lite transport (ADR-035)
+# Peat-Lite transport (ADR-035)
 log = { version = "0.4", optional = true }  # Logging for lite transport
 
 # Bluetooth LE transport (ADR-032, ADR-039)
@@ -72,7 +72,7 @@ default = ["ditto-backend"]
 ditto-backend = ["dittolive-ditto"]
 # Automerge/Iroh backend - pure Rust, works on Android
 automerge-backend = ["automerge", "iroh", "iroh-blobs", "redb", "lru", "toml", "mdns-sd", "rand", "futures-lite", "negentropy", "peat-mesh/automerge-backend"]
-# PEAT-Lite transport - UDP-based communication with embedded devices (ADR-035)
+# Peat-Lite transport - UDP-based communication with embedded devices (ADR-035)
 lite-transport = ["log", "peat-mesh/lite-bridge"]
 # Bluetooth LE transport - BLE mesh networking (ADR-032, ADR-039)
 bluetooth = ["peat-btle", "peat-mesh/bluetooth"]

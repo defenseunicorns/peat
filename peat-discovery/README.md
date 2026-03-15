@@ -1,6 +1,6 @@
 # peat-discovery
 
-Peer discovery layer for the PEAT Protocol mesh intelligence system.
+Peer discovery layer for the Peat Protocol mesh intelligence system.
 
 ## Overview
 

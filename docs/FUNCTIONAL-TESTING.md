@@ -2,14 +2,14 @@
 
 **Created**: 2026-02-15
 **Status**: Active
-**Related ADRs**: ADR-039 (PEAT-BTLE Mesh Transport), ADR-047 (Android BLE Hybrid Integration)
+**Related ADRs**: ADR-039 (Peat-BTLE Mesh Transport), ADR-047 (Android BLE Hybrid Integration)
 **Related Docs**: [PROJECT-BLE-INTEGRATION.md](PROJECT-BLE-INTEGRATION.md), [TESTING_STRATEGY.md](TESTING_STRATEGY.md)
 
 ---
 
 ## Overview
 
-This document describes the functional test infrastructure for PEAT's transport layer. Functional tests validate **real hardware** running real protocol stacks over real radios and networks — they are not simulations or mocks.
+This document describes the functional test infrastructure for Peat's transport layer. Functional tests validate **real hardware** running real protocol stacks over real radios and networks — they are not simulations or mocks.
 
 The test infrastructure is designed for extension. Each platform (Android, macOS, iOS, Windows, Linux) gets its own test harness that exercises the same feature set through the same phases. Adding a new platform means implementing a test client for that platform and adding corresponding Makefile targets.
 
@@ -97,7 +97,7 @@ Each phase validates a specific feature. The mapping below shows which capabilit
 | 1 | JNI Init | Native library loading, JNI binding | — | `peatVersion()` returns non-empty | Yes |
 | 2 | Dual Node Created | Node creation with BLE + QUIC | Both | Node handle != 0, node ID non-empty | Yes |
 | 3 | Iroh Active | QUIC transport initialization | QUIC | Node ID valid, handle active | Yes |
-| 4 | BLE Discovery | BLE scanning, advertisement parsing | BLE | PEAT service UUID found within 15s | Yes |
+| 4 | BLE Discovery | BLE scanning, advertisement parsing | BLE | Peat service UUID found within 15s | Yes |
 | 5 | BLE GATT Sync | GATT connect, characteristic R/W, document exchange | BLE | Bytes received > 0, peer node ID parsed | Yes |
 | 6 | Publish Platform | Automerge document creation, local store write | QUIC | `publishPlatformJni` returns true | Yes |
 | 7 | QUIC Peer Connect | Iroh peer discovery (mDNS or direct connect) | QUIC | Peer count > 0 within 25s | Yes |
@@ -115,7 +115,7 @@ When QUIC peer info is not provided, the test falls back to BLE-only mode:
 | 1 | JNI Init | Native library loading | — | Version non-empty |
 | 2 | Dual Node Created | Node creation with BLE | Both | Handle != 0 |
 | 3 | Iroh Active | QUIC transport init | QUIC | Node ID valid |
-| 4 | BLE Discovery | BLE scanning | BLE | PEAT service found |
+| 4 | BLE Discovery | BLE scanning | BLE | Peat service found |
 | 5 | BLE GATT Sync | GATT document exchange | BLE | Bytes received > 0 |
 | 6 | BLE State Signaled | TransportManager bridge | BLE | Available + peers |
 | 7 | Dual Transport | Both transports active | Both | Iroh active + BLE peers >= 1 |

@@ -164,7 +164,7 @@ pub struct XmlEncodingOptions {
     /// Pretty print XML (development only)
     pub pretty_print: bool,
 
-    /// Include PEAT extension by default
+    /// Include Peat extension by default
     pub include_peat_extension: bool,
 }
 

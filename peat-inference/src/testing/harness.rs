@@ -27,7 +27,7 @@ use std::time::{Duration, Instant};
 use tokio::time::timeout;
 use tracing::{debug, info, warn};
 
-/// Collection names for PEAT documents
+/// Collection names for Peat documents
 pub mod collections {
     pub const PLATFORMS: &str = "platforms";
     pub const CAPABILITIES: &str = "capabilities";

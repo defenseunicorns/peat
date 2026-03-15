@@ -1,4 +1,4 @@
-//! Time utilities for PEAT simulation.
+//! Time utilities for Peat simulation.
 //!
 //! Provides functions for timestamp handling, including extraction from various
 //! formats (plain integers, protobuf-style objects) and current time retrieval.

@@ -1,17 +1,17 @@
-# PEAT Protocol Specification
+# Peat Protocol Specification
 
 ```
 Internet-Draft                                              K. Plummer
-Intended Status: Standards Track                       (r)evolve, Inc.
+Intended Status: Standards Track                       Defense Unicorns
                                                            December 2025
 
-      Hierarchical Intelligence for Versatile Entities (PEAT) Protocol
+      Hierarchical Intelligence for Versatile Entities (Peat) Protocol
                         draft-peat-protocol-00
 ```
 
 ## Abstract
 
-This document specifies the Hierarchical Intelligence for Versatile Entities (PEAT) Protocol, a distributed coordination protocol for autonomous systems operating in constrained, partition-prone networks. PEAT enables scalable coordination through CRDT-based hierarchical capability composition, achieving O(n log n) message complexity while maintaining eventual consistency guarantees.
+This document specifies the Hierarchical Intelligence for Versatile Entities (Peat) Protocol, a distributed coordination protocol for autonomous systems operating in constrained, partition-prone networks. Peat enables scalable coordination through CRDT-based hierarchical capability composition, achieving O(n log n) message complexity while maintaining eventual consistency guarantees.
 
 ## Status of This Memo
 
@@ -57,7 +57,7 @@ Existing approaches suffer from:
 
 ### 1.2 Solution Overview
 
-PEAT addresses these challenges through:
+Peat addresses these challenges through:
 
 1. **Hierarchical organization**: Bounded cells with elected leaders reduce message paths
 2. **CRDT-based state**: Eventual consistency without coordination overhead
@@ -101,7 +101,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 | Term | Definition |
 |------|------------|
-| **Node** | A single platform (UAV, UGV, sensor, soldier system) participating in the PEAT mesh |
+| **Node** | A single platform (UAV, UGV, sensor, soldier system) participating in the Peat mesh |
 | **Cell** | A bounded group of nodes (typically 5-8) with a single elected leader |
 | **Beacon** | Discovery broadcast message advertising node presence and capabilities |
 | **Capability** | A discrete function a node or cell can perform (sense, compute, relay, etc.) |
@@ -133,7 +133,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ### 3.1 Three-Phase Operation
 
-PEAT operates in three sequential phases:
+Peat operates in three sequential phases:
 
 ```
 ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
@@ -468,13 +468,13 @@ When concurrent updates conflict:
 
 ### 9.4 Consistency Guarantees
 
-PEAT provides **eventual consistency**:
+Peat provides **eventual consistency**:
 
 - All replicas converge to the same state
 - No coordination required during partitions
 - Updates are durable once observed by any node
 
-PEAT does NOT provide:
+Peat does NOT provide:
 
 - Linearizability
 - Strong consistency
@@ -514,7 +514,7 @@ With hierarchy depth d = log(n/k):
 | Architecture | Messages (100 nodes) | Messages (1000 nodes) |
 |--------------|---------------------|----------------------|
 | All-to-all | 9,900 | 999,000 |
-| PEAT | ~664 | ~6,644 |
+| Peat | ~664 | ~6,644 |
 | Reduction | 93% | 99.3% |
 
 ---
@@ -635,6 +635,6 @@ Company Cmd ─────▶ Platoon Leader ─────▶ Squad Leader �
 ## Author's Address
 
 Kit Plummer
-(r)evolve, Inc.
-Email: kit@revolveteam.com
+Defense Unicorns
+Email: kitplummer@defenseunicorns.com
 GitHub: https://github.com/defenseunicorns/peat

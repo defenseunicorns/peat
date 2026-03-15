@@ -1,4 +1,4 @@
-# PEAT Developer Guide
+# Peat Developer Guide
 
 > **Version**: 1.0
 > **Last Updated**: 2025-12-08
@@ -14,7 +14,7 @@
 4. [Core Concepts](#4-core-concepts)
 5. [Crate Reference](#5-crate-reference)
 6. [API Reference](#6-api-reference)
-7. [Extending PEAT](#7-extending-peat)
+7. [Extending Peat](#7-extending-peat)
 8. [Testing](#8-testing)
 9. [Backend Abstraction](#9-backend-abstraction)
 10. [Mobile Development](#10-mobile-development)
@@ -29,10 +29,10 @@
 ### 1.1 About This Guide
 
 This guide is for software engineers who want to:
-- **Build applications** using PEAT as a coordination protocol
-- **Contribute** to the PEAT core protocol
-- **Integrate** PEAT with existing systems
-- **Extend** PEAT with custom capabilities and behaviors
+- **Build applications** using Peat as a coordination protocol
+- **Contribute** to the Peat core protocol
+- **Integrate** Peat with existing systems
+- **Extend** Peat with custom capabilities and behaviors
 
 ### 1.2 Prerequisites
 
@@ -41,9 +41,9 @@ This guide is for software engineers who want to:
 - **Distributed systems**: Basic knowledge of CRDTs, eventual consistency
 - **Development tools**: Git, cargo, IDE of choice
 
-### 1.3 What is PEAT?
+### 1.3 What is Peat?
 
-PEAT (Hierarchical Intelligence for Versatile Entities) is a protocol enabling scalable coordination of autonomous nodes through:
+Peat (Hierarchical Intelligence for Versatile Entities) is a protocol enabling scalable coordination of autonomous nodes through:
 
 - **CRDT-based state synchronization** - Conflict-free data structures for eventual consistency
 - **Three-phase protocol** - Discovery → Cell Formation → Hierarchical Operations
@@ -212,7 +212,7 @@ peat/
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              PEAT Architecture                               │
+│                              Peat Architecture                               │
 │                                                                              │
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
 │  │                        Application Layer                             │    │
@@ -308,7 +308,7 @@ peat-inference ─────────────────────�
 
 ### 3.4 CRDT Usage
 
-PEAT uses specific CRDT types for different data:
+Peat uses specific CRDT types for different data:
 
 | Data Type | CRDT | Rationale |
 |-----------|------|-----------|
@@ -326,7 +326,7 @@ PEAT uses specific CRDT types for different data:
 
 ### 4.1 Nodes
 
-A **Node** represents a single entity in the PEAT network:
+A **Node** represents a single entity in the Peat network:
 
 ```rust
 use peat_protocol::models::{Node, NodeId, PlatformType};
@@ -506,7 +506,7 @@ hierarchy.propagate_update(&update).await?;
 
 ### 4.6 Capability Composition
 
-PEAT composes capabilities from multiple nodes:
+Peat composes capabilities from multiple nodes:
 
 ```rust
 use peat_protocol::composition::{Composer, CompositionRules};
@@ -796,7 +796,7 @@ pub trait StorageBackend: Send + Sync {
 
 ### 6.6 Error Handling
 
-PEAT uses typed errors for each domain:
+Peat uses typed errors for each domain:
 
 ```rust
 use peat_protocol::error::{PeatError, CellError, DiscoveryError, SyncError};
@@ -828,7 +828,7 @@ async fn join_network(config: &Config) -> Result<(), PeatError> {
 
 ---
 
-## 7. Extending PEAT
+## 7. Extending Peat
 
 ### 7.1 Adding Custom Capabilities
 
@@ -1014,7 +1014,7 @@ let qos_config = QosConfig::new()
 
 ### 8.1 Test Philosophy
 
-PEAT follows a test pyramid approach:
+Peat follows a test pyramid approach:
 
 ```
          /\
@@ -1272,7 +1272,7 @@ cargo tarpaulin --out Html
 
 ### 9.1 Backend Architecture
 
-PEAT abstracts the CRDT backend to support multiple implementations:
+Peat abstracts the CRDT backend to support multiple implementations:
 
 ```rust
 /// Backend-agnostic sync trait
@@ -1428,7 +1428,7 @@ class PeatService {
     private val peat: PeatClient
 
     init {
-        // Initialize PEAT client
+        // Initialize Peat client
         val config = PeatConfig(
             nodeId = UUID.randomUUID().toString(),
             persistenceDir = context.filesDir.absolutePath
@@ -1498,7 +1498,7 @@ while let Some(detection) = detections.recv().await {
 
 ### 11.2 Model Distribution
 
-PEAT distributes AI models across the network:
+Peat distributes AI models across the network:
 
 ```rust
 use peat_protocol::distribution::{ModelDistributor, ModelManifest};
@@ -1627,7 +1627,7 @@ All public APIs must have doc comments:
 ```rust
 /// Discovers peers in the local network.
 ///
-/// Uses the configured discovery strategy to find other PEAT nodes.
+/// Uses the configured discovery strategy to find other Peat nodes.
 /// Returns a list of discovered peers within the timeout period.
 ///
 /// # Arguments
@@ -1679,7 +1679,7 @@ Key Architecture Decision Records:
 
 | ADR | Title |
 |-----|-------|
-| [001](../../adr/001-cap-protocol-poc.md) | PEAT Protocol POC |
+| [001](../../adr/001-cap-protocol-poc.md) | Peat Protocol POC |
 | [004](../../adr/004-human-machine-cell-composition.md) | Human-Machine Cell Composition |
 | [011](../../adr/011-ditto-vs-automerge-iroh.md) | Ditto vs Automerge/Iroh |
 | [012](../../adr/012-schema-definition-protocol-extensibility.md) | Schema Definition |
@@ -1706,4 +1706,4 @@ Key Architecture Decision Records:
 
 **Document Version**: 1.0
 **Last Updated**: 2025-12-08
-**Maintainer**: PEAT Development Team
+**Maintainer**: Peat Development Team

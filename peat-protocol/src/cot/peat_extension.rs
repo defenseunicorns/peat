@@ -1,7 +1,7 @@
-//! PEAT custom detail extension schema for CoT
+//! Peat custom detail extension schema for CoT
 //!
 //! Implements the `<_peat_>` XML extension defined in ADR-028 for preserving
-//! PEAT-specific semantics in CoT messages.
+//! Peat-specific semantics in CoT messages.
 
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::Writer;
@@ -12,12 +12,12 @@ use std::io::Cursor;
 use super::event::CotError;
 use super::types::OperationalStatus;
 
-/// PEAT version for the extension schema
+/// Peat version for the extension schema
 pub const PEAT_EXTENSION_VERSION: &str = "1.0";
 
-/// PEAT custom detail extension
+/// Peat custom detail extension
 ///
-/// Contains PEAT-specific metadata that doesn't map to standard CoT fields.
+/// Contains Peat-specific metadata that doesn't map to standard CoT fields.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PeatExtension {
     /// Source attribution
@@ -39,7 +39,7 @@ pub struct PeatExtension {
 }
 
 impl PeatExtension {
-    /// Create a new empty PEAT extension
+    /// Create a new empty Peat extension
     pub fn new() -> Self {
         Self::default()
     }

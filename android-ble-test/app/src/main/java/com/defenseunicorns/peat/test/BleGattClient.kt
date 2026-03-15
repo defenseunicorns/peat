@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ * Copyright (c) 2026 Defense Unicorns.  All rights reserved.
  */
 
 package com.defenseunicorns.peat.test
@@ -18,7 +18,7 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /**
- * Android BLE GATT client implementing the PEAT GATT protocol.
+ * Android BLE GATT client implementing the Peat GATT protocol.
  *
  * Uses raw Android BLE APIs (not PeatBtle AAR) to prove the GATT protocol
  * directly. Wraps callback-based APIs into sequential coroutines.
@@ -35,7 +35,7 @@ class BleGattClient(private val context: Context) {
     companion object {
         private const val TAG = "BleGattClient"
 
-        // PEAT GATT UUIDs — derived from base service UUID
+        // Peat GATT UUIDs — derived from base service UUID
         // Characteristic UUIDs replace bytes [2:3] of service UUID with char ID
         val PEAT_SERVICE_UUID: UUID =
             UUID.fromString("f47ac10b-58cc-4372-a567-0e02b2c3d479")
@@ -77,8 +77,8 @@ class BleGattClient(private val context: Context) {
     private var bluetoothGatt: BluetoothGatt? = null
     private val gattMutex = Mutex()
 
-    // Scan for PEAT devices.
-    // The BLE device name format is "PEAT-{NODE_ID}" (e.g. "PEAT-C8E32F88").
+    // Scan for Peat devices.
+    // The BLE device name format is "Peat-{NODE_ID}" (e.g. "Peat-C8E32F88").
     // The mesh ID is carried in scan response data, not the device name.
     suspend fun scan(meshId: String, timeoutMs: Long = 15_000): DiscoveredDevice {
         val adapter = BluetoothAdapter.getDefaultAdapter()
@@ -86,8 +86,8 @@ class BleGattClient(private val context: Context) {
         val scanner = adapter.bluetoothLeScanner
             ?: throw IllegalStateException("BLE scanner not available (is Bluetooth on?)")
 
-        val peatPrefix = "PEAT-"
-        Log.i(TAG, "Scanning for PEAT devices (prefix: $peatPrefix, mesh: $meshId)")
+        val peatPrefix = "Peat-"
+        Log.i(TAG, "Scanning for Peat devices (prefix: $peatPrefix, mesh: $meshId)")
 
         return suspendCancellableCoroutine { cont ->
             val callback = object : ScanCallback() {
@@ -96,7 +96,7 @@ class BleGattClient(private val context: Context) {
                     Log.d(TAG, "Scan result: name=$name, addr=${result.device.address}, rssi=${result.rssi}")
 
                     if (name != null && name.startsWith(peatPrefix)) {
-                        Log.i(TAG, "Found PEAT device: $name (${result.device.address}), RSSI: ${result.rssi}")
+                        Log.i(TAG, "Found Peat device: $name (${result.device.address}), RSSI: ${result.rssi}")
                         scanner.stopScan(this)
                         if (cont.isActive) {
                             cont.resume(DiscoveredDevice(result.device, name, result.rssi))
@@ -132,7 +132,7 @@ class BleGattClient(private val context: Context) {
                 override fun onScanResult(callbackType: Int, result: ScanResult) {
                     val name = result.device.name ?: result.scanRecord?.deviceName
                     if (name != null && name.startsWith(peatPrefix)) {
-                        Log.i(TAG, "Found PEAT device (unfiltered): $name (${result.device.address}), RSSI: ${result.rssi}")
+                        Log.i(TAG, "Found Peat device (unfiltered): $name (${result.device.address}), RSSI: ${result.rssi}")
                         scanner.stopScan(this)
                         scanner.stopScan(callback)
                         if (cont.isActive) {
@@ -187,13 +187,13 @@ class BleGattClient(private val context: Context) {
                     }
 
                 if (service != null) {
-                    Log.i(TAG, "Found PEAT GATT service: ${service.uuid}")
+                    Log.i(TAG, "Found Peat GATT service: ${service.uuid}")
                     if (cont.isActive) cont.resume(service)
                 } else {
                     val allServices = gatt.services?.map { it.uuid } ?: emptyList()
-                    Log.e(TAG, "PEAT service not found. Available: $allServices")
+                    Log.e(TAG, "Peat service not found. Available: $allServices")
                     if (cont.isActive) {
-                        cont.resumeWithException(RuntimeException("PEAT GATT service not found"))
+                        cont.resumeWithException(RuntimeException("Peat GATT service not found"))
                     }
                 }
             } else {

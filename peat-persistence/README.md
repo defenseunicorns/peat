@@ -4,7 +4,7 @@ Storage abstraction layer for the Capability Aggregation Protocol (CAP).
 
 ## Overview
 
-`peat-persistence` provides a backend-agnostic interface for persisting and querying PEAT protocol data, enabling external systems to access CAP state without coupling to specific storage implementations.
+`peat-persistence` provides a backend-agnostic interface for persisting and querying Peat protocol data, enabling external systems to access CAP state without coupling to specific storage implementations.
 
 ## Features
 
@@ -386,7 +386,7 @@ impl DataStore for SqliteStore {
 
 ## Integration with CAP Ecosystem
 
-`peat-persistence` is part of the larger PEAT Protocol ecosystem:
+`peat-persistence` is part of the larger Peat Protocol ecosystem:
 
 - **peat-schema**: Protobuf message definitions (stores these messages)
 - **peat-protocol**: Core protocol logic (uses this for state storage)
@@ -428,5 +428,5 @@ Contributions are welcome! See `DEVELOPMENT.md` in the repository root for guide
 ## References
 
 - [ADR-012: Schema Definition and Protocol Extensibility](../docs/adr/012-schema-definition-protocol-extensibility.md)
-- [PEAT Protocol Documentation](../README.md)
+- [Peat Protocol Documentation](../README.md)
 - [Ditto SDK Documentation](https://docs.ditto.live/)

@@ -1,20 +1,20 @@
-# PEAT Protocol Specification: Transport Layer
+# Peat Protocol Specification: Transport Layer
 
-**Spec ID**: PEAT-SPEC-001
+**Spec ID**: Peat-SPEC-001
 **Status**: Draft
 **Version**: 0.1.0
 **Date**: 2025-01-07
-**Authors**: (r)evolve - Revolve Team LLC
+**Authors**: Defense Unicorns
 
 ## Abstract
 
-This document specifies the transport layer for the PEAT Protocol. It defines wire formats, connection lifecycle, transport abstractions, and the UDP bypass channel for latency-critical applications.
+This document specifies the transport layer for the Peat Protocol. It defines wire formats, connection lifecycle, transport abstractions, and the UDP bypass channel for latency-critical applications.
 
 ## 1. Introduction
 
 ### 1.1 Purpose
 
-The PEAT transport layer provides reliable and unreliable message delivery across heterogeneous network environments. It abstracts multiple physical transports (QUIC, UDP, BLE) behind a common interface, enabling applications to function regardless of underlying connectivity.
+The Peat transport layer provides reliable and unreliable message delivery across heterogeneous network environments. It abstracts multiple physical transports (QUIC, UDP, BLE) behind a common interface, enabling applications to function regardless of underlying connectivity.
 
 ### 1.2 Scope
 
@@ -22,7 +22,7 @@ This specification covers:
 - Transport trait abstraction
 - QUIC-based primary transport (via Iroh)
 - UDP bypass channel for low-latency data
-- PEAT-Lite protocol for constrained devices
+- Peat-Lite protocol for constrained devices
 - BLE mesh transport for mobile/embedded devices
 - Connection establishment and teardown
 - Wire format encoding
@@ -37,7 +37,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 | Term | Definition |
 |------|------------|
-| **Node** | A PEAT-capable device with a unique identity |
+| **Node** | A Peat-capable device with a unique identity |
 | **Peer** | A node with an established transport connection |
 | **Endpoint** | A network address (IP:port, BLE address, etc.) |
 | **Channel** | A logical stream within a transport connection |
@@ -50,7 +50,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ### 3.1 Transport Trait
 
-All PEAT transports MUST implement the following interface:
+All Peat transports MUST implement the following interface:
 
 ```rust
 pub trait Transport: Send + Sync {
@@ -103,7 +103,7 @@ Implementations MUST use the first 32 bytes of the SHA-256 hash. The PeerId MUST
 
 ### 4.1 Overview
 
-The primary PEAT transport uses QUIC via the Iroh library. QUIC provides:
+The primary Peat transport uses QUIC via the Iroh library. QUIC provides:
 - Multiplexed streams over a single connection
 - Built-in encryption (TLS 1.3)
 - Connection migration
@@ -118,10 +118,10 @@ The primary PEAT transport uses QUIC via the Iroh library. QUIC provides:
         |                                   |
         |<------- QUIC ServerHello ---------|
         |                                   |
-        |-------- PEAT Handshake ---------->|
+        |-------- Peat Handshake ---------->|
         |  (DeviceId, FormationId, Nonce)   |
         |                                   |
-        |<------- PEAT HandshakeAck --------|
+        |<------- Peat HandshakeAck --------|
         |  (DeviceId, Challenge)            |
         |                                   |
         |-------- ChallengeResponse ------->|
@@ -131,7 +131,7 @@ The primary PEAT transport uses QUIC via the Iroh library. QUIC provides:
         |                                   |
 ```
 
-### 4.3 PEAT Handshake Message
+### 4.3 Peat Handshake Message
 
 ```
  0                   1                   2                   3
@@ -272,11 +272,11 @@ pub struct BypassCollectionConfig {
 
 ### 5.4 Multicast
 
-For broadcast scenarios, PEAT supports IP multicast:
+For broadcast scenarios, Peat supports IP multicast:
 
 | Multicast Group | Purpose |
 |-----------------|---------|
-| `239.255.72.86` | Default PEAT multicast group |
+| `239.255.72.86` | Default Peat multicast group |
 | `239.255.72.87` | Sensor data |
 | `239.255.72.88` | Control commands |
 
@@ -292,11 +292,11 @@ Nodes MUST join multicast groups using IGMP. The default TTL for multicast packe
 
 ---
 
-## 6. PEAT-Lite Protocol
+## 6. Peat-Lite Protocol
 
 ### 6.1 Purpose
 
-PEAT-Lite is a lightweight UDP protocol for resource-constrained devices (ESP32, ARM Cortex-M) that cannot run the full QUIC stack.
+Peat-Lite is a lightweight UDP protocol for resource-constrained devices (ESP32, ARM Cortex-M) that cannot run the full QUIC stack.
 
 ### 6.2 Message Format
 
@@ -330,7 +330,7 @@ PEAT-Lite is a lightweight UDP protocol for resource-constrained devices (ESP32,
 
 ### 6.3 Reliability
 
-PEAT-Lite uses a simple acknowledgment scheme:
+Peat-Lite uses a simple acknowledgment scheme:
 - Sender transmits with sequence number (0-255, wraparound)
 - Receiver sends Ack/Nack within timeout (default: 100ms)
 - Sender retries up to 3 times before marking peer as failed
@@ -341,19 +341,19 @@ PEAT-Lite uses a simple acknowledgment scheme:
 
 ### 7.1 Overview
 
-The BLE mesh transport (`peat-btle`) enables PEAT communication over Bluetooth Low Energy for mobile and embedded devices.
+The BLE mesh transport (`peat-btle`) enables Peat communication over Bluetooth Low Energy for mobile and embedded devices.
 
 ### 7.2 GATT Service
 
 | UUID | Name | Description |
 |------|------|-------------|
-| `0x1826` | PEAT Mesh Service | Primary service |
+| `0x1826` | Peat Mesh Service | Primary service |
 | `0x2A6E` | Data Characteristic | Read/Write/Notify |
 | `0x2A6F` | Control Characteristic | Write only |
 
 ### 7.3 Advertising
 
-PEAT nodes advertise with:
+Peat nodes advertise with:
 - Service UUID: `0x1826`
 - Manufacturer Data: 4-byte Formation ID + 2-byte Mesh ID
 
@@ -453,13 +453,13 @@ All multi-byte integers are encoded in **big-endian** (network byte order).
 |------|----------|---------|
 | 4433 | UDP | QUIC/Iroh primary transport |
 | 4434 | UDP | Bypass channel |
-| 4435 | UDP | PEAT-Lite |
+| 4435 | UDP | Peat-Lite |
 
 ### 11.2 Multicast Groups
 
 | Group | Purpose |
 |-------|---------|
-| 239.255.72.86-88 | PEAT protocol multicast |
+| 239.255.72.86-88 | Peat protocol multicast |
 
 ---
 
@@ -479,23 +479,23 @@ All multi-byte integers are encoded in **big-endian** (network byte order).
 
 ---
 
-# PEAT Protocol Specification: Synchronization Protocol
+# Peat Protocol Specification: Synchronization Protocol
 
-**Spec ID**: PEAT-SPEC-002
+**Spec ID**: Peat-SPEC-002
 **Status**: Draft
 **Version**: 0.1.0
 **Date**: 2025-01-07
-**Authors**: (r)evolve - Revolve Team LLC
+**Authors**: Defense Unicorns
 
 ## Abstract
 
-This document specifies the synchronization protocol for PEAT. It defines CRDT semantics, conflict resolution, document lifecycle, and the Negentropy-based set reconciliation mechanism.
+This document specifies the synchronization protocol for Peat. It defines CRDT semantics, conflict resolution, document lifecycle, and the Negentropy-based set reconciliation mechanism.
 
 ## 1. Introduction
 
 ### 1.1 Purpose
 
-PEAT's synchronization protocol ensures that all nodes in a cell eventually converge to the same state, even when operating offline or with intermittent connectivity. It builds on Conflict-free Replicated Data Types (CRDTs) to achieve automatic conflict resolution.
+Peat's synchronization protocol ensures that all nodes in a cell eventually converge to the same state, even when operating offline or with intermittent connectivity. It builds on Conflict-free Replicated Data Types (CRDTs) to achieve automatic conflict resolution.
 
 ### 1.2 Design Goals
 
@@ -528,7 +528,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ### 3.1 Automerge CRDT
 
-PEAT uses Automerge as its CRDT implementation. Automerge provides:
+Peat uses Automerge as its CRDT implementation. Automerge provides:
 
 - **JSON-like documents**: Nested maps, lists, and primitives
 - **Causal ordering**: Operations include dependency information
@@ -821,7 +821,7 @@ Tombstones and old changes MAY be collected when:
 
 ### 8.1 Overview
 
-For efficient sync of large collections, PEAT uses Negentropy set reconciliation. This protocol efficiently computes set differences using range fingerprints.
+For efficient sync of large collections, Peat uses Negentropy set reconciliation. This protocol efficiently computes set differences using range fingerprints.
 
 ### 8.2 Fingerprint Computation
 
@@ -967,7 +967,7 @@ Sync priority SHOULD be assigned based on:
 
 ### 11.1 Operation Signing
 
-When E2E encryption is enabled (see PEAT-SPEC-005), operations SHOULD be signed:
+When E2E encryption is enabled (see Peat-SPEC-005), operations SHOULD be signed:
 
 ```rust
 pub struct SignedChange {
@@ -992,7 +992,7 @@ Implementations MUST validate:
 
 ### 11.3 Storage Encryption
 
-Documents at rest SHOULD be encrypted. See PEAT-SPEC-005 for key management.
+Documents at rest SHOULD be encrypted. See Peat-SPEC-005 for key management.
 
 ---
 
@@ -1012,23 +1012,23 @@ Documents at rest SHOULD be encrypted. See PEAT-SPEC-005 for key management.
 
 ---
 
-# PEAT Protocol Specification: Data Schema Definitions
+# Peat Protocol Specification: Data Schema Definitions
 
-**Spec ID**: PEAT-SPEC-003
+**Spec ID**: Peat-SPEC-003
 **Status**: Draft
 **Version**: 0.1.0
 **Date**: 2025-01-07
-**Authors**: (r)evolve - Revolve Team LLC
+**Authors**: Defense Unicorns
 
 ## Abstract
 
-This document specifies the data schemas for PEAT Protocol. It defines the Protocol Buffer message formats for tactical entities, their relationships, and mapping to external standards (CoT/TAK).
+This document specifies the data schemas for Peat Protocol. It defines the Protocol Buffer message formats for tactical entities, their relationships, and mapping to external standards (CoT/TAK).
 
 ## 1. Introduction
 
 ### 1.1 Purpose
 
-PEAT schemas define the structure of all data exchanged between nodes. Using Protocol Buffers ensures:
+Peat schemas define the structure of all data exchanged between nodes. Using Protocol Buffers ensures:
 - Compact binary encoding
 - Forward/backward compatibility
 - Cross-language support
@@ -1550,7 +1550,7 @@ message CommunicationCapability {
 
 enum LinkType {
     LINK_TYPE_UNSPECIFIED = 0;
-    LINK_TYPE_MESH = 1;         // PEAT mesh
+    LINK_TYPE_MESH = 1;         // Peat mesh
     LINK_TYPE_SATCOM = 2;
     LINK_TYPE_HF = 3;
     LINK_TYPE_VHF = 4;
@@ -1767,9 +1767,9 @@ message Detection {
 
 ### 9.1 CoT Event Mapping
 
-PEAT beacons map to CoT events:
+Peat beacons map to CoT events:
 
-| PEAT Field | CoT Field | Notes |
+| Peat Field | CoT Field | Notes |
 |------------|-----------|-------|
 | `track_id` | `uid` | UUID format |
 | `position.latitude` | `point/@lat` | |
@@ -1784,7 +1784,7 @@ PEAT beacons map to CoT events:
 ### 9.2 CoT Type Mapping
 
 ```
-PEAT Affiliation + Dimension → CoT Type
+Peat Affiliation + Dimension → CoT Type
 
 MEMBER + GROUND     → a-f-G
 MEMBER + AIR        → a-f-A
@@ -1795,7 +1795,7 @@ UNKNOWN + AIR       → a-u-A
 
 ### 9.3 CoT Detail Extensions
 
-PEAT-specific data is carried in CoT `<detail>` elements:
+Peat-specific data is carried in CoT `<detail>` elements:
 
 ```xml
 <detail>
@@ -1878,23 +1878,23 @@ Production deployments SHOULD maintain a schema registry for:
 
 ---
 
-# PEAT Protocol Specification: Coordination Protocol
+# Peat Protocol Specification: Coordination Protocol
 
-**Spec ID**: PEAT-SPEC-004
+**Spec ID**: Peat-SPEC-004
 **Status**: Draft
 **Version**: 0.1.0
 **Date**: 2025-01-07
-**Authors**: (r)evolve - Revolve Team LLC
+**Authors**: Defense Unicorns
 
 ## Abstract
 
-This document specifies the coordination protocol for PEAT. It defines cell formation, leader election, hierarchical organization, and inter-cell coordination mechanisms.
+This document specifies the coordination protocol for Peat. It defines cell formation, leader election, hierarchical organization, and inter-cell coordination mechanisms.
 
 ## 1. Introduction
 
 ### 1.1 Purpose
 
-The PEAT coordination protocol enables autonomous and semi-autonomous systems to form dynamic teams ("cells") that operate effectively without centralized control. It provides mechanisms for:
+The Peat coordination protocol enables autonomous and semi-autonomous systems to form dynamic teams ("cells") that operate effectively without centralized control. It provides mechanisms for:
 - Discovering and joining cells
 - Electing leaders based on capabilities and authority
 - Organizing hierarchically (team → group → formation)
@@ -2224,7 +2224,7 @@ enum BindingStatus {
 
 ### 6.3 Capability Aggregation and Emergent Behavior
 
-A core principle of PEAT is that **cells exhibit emergent capabilities** greater than the sum of their individual members. Capability aggregation flows upward through the hierarchy, enabling higher echelons to understand and task based on collective capabilities.
+A core principle of Peat is that **cells exhibit emergent capabilities** greater than the sum of their individual members. Capability aggregation flows upward through the hierarchy, enabling higher echelons to understand and task based on collective capabilities.
 
 #### 6.3.1 Capability Flow Model
 
@@ -2267,7 +2267,7 @@ Individual platforms → Group capabilities → Formation emergent → Cluster e
 Emergent capabilities arise from the **composition** of individual platform capabilities:
 
 ```rust
-/// Emergent capability patterns recognized by PEAT
+/// Emergent capability patterns recognized by Peat
 pub enum EmergentCapability {
     /// Multiple sensors with overlapping coverage → Wide-area observation
     WideAreaObservation {
@@ -2482,7 +2482,7 @@ pub enum CapabilitySummaryMode {
 
 ### 6.4 Bidirectional Flow Model
 
-PEAT operates as a **full-duplex hierarchical synchronization system**:
+Peat operates as a **full-duplex hierarchical synchronization system**:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -2521,7 +2521,7 @@ PEAT operates as a **full-duplex hierarchical synchronization system**:
 
 #### 6.4.1 Policy-Based Routing
 
-Events carry routing policies that PEAT enforces:
+Events carry routing policies that Peat enforces:
 
 ```rust
 pub struct EventRoutingPolicy {
@@ -2895,23 +2895,23 @@ All coordination messages include:
 
 ---
 
-# PEAT Protocol Specification: Security Framework
+# Peat Protocol Specification: Security Framework
 
-**Spec ID**: PEAT-SPEC-005
+**Spec ID**: Peat-SPEC-005
 **Status**: Draft
 **Version**: 0.1.0
 **Date**: 2025-01-07
-**Authors**: (r)evolve - Revolve Team LLC
+**Authors**: Defense Unicorns
 
 ## Abstract
 
-This document specifies the security framework for PEAT Protocol. It defines device authentication, user authorization, encryption, key management, and audit logging requirements.
+This document specifies the security framework for Peat Protocol. It defines device authentication, user authorization, encryption, key management, and audit logging requirements.
 
 ## 1. Introduction
 
 ### 1.1 Purpose
 
-The PEAT security framework ensures that tactical mesh networks operate securely in contested environments. It provides:
+The Peat security framework ensures that tactical mesh networks operate securely in contested environments. It provides:
 - Device identity verification
 - Cell membership authentication
 - Role-based access control
@@ -3403,7 +3403,7 @@ message EncryptedKeyShare {
 
 ### 8.4 Forward Secrecy
 
-PEAT provides forward secrecy through:
+Peat provides forward secrecy through:
 1. **Ephemeral keys**: New X25519 keypair per session
 2. **Key ratcheting**: Group keys advance after member removal
 3. **MLS integration** (recommended): Full forward secrecy via tree-based key agreement

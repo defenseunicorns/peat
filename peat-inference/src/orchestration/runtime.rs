@@ -237,7 +237,7 @@ pub enum EventPriority {
     LocalOnly,
 }
 
-/// Hints for routing product outputs through PEAT
+/// Hints for routing product outputs through Peat
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct RoutingHint {
     /// Propagate full payload
@@ -562,7 +562,7 @@ pub trait RuntimeAdapter: Send + Sync {
     /// Subscribe to product outputs from this instance
     ///
     /// Products are runtime-specific outputs (detections, classifications, etc.)
-    /// The orchestration service will route these through PEAT events.
+    /// The orchestration service will route these through Peat events.
     async fn subscribe_products(
         &self,
         instance_id: &InstanceId,

@@ -1,6 +1,6 @@
-# PEAT Protocol - Patent Filing Package
+# Peat Protocol - Patent Filing Package
 
-This directory contains technical disclosure documents for provisional patent applications related to PEAT Protocol innovations.
+This directory contains technical disclosure documents for provisional patent applications related to Peat Protocol innovations.
 
 ## Documents Overview
 
@@ -117,7 +117,7 @@ This directory contains technical disclosure documents for provisional patent ap
 - [ ] Update `PATENT_STRATEGY.md` with filing dates and application numbers
 - [ ] Update `../PATENT_PLEDGE.md` with application numbers and effective date
 - [ ] Publish Patent Pledge on website and GitHub
-- [ ] Open-source PEAT Protocol (now protected by provisional + pledge)
+- [ ] Open-source Peat Protocol (now protected by provisional + pledge)
 - [ ] Add "Patent Pending" + link to pledge in README files
 
 ### Timeline
@@ -125,7 +125,7 @@ This directory contains technical disclosure documents for provisional patent ap
 | Event | Date | Action |
 |-------|------|--------|
 | **Week 1** | This week | File provisionals (DIY or attorney) |
-| **Week 2** | After filing | Open-source PEAT Protocol |
+| **Week 2** | After filing | Open-source Peat Protocol |
 | **Month 1-12** | Throughout year | Collect evidence for utility decision |
 | **Month 11** | Oct 2025 | Schedule decision meeting |
 | **Month 12** | Nov 2025 | Decide: Convert to utility or abandon |
@@ -223,14 +223,14 @@ After filing provisionals, you can:
 2. **Decide filing approach** (DIY vs attorney)
 3. **File provisionals** (establishes priority date)
 4. **Save filing receipts** (proof of priority date)
-5. **Open-source PEAT Protocol** (now protected)
+5. **Open-source Peat Protocol** (now protected)
 6. **Update PATENT_STRATEGY.md** with filing details
 
 ## Questions?
 
 **Technical questions**: Review `PATENT_STRATEGY.md`
 **Filing questions**: USPTO helpline (800-786-9199) or consult patent attorney
-**Strategic questions**: Discuss with (r)evolve leadership
+**Strategic questions**: Discuss with Defense Unicorns leadership
 
 ## Document History
 
@@ -244,4 +244,4 @@ After filing provisionals, you can:
 
 **Status**: Ready for filing
 **Priority**: High (file this week to establish priority date before any public disclosure)
-**Owner**: Kit Plummer / (r)evolve LLC
+**Owner**: Kit Plummer / Defense Unicorns LLC

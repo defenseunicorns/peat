@@ -1,12 +1,12 @@
-# PEAT BLE Demo App
+# Peat BLE Demo App
 
-A simple Android application demonstrating PEAT BLE mesh connectivity with M5Stack Core2 devices.
+A simple Android application demonstrating Peat BLE mesh connectivity with M5Stack Core2 devices.
 
 ## Features
 
-- **Scan** for PEAT BLE nodes (devices advertising the PEAT service UUID `0xF47A`)
+- **Scan** for Peat BLE nodes (devices advertising the Peat service UUID `0xF47A`)
 - **Connect** to discovered M5Stack Core2 nodes
-- **Advertise** as a PEAT node for other devices to discover
+- **Advertise** as a Peat node for other devices to discover
 - **Sync** CRDT data over BLE GATT characteristics
 - **Alert/Ack** emergency alert system with vibration feedback
 
@@ -57,11 +57,11 @@ cp ../../target/armv7-linux-androideabi/release/libpeat_btle.so app/src/main/jni
 
 1. Launch the app on an Android device
 2. Grant Bluetooth permissions when prompted
-3. Tap "Start Scan" to discover nearby PEAT nodes
+3. Tap "Start Scan" to discover nearby Peat nodes
 4. Tap a discovered device to connect
 5. Tap "Start Advertise" to make this device discoverable
 
-## PEAT BLE Protocol
+## Peat BLE Protocol
 
 This demo uses the same BLE protocol as the M5Stack Core2 firmware for full interoperability.
 
@@ -69,12 +69,12 @@ This demo uses the same BLE protocol as the M5Stack Core2 firmware for full inte
 
 | UUID | Name | Description |
 |------|------|-------------|
-| `0xF47A` | Service | PEAT BLE Service |
+| `0xF47A` | Service | Peat BLE Service |
 | `0xF47B` | Document | CRDT document exchange (read/write/notify) |
 
 ### Document Format
 
-The PEAT document format is:
+The Peat document format is:
 
 ```
 [version: 4 bytes] [node_id: 4 bytes] [counter_data: N bytes] [0xAB marker] [reserved: 1 byte] [peripheral_len: 2 bytes] [peripheral_data: M bytes]
@@ -99,7 +99,7 @@ The Peripheral data includes event information:
 ## Testing with M5Stack Core2
 
 1. Flash the M5Stack Core2 with the `m5stack-core2-peat` firmware
-2. Power on the M5Stack - it will advertise as `PEAT-XXXXXXXX`
+2. Power on the M5Stack - it will advertise as `Peat-XXXXXXXX`
 3. Use this demo app to scan and connect
 4. Tap the M5Stack's right button (C) to send EMERGENCY
 5. Tap the left button (A) on M5Stack or ACK button on Android to acknowledge

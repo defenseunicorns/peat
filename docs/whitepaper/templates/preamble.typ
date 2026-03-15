@@ -1,4 +1,4 @@
-// HIVE Whitepaper Typst Preamble
+// Peat Whitepaper Typst Preamble
 // Defines functions needed by pandoc's typst output
 
 // Colors
@@ -14,7 +14,7 @@
   header: context {
     if counter(page).get().first() > 1 [
       #set text(size: 7pt, fill: text-muted)
-      HIVE Protocol: Breaking the 20-Node Wall
+      Peat Protocol: Breaking the 20-Node Wall
       #h(1fr)
       v1.0
     ]

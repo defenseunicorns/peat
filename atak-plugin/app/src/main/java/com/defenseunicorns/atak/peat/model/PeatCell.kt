@@ -1,13 +1,13 @@
 /*
- * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ * Copyright (c) 2026 Defense Unicorns.  All rights reserved.
  */
 
 package com.defenseunicorns.atak.peat.model
 
 /**
- * Represents a PEAT cell (squad/team) for display in ATAK.
+ * Represents a Peat cell (squad/team) for display in ATAK.
  *
- * A cell is a group of autonomous platforms that coordinate via the PEAT protocol.
+ * A cell is a group of autonomous platforms that coordinate via the Peat protocol.
  * Cells have aggregated capabilities and a geographic center.
  */
 data class PeatCell(
@@ -61,7 +61,7 @@ data class PeatCell(
     /**
      * Generate a CoT UID for this cell
      */
-    fun toCotUid(): String = "PEAT-CELL-$id"
+    fun toCotUid(): String = "Peat-CELL-$id"
 
     /**
      * Generate a CoT type string for this cell

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ * Copyright (c) 2026 Defense Unicorns.  All rights reserved.
  */
 
 package com.defenseunicorns.peat.test
@@ -50,7 +50,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        appendLog("PEAT BLE Test App ready.", false)
+        appendLog("Peat BLE Test App ready.", false)
         appendLog("Ensure Pi is running: ~/ble_responder --mesh-id FUNCTEST --callsign PI-RESP", false)
 
         val quicNodeId = intent.getStringExtra("quic_node_id")

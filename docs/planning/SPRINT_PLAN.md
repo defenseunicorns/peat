@@ -1,22 +1,22 @@
-# PEAT Protocol Demo - Sprint Plan
+# Peat Protocol Demo - Sprint Plan
 
 **Document Version**: 1.0  
-**Organization**: (r)evolve - Revolve Team LLC  
-**URL**: https://revolveteam.com  
+**Organization**: Defense Unicorns  
+**URL**: https://defenseunicorns.com  
 **Demo Target**: POI Tracking Across Distributed Human-Machine-AI Teams
 
 ---
 
 ## Overview
 
-This document provides a detailed sprint plan for coordinating five parallel development teams toward a successful PEAT Protocol demonstration. The plan maps team deliverables to vignette phases with clear dependencies and integration milestones.
+This document provides a detailed sprint plan for coordinating five parallel development teams toward a successful Peat Protocol demonstration. The plan maps team deliverables to vignette phases with clear dependencies and integration milestones.
 
 ## Team Summary
 
 | Team | Focus | Lead | Workstation |
 |------|-------|------|-------------|
 | **Core** | Schema, protocol, Automerge/Iroh sync | TBD | Server 1 |
-| **ATAK** | Android plugin, PEAT-TAK Bridge, CoT | TBD | Server 2 |
+| **ATAK** | Android plugin, Peat-TAK Bridge, CoT | TBD | Server 2 |
 | **Experiments** | Containerlab, validation, metrics | TBD | Server 3 |
 | **AI** | Jetson inference, YOLOv8, MLOps agent | TBD | Jetson Orin Nano |
 | **PM** | Coordination, stakeholders, demo script | TBD | Laptop |
@@ -58,8 +58,8 @@ This document provides a detailed sprint plan for coordinating five parallel dev
 |------|----------|------------|-------------|
 | Set up Android dev environment | P1 | None | Build system working |
 | Review CoT specification | P1 | None | Internal doc |
-| Define CoT ↔ PEAT mapping | P1 | Core schemas | Mapping table |
-| Scaffold PEAT-TAK Bridge | P1 | None | Bridge skeleton |
+| Define CoT ↔ Peat mapping | P1 | Core schemas | Mapping table |
+| Scaffold Peat-TAK Bridge | P1 | None | Bridge skeleton |
 | Connect to TAK Server (hello world) | P2 | TAK Server available | CoT send/receive |
 
 **Exit Criteria**: Bridge can send static CoT to TAK Server
@@ -123,7 +123,7 @@ This document provides a detailed sprint plan for coordinating five parallel dev
 ### ATAK Team
 | Task | Priority | Dependency | Deliverable |
 |------|----------|------------|-------------|
-| Receive capability via PEAT sync | P1 | Core sync | Bridge receives |
+| Receive capability via Peat sync | P1 | Core sync | Bridge receives |
 | Convert capability → CoT registration | P1 | Mapping | CoT generated |
 | Send formation to TAK Server | P1 | CoT | TAK receives |
 | Display capability on ATAK plugin | P2 | Bridge | UI shows status |
@@ -170,7 +170,7 @@ This document provides a detailed sprint plan for coordinating five parallel dev
 ### ATAK Team
 | Task | Priority | Dependency | Deliverable |
 |------|----------|------------|-------------|
-| Convert CoT mission → PEAT task | P1 | Mapping | Task generated |
+| Convert CoT mission → Peat task | P1 | Mapping | Task generated |
 | Route task to teams via bridge | P1 | Core sync | Teams receive |
 | Convert track → CoT position event | P1 | Mapping | CoT generated |
 | Display track on WebTAK | P1 | CoT | Track visible |
@@ -390,8 +390,8 @@ Week 11-12: Rehearsals & Demo ←── Delivery
 
 **ATAK Team:**
 - [ ] [FEATURE] Set up Android development environment
-- [ ] [CONTRACT] Define CoT ↔ PEAT mapping
-- [ ] [FEATURE] Scaffold PEAT-TAK Bridge
+- [ ] [CONTRACT] Define CoT ↔ Peat mapping
+- [ ] [FEATURE] Scaffold Peat-TAK Bridge
 - [ ] [INTEGRATION] Connect Bridge to TAK Server
 
 **Experiments Team:**
@@ -407,5 +407,5 @@ Week 11-12: Rehearsals & Demo ←── Delivery
 
 ---
 
-*Document maintained by (r)evolve - Revolve Team LLC*  
-*https://revolveteam.com*
+*Document maintained by Defense Unicorns*  
+*https://defenseunicorns.com*

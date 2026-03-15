@@ -397,7 +397,7 @@ impl CotEvent {
                 .map_err(|e| CotError::XmlWrite(e.to_string()))?;
         }
 
-        // PEAT extension (if present)
+        // Peat extension (if present)
         if let Some(ref peat) = self.detail.peat_extension {
             peat.write_xml(writer)?;
         }
@@ -485,7 +485,7 @@ pub struct CotDetail {
     pub group: Option<CotGroup>,
     /// Remarks/description
     pub remarks: Option<String>,
-    /// PEAT custom extension
+    /// Peat custom extension
     pub peat_extension: Option<PeatExtension>,
     /// Related entity links
     pub links: Vec<CotLink>,
@@ -631,7 +631,7 @@ impl CotEventBuilder {
         self
     }
 
-    /// Set PEAT extension
+    /// Set Peat extension
     pub fn peat_extension(mut self, extension: PeatExtension) -> Self {
         self.detail.peat_extension = Some(extension);
         self

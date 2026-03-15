@@ -512,9 +512,9 @@ pub struct LlmStats {
     pub tokens_per_sec: f64,
 }
 
-/// Helper functions for PEAT integration
+/// Helper functions for Peat integration
 impl LlamaInference {
-    /// Describe detected objects for PEAT track updates
+    /// Describe detected objects for Peat track updates
     /// Input: list of detected object labels and their positions
     pub async fn describe_detections(
         &mut self,

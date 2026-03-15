@@ -1,4 +1,4 @@
-# PEAT Object Tracking - Data Flow Sequence
+# Peat Object Tracking - Data Flow Sequence
 
 This diagram shows the message flow for the object tracking vignette, including the MLOps model update flow.
 
@@ -10,11 +10,11 @@ This diagram shows the message flow for the object tracking vignette, including 
 │   Team Alpha                      Coordinator                         C2 Element                                │
 │   ─────────────                   ───────────                         ──────────                                │
 │                                                                                                                  │
-│   Alpha-1,2,3 ──────► PEAT Discovery                                                                            │
+│   Alpha-1,2,3 ──────► Peat Discovery                                                                            │
 │   (team forms)                    │                                                                              │
 │        │                          │                                                                              │
 │        ├──────────────────────────┤                                                                              │
-│        │  PEAT: Capability        │                                                                              │
+│        │  Peat: Capability        │                                                                              │
 │        │  Advertisement           │                                                                              │
 │        │  • Camera: operational   │                                                                              │
 │        │  • AI Model: YOLOv8 v1.2 │                                                                              │
@@ -42,7 +42,7 @@ This diagram shows the message flow for the object tracking vignette, including 
 │        │                          │   boundary: [polygon]             │                                          │
 │        │                          │                                   │                                          │
 │        │ ◄────────────────────────┤                                   │                                          │
-│        │ PEAT: TRACK_TARGET       │ Converts CoT → PEAT Command       │                                          │
+│        │ Peat: TRACK_TARGET       │ Converts CoT → Peat Command       │                                          │
 │        │   command                │                                   │                                          │
 │        │                          │                                   │                                          │
 │   Alpha-1 (ATAK)                  │                                   │                                          │
@@ -62,7 +62,7 @@ This diagram shows the message flow for the object tracking vignette, including 
 │   (5 Mbps)           │ Detect + Track                                                                            │
 │                      │                                                                                           │
 │                      ├─────────────────────►│                                                                    │
-│                      │ PEAT: TrackUpdate    │                                                                    │
+│                      │ Peat: TrackUpdate    │                                                                    │
 │                      │   track_id: TRACK-001│                                                                    │
 │                      │   position: lat/lon  │                                                                    │
 │                      │   confidence: 0.89   │                                                                    │
@@ -81,7 +81,7 @@ This diagram shows the message flow for the object tracking vignette, including 
 │   ║                                                                                                            ║ │
 │   ║  Traditional Approach:     │████████████████████████████████████████████│  5 Mbps (video stream)          ║ │
 │   ║                                                                                                            ║ │
-│   ║  PEAT Approach:            │█│  ~1 Kbps (track updates @ 2 Hz)                                             ║ │
+│   ║  Peat Approach:            │█│  ~1 Kbps (track updates @ 2 Hz)                                             ║ │
 │   ║                                                                                                            ║ │
 │   ║  REDUCTION: 99.98%                                                                                         ║ │
 │   ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ │
@@ -99,7 +99,7 @@ This diagram shows the message flow for the object tracking vignette, including 
 │   boundary ────────────►  │                                                                                      │
 │                           │                                                                                      │
 │                           │ ───────────────────────►│                                                            │
-│                           │ PEAT: PREPARE_HANDOFF   │                                                            │
+│                           │ Peat: PREPARE_HANDOFF   │                                                            │
 │                           │   track_history: [...]  │                                                            │
 │                           │   poi_description: ...  │                                                            │
 │                           │                         │                                                            │
@@ -107,12 +107,12 @@ This diagram shows the message flow for the object tracking vignette, including 
 │                           │                         │ Bravo-3 searches...                                        │
 │                           │                         │                                                            │
 │                           │ ◄───────────────────────┤                                                            │
-│                           │ PEAT: TRACK_ACQUIRED    │                                                            │
+│                           │ Peat: TRACK_ACQUIRED    │                                                            │
 │                           │   new_track: TRACK-002  │                                                            │
 │                           │   confidence: 0.91      │                                                            │
 │                           │                         │                                                            │
 │   ◄───────────────────────┤                         │                                                            │
-│   PEAT: HANDOFF_COMPLETE  │ Correlates:            │                                                            │
+│   Peat: HANDOFF_COMPLETE  │ Correlates:            │                                                            │
 │                           │ TRACK-001 == TRACK-002 │                                                            │
 │                           │                         │                                                            │
 │   Alpha-3: status =       │ ───────────────────────────────────────────────►│                                   │
@@ -145,7 +145,7 @@ This diagram shows the message flow for the object tracking vignette, including 
 │        │ }               │                                                                                       │
 │        │                 │                                                                                       │
 │        │                 ├─────────────────►│                                                                    │
-│        │                 │ PEAT: MODEL_PKG  │                                                                    │
+│        │                 │ Peat: MODEL_PKG  │                                                                    │
 │        │                 │ (via TAK Bridge) │                                                                    │
 │        │                 │                  │                                                                    │
 │        │                 │                  │ ════════════════════════════════════════════════                   │
@@ -155,7 +155,7 @@ This diagram shows the message flow for the object tracking vignette, including 
 │        │                 │                  │ ════════════════════════════════════════════════                   │
 │        │                 │                  │                                                                    │
 │        │                 │                  ├────────────────────►│                                              │
-│        │                 │                  │ PEAT: MODEL_UPDATE  │                                              │
+│        │                 │                  │ Peat: MODEL_UPDATE  │                                              │
 │        │                 │                  │   blob_ref: sha256  │                                              │
 │        │                 │                  │                     │                                              │
 │        │                 │                  │                     │ Alpha-3 receives                             │
@@ -164,13 +164,13 @@ This diagram shows the message flow for the object tracking vignette, including 
 │        │                 │                  │                     │ (~2 sec pause)                               │
 │        │                 │                  │                     │                                              │
 │        │                 │                  │ ◄────────────────────┤                                              │
-│        │                 │                  │ PEAT: Capability    │                                              │
+│        │                 │                  │ Peat: Capability    │                                              │
 │        │                 │                  │ Re-Advertisement    │                                              │
 │        │                 │                  │   model_ver: 1.3.0  │                                              │
 │        │                 │                  │   precision: 0.94   │                                              │
 │        │                 │                  │                     │                                              │
 │        │                 │                  ├───────────────────────────────────────►│                           │
-│        │                 │                  │ PEAT: MODEL_UPDATE                     │                           │
+│        │                 │                  │ Peat: MODEL_UPDATE                     │                           │
 │        │                 │                  │   (same blob_ref)                      │                           │
 │        │                 │                  │                                        │                           │
 │        │                 │                  │                                        │ Bravo-3 receives          │
@@ -178,7 +178,7 @@ This diagram shows the message flow for the object tracking vignette, including 
 │        │                 │                  │                                        │ Hot-swaps model           │
 │        │                 │                  │                                        │                           │
 │        │                 │                  │ ◄──────────────────────────────────────┤                           │
-│        │                 │                  │ PEAT: Capability Re-Advertisement      │                           │
+│        │                 │                  │ Peat: Capability Re-Advertisement      │                           │
 │        │                 │                  │   model_ver: 1.3.0                     │                           │
 │        │                 │                  │   precision: 0.94                      │                           │
 │        │                 │                  │                                                                    │
@@ -241,7 +241,7 @@ This diagram shows the message flow for the object tracking vignette, including 
 │                           │ ║   Video Streams:     938 MB            ║   │                                      │
 │                           │ ║   (25 min × 2 cam × 5 Mbps)           ║   │                                      │
 │                           │ ║                                        ║   │                                      │
-│                           │ ║ PEAT SAVINGS:        95%               ║   │                                      │
+│                           │ ║ Peat SAVINGS:        95%               ║   │                                      │
 │                           │ ║ (Even with full model push)            ║   │                                      │
 │                           │ ╚════════════════════════════════════════╝   │                                      │
 │                                                                                                                  │
@@ -284,9 +284,9 @@ This diagram shows the message flow for the object tracking vignette, including 
               └──────────┘         └──────────┘          └──────────┘
 ```
 
-## Key PEAT Protocol Messages
+## Key Peat Protocol Messages
 
-### Track Update (PEAT → Coordinator → C2)
+### Track Update (Peat → Coordinator → C2)
 ```json
 {
   "track_id": "TRACK-001",

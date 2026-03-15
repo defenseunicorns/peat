@@ -1,6 +1,6 @@
 //! Secure Node Example
 //!
-//! Demonstrates the PEAT security framework for device authentication
+//! Demonstrates the Peat security framework for device authentication
 //! and RBAC authorization.
 //!
 //! # What This Shows
@@ -29,7 +29,7 @@ use peat_protocol::security::{
 use std::collections::HashSet;
 
 fn main() {
-    println!("=== PEAT Security Framework Demo ===\n");
+    println!("=== Peat Security Framework Demo ===\n");
 
     demo_device_authentication();
     demo_rbac_authorization();

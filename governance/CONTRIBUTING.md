@@ -1,6 +1,6 @@
-# Contributing to PEAT Protocol
+# Contributing to Peat Protocol
 
-Thank you for your interest in contributing to the PEAT Protocol! This document provides guidelines for contributing to both the specification and the reference implementation.
+Thank you for your interest in contributing to the Peat Protocol! This document provides guidelines for contributing to both the specification and the reference implementation.
 
 ## Table of Contents
 
@@ -40,7 +40,7 @@ Thank you for your interest in contributing to the PEAT Protocol! This document 
 
 - **Review specification**: Check for ambiguity, inconsistency
 - **Suggest clarifications**: Where is the spec unclear?
-- **Alignment**: How does PEAT relate to existing standards?
+- **Alignment**: How does Peat relate to existing standards?
 
 ---
 
@@ -296,6 +296,6 @@ If including third-party code:
 
 - **GitHub Issues**: For bugs, features, questions
 - **GitHub Discussions**: For open-ended discussion
-- **Email**: kit@revolveteam.com
+- **Email**: kitplummer@defenseunicorns.com
 
-Welcome to the PEAT community!
+Welcome to the Peat community!

@@ -1,4 +1,4 @@
-# ADR-028: PEAT CoT Custom Detail Extension Schema
+# ADR-028: Peat CoT Custom Detail Extension Schema
 
 **Status**: Proposed
 **Date**: 2025-11-26
@@ -14,24 +14,24 @@
 
 ### Problem Statement
 
-When translating PEAT messages to Cursor-on-Target (CoT) XML format for TAK integration, significant semantic information is lost. CoT's core schema supports:
+When translating Peat messages to Cursor-on-Target (CoT) XML format for TAK integration, significant semantic information is lost. CoT's core schema supports:
 - Position (lat/lon/hae)
 - Identity (uid, type)
 - Time bounds (time, start, stale)
 - Basic details (remarks, links, contacts)
 
-However, PEAT messages contain rich context that TAK operators need:
+However, Peat messages contain rich context that TAK operators need:
 - **Source attribution**: Which platform and AI model produced this data?
 - **Confidence scores**: How reliable is this track detection?
 - **Hierarchy membership**: Which cell/formation does this belong to?
 - **Capability status**: What can this platform do? Is it degraded?
 - **Custom attributes**: Domain-specific metadata (clothing color, vehicle type, etc.)
 
-Without preserving this information, TAK operators cannot make informed decisions about PEAT-coordinated assets.
+Without preserving this information, TAK operators cannot make informed decisions about Peat-coordinated assets.
 
 ### CoT Extensibility
 
-CoT supports custom detail elements via XML namespaces. Elements starting with `_` are treated as extensions and passed through by TAK servers/clients that don't recognize them. This allows PEAT to embed rich metadata while maintaining compatibility.
+CoT supports custom detail elements via XML namespaces. Elements starting with `_` are treated as extensions and passed through by TAK servers/clients that don't recognize them. This allows Peat to embed rich metadata while maintaining compatibility.
 
 **TAK Extension Convention**:
 - Element names starting with `_` are extensions
@@ -41,7 +41,7 @@ CoT supports custom detail elements via XML namespaces. Elements starting with `
 
 ## Decision
 
-We will define a standardized `<_peat_>` CoT detail extension schema for embedding PEAT-specific semantics in CoT messages.
+We will define a standardized `<_peat_>` CoT detail extension schema for embedding Peat-specific semantics in CoT messages.
 
 ### Schema Definition
 
@@ -68,7 +68,7 @@ We will define a standardized `<_peat_>` CoT detail extension schema for embeddi
     <zone id="{zone_id}"/>
   </hierarchy>
 
-  <!-- Custom Attributes (pass-through from PEAT messages) -->
+  <!-- Custom Attributes (pass-through from Peat messages) -->
   <attributes>
     <attr key="{key}" type="{string|number|boolean}">{value}</attr>
     <!-- ... additional attributes ... -->
@@ -161,7 +161,7 @@ We will define a standardized `<_peat_>` CoT detail extension schema for embeddi
 
 #### `<hierarchy>` - Hierarchy Membership
 
-Contains child elements describing the entity's position in PEAT hierarchy:
+Contains child elements describing the entity's position in Peat hierarchy:
 
 | Element | Attributes | Description |
 |---------|------------|-------------|
@@ -180,7 +180,7 @@ Contains child elements describing the entity's position in PEAT hierarchy:
 
 #### `<attributes>` - Custom Attributes
 
-Pass-through container for domain-specific metadata from PEAT messages.
+Pass-through container for domain-specific metadata from Peat messages.
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -516,12 +516,12 @@ impl PeatDetailDecoder {
 
 ### Positive
 
-1. **Semantic Preservation**: Rich PEAT context survives translation to CoT
+1. **Semantic Preservation**: Rich Peat context survives translation to CoT
 2. **TAK Compatibility**: Uses standard CoT extension mechanism
 3. **Operator Awareness**: TAK users can see confidence, source, hierarchy
-4. **Plugin Support**: ATAK plugins can render PEAT-specific UI
+4. **Plugin Support**: ATAK plugins can render Peat-specific UI
 5. **Versioned Schema**: Enables forward-compatible evolution
-6. **Standardized Format**: Consistent across all PEAT message types
+6. **Standardized Format**: Consistent across all Peat message types
 
 ### Negative
 
@@ -546,8 +546,8 @@ impl PeatDetailDecoder {
 
 ## Success Metrics
 
-1. **Completeness**: All PEAT message types have defined mappings
-2. **Round-trip**: PEAT → CoT → PEAT preserves semantic meaning
+1. **Completeness**: All Peat message types have defined mappings
+2. **Round-trip**: Peat → CoT → Peat preserves semantic meaning
 3. **Compatibility**: Works with TAK Server, FreeTakServer, ATAK
 4. **Performance**: Extension parsing < 1ms
 5. **Documentation**: XSD schema published and validated
@@ -564,6 +564,6 @@ impl PeatDetailDecoder {
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2025-11-26 | Created ADR-028 | M1 POC feedback - need standardized PEAT extension |
+| 2025-11-26 | Created ADR-028 | M1 POC feedback - need standardized Peat extension |
 | 2025-11-26 | Selected `_peat_` element name | TAK `_` prefix convention for extensions |
-| 2025-11-26 | Included all PEAT message types | Comprehensive coverage from COT_SCHEMA_MAPPING.md |
+| 2025-11-26 | Included all Peat message types | Comprehensive coverage from COT_SCHEMA_MAPPING.md |

@@ -90,12 +90,12 @@
 
 
 ######################################################################
-## PEAT ATAK Plugin specific rules
+## Peat ATAK Plugin specific rules
 ######################################################################
 
 -repackageclasses atakplugin.PEAT
 
-# Keep PEAT FFI bindings
+# Keep Peat FFI bindings
 -keep class uniffi.peat_ffi.** { *; }
 
 # Keep plugin entry points for ATAK

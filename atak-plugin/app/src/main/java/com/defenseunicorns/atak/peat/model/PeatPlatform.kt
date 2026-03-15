@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ * Copyright (c) 2026 Defense Unicorns.  All rights reserved.
  */
 
 package com.defenseunicorns.atak.peat.model
 
 /**
- * Represents an individual PEAT platform (UAV, UGV, etc.) for display in ATAK.
+ * Represents an individual Peat platform (UAV, UGV, etc.) for display in ATAK.
  */
 data class PeatPlatform(
     /** Unique platform identifier */
@@ -132,7 +132,7 @@ data class PeatPlatform(
     /**
      * Generate a CoT UID for this platform
      */
-    fun toCotUid(): String = "PEAT-PLAT-$id"
+    fun toCotUid(): String = "Peat-PLAT-$id"
 
     /**
      * Generate a CoT type string based on platform type

@@ -1,8 +1,8 @@
-//! PEAT Sync Integration for Inference Pipeline
+//! Peat Sync Integration for Inference Pipeline
 //!
 //! Connects the inference pipeline to the Peat protocol network,
 //! enabling:
-//! - TrackUpdate publishing to PEAT document store
+//! - TrackUpdate publishing to Peat document store
 //! - CapabilityAdvertisement publishing
 //! - Observation of incoming commands
 //!
@@ -11,7 +11,7 @@
 //! ```rust,ignore
 //! use peat_inference::sync::{PeatSyncClient, SyncConfig};
 //!
-//! // Create sync client with PEAT backend
+//! // Create sync client with Peat backend
 //! let config = SyncConfig::new("platform-1", "/tmp/peat-data");
 //! let mut client = PeatSyncClient::new(config).await?;
 //!
@@ -32,7 +32,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::{debug, info};
 
-/// Collection names for PEAT documents
+/// Collection names for Peat documents
 pub mod collections {
     /// Track updates from AI platforms
     pub const TRACKS: &str = "tracks";
@@ -46,7 +46,7 @@ pub mod collections {
     pub const CHIPOUTS: &str = "chipouts";
 }
 
-/// Configuration for PEAT sync client
+/// Configuration for Peat sync client
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncConfig {
     /// Platform identifier
@@ -92,7 +92,7 @@ impl SyncConfig {
     }
 }
 
-/// PEAT sync client for publishing inference results
+/// Peat sync client for publishing inference results
 pub struct PeatSyncClient {
     config: SyncConfig,
     backend: Arc<dyn DataSyncBackend>,
@@ -108,7 +108,7 @@ impl PeatSyncClient {
     /// Create a new sync client with the given backend
     pub fn with_backend(config: SyncConfig, backend: Arc<dyn DataSyncBackend>) -> Self {
         info!(
-            "Creating PEAT sync client for platform: {}",
+            "Creating Peat sync client for platform: {}",
             config.platform_id
         );
         Self {
@@ -120,7 +120,7 @@ impl PeatSyncClient {
         }
     }
 
-    /// Publish a track update to the PEAT network
+    /// Publish a track update to the Peat network
     pub async fn publish_track_update(&mut self, track: &TrackUpdate) -> anyhow::Result<String> {
         let doc = self.track_to_document(track);
         let doc_id = self
@@ -174,7 +174,7 @@ impl PeatSyncClient {
         Ok(doc_id)
     }
 
-    /// Publish a chipout document to the PEAT network
+    /// Publish a chipout document to the Peat network
     pub async fn publish_chipout(&mut self, chipout: &ChipoutDocument) -> anyhow::Result<String> {
         let doc = self.chipout_to_document(chipout);
         let doc_id = self
@@ -305,7 +305,7 @@ impl PeatSyncClient {
         }
     }
 
-    /// Convert TrackUpdate to PEAT Document
+    /// Convert TrackUpdate to Peat Document
     fn track_to_document(&self, track: &TrackUpdate) -> Document {
         let mut fields = HashMap::new();
 
@@ -379,7 +379,7 @@ impl PeatSyncClient {
         Document::with_id(doc_id, fields)
     }
 
-    /// Convert PEAT Document back to TrackUpdate
+    /// Convert Peat Document back to TrackUpdate
     fn document_to_track(&self, doc: &Document) -> anyhow::Result<TrackUpdate> {
         use crate::messages::{Position, Velocity};
 
@@ -482,7 +482,7 @@ impl PeatSyncClient {
         })
     }
 
-    /// Convert CapabilityAdvertisement to PEAT Document
+    /// Convert CapabilityAdvertisement to Peat Document
     fn capability_to_document(&self, cap: &CapabilityAdvertisement) -> Document {
         let mut fields = HashMap::new();
 
@@ -509,7 +509,7 @@ impl PeatSyncClient {
         Document::with_id(&cap.platform_id, fields)
     }
 
-    /// Convert ChipoutDocument to PEAT Document
+    /// Convert ChipoutDocument to Peat Document
     fn chipout_to_document(&self, chipout: &ChipoutDocument) -> Document {
         let mut fields = HashMap::new();
 
@@ -604,7 +604,7 @@ impl PeatSyncClient {
         Document::with_id(&chipout.chipout_id, fields)
     }
 
-    /// Convert PEAT Document back to ChipoutDocument
+    /// Convert Peat Document back to ChipoutDocument
     fn document_to_chipout(&self, doc: &Document) -> anyhow::Result<ChipoutDocument> {
         use crate::messages::{ChipoutDetection, ChipoutImage, ChipoutTrigger, ImageFormat};
 
@@ -772,10 +772,10 @@ pub struct SyncStats {
     pub chipouts_published: u64,
 }
 
-/// Connected inference pipeline with PEAT sync
+/// Connected inference pipeline with Peat sync
 ///
 /// Wraps an inference pipeline and automatically publishes
-/// TrackUpdate messages to the PEAT network.
+/// TrackUpdate messages to the Peat network.
 pub struct ConnectedPipeline<D, T>
 where
     D: crate::inference::Detector + Send + 'static,
@@ -804,7 +804,7 @@ where
         }
     }
 
-    /// Process a frame and publish results to PEAT
+    /// Process a frame and publish results to Peat
     pub async fn process_and_publish(
         &mut self,
         frame: crate::inference::VideoFrame,
@@ -812,7 +812,7 @@ where
         // Process frame through inference pipeline
         let output = self.pipeline.process(&frame).await?;
 
-        // Publish track updates to PEAT
+        // Publish track updates to Peat
         if !output.track_updates.is_empty() {
             self.sync_client
                 .publish_track_updates(&output.track_updates)
@@ -838,7 +838,7 @@ where
     }
 }
 
-/// Connected inference pipeline with PEAT sync and chipout extraction
+/// Connected inference pipeline with Peat sync and chipout extraction
 ///
 /// Extends ConnectedPipeline with automatic chipout extraction and publishing.
 pub struct ConnectedPipelineWithChipouts<D, T>
@@ -869,7 +869,7 @@ where
         }
     }
 
-    /// Process a frame, extract chipouts, and publish all results to PEAT
+    /// Process a frame, extract chipouts, and publish all results to Peat
     pub async fn process_and_publish(
         &mut self,
         frame: crate::inference::VideoFrame,
@@ -882,14 +882,14 @@ where
             .chipout_extractor
             .evaluate_and_extract(&output.tracks, &frame);
 
-        // Publish track updates to PEAT
+        // Publish track updates to Peat
         if !output.track_updates.is_empty() {
             self.sync_client
                 .publish_track_updates(&output.track_updates)
                 .await?;
         }
 
-        // Publish chipouts to PEAT
+        // Publish chipouts to Peat
         if !chipouts.is_empty() {
             self.sync_client.publish_chipouts(&chipouts).await?;
         }

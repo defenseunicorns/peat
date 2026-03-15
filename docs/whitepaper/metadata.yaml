@@ -1,11 +1,11 @@
 # Whitepaper Metadata
 # Used by pandoc for document generation
 
-title: "PEAT Protocol: Breaking the 20-Node Wall"
+title: "Peat Protocol: Breaking the 20-Node Wall"
 subtitle: "Open Coordination Architecture for Distributed Multi-Agent Systems"
 author:
-  - name: PEAT Protocol Contributors
-    affiliation: "PEAT Protocol Project"
+  - name: Peat Protocol Contributors
+    affiliation: "Peat Protocol Project"
 date: January 2026
 version: "1.0"
 
@@ -13,7 +13,7 @@ version: "1.0"
 abstract: |
   Distributed multi-agent systems consistently plateau at approximately
   20 nodes—not due to technology gaps, but architectural constraints rooted
-  in O(n²) scaling mathematics. PEAT Protocol breaks this barrier through
+  in O(n²) scaling mathematics. Peat Protocol breaks this barrier through
   hierarchical CRDT-based coordination that achieves O(n log n) scaling,
   enabling 1,000+ node operations on bandwidth-constrained networks.
   Laboratory validation confirms 95-99% bandwidth reduction. This whitepaper
@@ -36,7 +36,7 @@ classification: PUBLIC
 distribution: Open Source
 
 # Publisher info
-publisher: "PEAT Protocol Project"
+publisher: "Peat Protocol Project"
 website: https://github.com/kitplummer/peat
 license: Apache 2.0
 
@@ -52,5 +52,5 @@ lang: en-US
 
 # Citation
 citation: |
-  PEAT Protocol Contributors. (2026). "PEAT Protocol: Breaking the 20-Node Wall."
-  PEAT Protocol Project. https://github.com/kitplummer/peat
+  Peat Protocol Contributors. (2026). "Peat Protocol: Breaking the 20-Node Wall."
+  Peat Protocol Project. https://github.com/kitplummer/peat

@@ -1,6 +1,6 @@
 //! Software Orchestration - Issue #177 / ADR-026
 //!
-//! This module implements software orchestration for PEAT:
+//! This module implements software orchestration for Peat:
 //!
 //! ## Modules
 //!

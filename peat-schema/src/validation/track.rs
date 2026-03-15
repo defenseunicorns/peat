@@ -1,6 +1,6 @@
 //! Track validators
 //!
-//! Validates Track and TrackUpdate messages for PEAT Protocol.
+//! Validates Track and TrackUpdate messages for Peat Protocol.
 
 use super::{ValidationError, ValidationResult};
 use crate::track::v1::{Track, TrackPosition, TrackUpdate, UpdateType};

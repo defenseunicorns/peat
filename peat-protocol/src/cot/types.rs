@@ -1,6 +1,6 @@
-//! PEAT message types for TAK integration
+//! Peat message types for TAK integration
 //!
-//! These types represent PEAT messages that can be translated to/from CoT format
+//! These types represent Peat messages that can be translated to/from CoT format
 //! for integration with TAK (Team Awareness Kit) systems.
 
 use chrono::{DateTime, Utc};
@@ -73,9 +73,9 @@ impl Velocity {
     }
 }
 
-/// Track update from a PEAT platform's sensor
+/// Track update from a Peat platform's sensor
 ///
-/// Represents a detected entity (person, vehicle, etc.) being tracked by a PEAT sensor.
+/// Represents a detected entity (person, vehicle, etc.) being tracked by a Peat sensor.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TrackUpdate {
     /// Unique track identifier
@@ -184,7 +184,7 @@ impl OperationalStatus {
     }
 }
 
-/// Capability advertisement from a PEAT platform
+/// Capability advertisement from a Peat platform
 ///
 /// Announces what a platform can do (sensor types, compute capabilities, etc.)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -377,7 +377,7 @@ pub struct AggregatedCapability {
 }
 
 // =============================================================================
-// Mission Task Types (Issue #318: TAK → PEAT direction)
+// Mission Task Types (Issue #318: TAK → Peat direction)
 // =============================================================================
 
 /// Mission task type enumeration
@@ -469,7 +469,7 @@ pub enum BoundaryType {
 /// Mission task from C2/TAK Server (Issue #318)
 ///
 /// Represents a mission tasking command received from TAK Server.
-/// This is the PEAT representation of CoT mission task events.
+/// This is the Peat representation of CoT mission task events.
 ///
 /// CoT Event Types handled:
 /// - `t-x-m-c-c`: Track target command → TrackTarget
@@ -523,7 +523,7 @@ impl MissionTask {
 
     /// Create from a CoT event (Issue #318)
     ///
-    /// Converts a mission-type CoT event to PEAT MissionTask format.
+    /// Converts a mission-type CoT event to Peat MissionTask format.
     pub fn from_cot_event(event: &super::CotEvent) -> Result<Self, MissionTaskError> {
         let task_type = MissionTaskType::from_cot_type(event.cot_type.as_str()).ok_or(
             MissionTaskError::InvalidCotType(event.cot_type.as_str().to_string()),

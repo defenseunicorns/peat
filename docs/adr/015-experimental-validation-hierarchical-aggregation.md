@@ -7,7 +7,7 @@
 
 ## Context and Problem Statement
 
-During E8 experimental validation, we have developed a comprehensive test laboratory infrastructure using ContainerLab to validate PEAT protocol performance at scale. Initial testing (2-node POC, 12-node squad) showed promising results, and we expanded to 24-node platoon hierarchies (Phase 3A) as documented in EXPERIMENT-PORTFOLIO.md.
+During E8 experimental validation, we have developed a comprehensive test laboratory infrastructure using ContainerLab to validate Peat protocol performance at scale. Initial testing (2-node POC, 12-node squad) showed promising results, and we expanded to 24-node platoon hierarchies (Phase 3A) as documented in EXPERIMENT-PORTFOLIO.md.
 
 However, **Phase 3A validation (2025-11-08) revealed a critical architectural concern:**
 
@@ -369,7 +369,7 @@ Before resuming Phase 3A/3B/3C testing, we must verify:
 
 ## Related Decisions
 
-- **ADR-001:** PEAT Protocol POC - Established capability-based filtering as core design
+- **ADR-001:** Peat Protocol POC - Established capability-based filtering as core design
 - **ADR-008:** Network Simulation Layer - Defined experimental validation approach
 - **ADR-009:** Bidirectional Hierarchical Flows - Documented hierarchical data patterns
 - **EXPERIMENT-PORTFOLIO.md:** Phase 3A-3D scaling roadmap

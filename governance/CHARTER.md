@@ -1,8 +1,8 @@
-# PEAT Protocol Project Charter
+# Peat Protocol Project Charter
 
 ## 1. Mission
 
-The PEAT Protocol project exists to develop and maintain an open standard for hierarchical coordination of autonomous systems, enabling scalable, partition-tolerant coordination across defense, commercial, and research applications.
+The Peat Protocol project exists to develop and maintain an open standard for hierarchical coordination of autonomous systems, enabling scalable, partition-tolerant coordination across defense, commercial, and research applications.
 
 ## 2. Vision
 
@@ -58,7 +58,7 @@ A world where autonomous systems from any vendor, nation, or organization can co
 
 The Project Lead provides technical direction and makes final decisions when consensus cannot be reached.
 
-**Current Project Lead**: Kit Plummer (kit@revolveteam.com)
+**Current Project Lead**: Kit Plummer (kitplummer@defenseunicorns.com)
 
 ### 5.2 Contributors
 
@@ -194,4 +194,4 @@ This charter may be amended by:
 ## Contact
 
 - GitHub: https://github.com/defenseunicorns/peat
-- Email: kit@revolveteam.com
+- Email: kitplummer@defenseunicorns.com

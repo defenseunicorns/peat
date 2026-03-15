@@ -1,14 +1,14 @@
 /*
- * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ * Copyright (c) 2026 Defense Unicorns.  All rights reserved.
  */
 
 package com.defenseunicorns.atak.peat.model
 
 /**
- * Represents the user's role within the PEAT hierarchy.
+ * Represents the user's role within the Peat hierarchy.
  *
  * For the PoC, this is configured manually in plugin settings.
- * Future versions may derive this from PEAT protocol or ATAK team configuration.
+ * Future versions may derive this from Peat protocol or ATAK team configuration.
  */
 data class PeatRole(
     /** The hierarchy level this user operates at */

@@ -1,6 +1,6 @@
-//! PEAT Beacon Client
+//! Peat Beacon Client
 //!
-//! Registers the edge device as a sensor platform with the PEAT network,
+//! Registers the edge device as a sensor platform with the Peat network,
 //! advertising camera and AI model capabilities with real hardware specs.
 //!
 //! ## Usage
@@ -535,7 +535,7 @@ impl Default for BeaconState {
     }
 }
 
-/// PEAT Beacon - registers edge device with the PEAT network
+/// Peat Beacon - registers edge device with the Peat network
 pub struct PeatBeacon {
     config: BeaconConfig,
     state: Arc<RwLock<BeaconState>>,
@@ -543,10 +543,10 @@ pub struct PeatBeacon {
 }
 
 impl PeatBeacon {
-    /// Create a new PEAT beacon
+    /// Create a new Peat beacon
     pub fn new(config: BeaconConfig) -> anyhow::Result<Self> {
         info!(
-            "Creating PEAT beacon: {} ({})",
+            "Creating Peat beacon: {} ({})",
             config.platform_id, config.name
         );
 

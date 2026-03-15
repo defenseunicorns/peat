@@ -1,4 +1,4 @@
-# Lab 4: Hierarchical PEAT CRDT - Status and Action Plan
+# Lab 4: Hierarchical Peat CRDT - Status and Action Plan
 
 **Date**: 2025-11-24
 **Epic**: #132 Comprehensive Empirical Validation
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-Lab 4 (Hierarchical PEAT CRDT) infrastructure **ALREADY EXISTS** but is not structured as a standalone lab for Epic #132 comparison. The hierarchical mode was built for backend comparison tests (Ditto vs Automerge) rather than architecture comparison (Flat vs Hierarchical).
+Lab 4 (Hierarchical Peat CRDT) infrastructure **ALREADY EXISTS** but is not structured as a standalone lab for Epic #132 comparison. The hierarchical mode was built for backend comparison tests (Ditto vs Automerge) rather than architecture comparison (Flat vs Hierarchical).
 
 **Key Finding**: We have all the building blocks needed for Lab 4, but need to:
 1. Create Lab 4-specific test scripts (mirroring Lab 3b structure)
@@ -516,4 +516,4 @@ Lab 4 infrastructure **ALREADY EXISTS** - we just need to adapt it for Epic #132
 
 **Outcome**: Complete Epic #132 with empirical proof that hierarchical CRDT scales logarithmically to 1000+ nodes where flat mesh fails.
 
-🎯 **Goal**: Prove PEAT's hierarchical CRDT maintains <50ms P95 at 1000 nodes (vs 399ms at 50 nodes for Lab 3b flat mesh).
+🎯 **Goal**: Prove Peat's hierarchical CRDT maintains <50ms P95 at 1000 nodes (vs 399ms at 50 nodes for Lab 3b flat mesh).

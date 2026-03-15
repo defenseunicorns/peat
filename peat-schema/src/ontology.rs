@@ -1,6 +1,6 @@
-//! PEAT Protocol Ontology
+//! Peat Protocol Ontology
 //!
-//! This module defines the semantic vocabulary and relationships for the PEAT Protocol.
+//! This module defines the semantic vocabulary and relationships for the Peat Protocol.
 //! It provides:
 //! - Domain concepts and their relationships
 //! - Semantic validation rules
@@ -86,7 +86,7 @@ impl Concept {
     }
 }
 
-/// PEAT Protocol ontology
+/// Peat Protocol ontology
 pub struct Ontology {
     concepts: HashMap<String, Concept>,
 }
@@ -141,14 +141,14 @@ impl Default for Ontology {
     }
 }
 
-/// Build the PEAT Protocol domain ontology
+/// Build the Peat Protocol domain ontology
 pub fn build_cap_ontology() -> Ontology {
     let mut ont = Ontology::new();
 
     // Entity concepts
     ont.add_concept(
         Concept::new("node", "Node", ConceptCategory::Entity)
-            .with_description("A node in the PEAT Protocol network (platform or system)"),
+            .with_description("A node in the Peat Protocol network (platform or system)"),
     );
 
     ont.add_concept(

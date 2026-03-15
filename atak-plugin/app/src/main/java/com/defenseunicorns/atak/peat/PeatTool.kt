@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 (r)evolve - Revolve Team LLC.  All rights reserved.
+ * Copyright (c) 2026 Defense Unicorns.  All rights reserved.
  */
 
 package com.defenseunicorns.atak.peat
@@ -9,9 +9,9 @@ import com.atak.plugins.impl.AbstractPluginTool
 import gov.tak.api.util.Disposable
 
 /**
- * PEAT Plugin Tool
+ * Peat Plugin Tool
  *
- * Toolbar button that opens the PEAT dropdown panel.
+ * Toolbar button that opens the Peat dropdown panel.
  */
 class PeatTool(context: Context) : AbstractPluginTool(
     context,
