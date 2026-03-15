@@ -126,3 +126,18 @@ jobs:
           PEAT_OFFLINE_TOKEN: ${{ secrets.HIVE_OFFLINE_TOKEN }}
         run: |
           cargo nextest run --all-features --workspace --exclude peat-ffi --exclude peat-inference -E 'test(e2e)'
+
+  # ============================================
+  # Security Audit
+  # ============================================
+  audit:
+    name: Security Audit
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo generate-lockfile
+      - uses: rustsec/audit-check@v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
