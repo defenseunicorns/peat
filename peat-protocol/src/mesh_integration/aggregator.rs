@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 
 /// Envelope for NodeState + NodeConfig in DataPacket payload
 ///
-/// Since DataPacket payload is opaque Vec<u8>, we need to serialize
+/// Since DataPacket payload is opaque `Vec<u8>`, we need to serialize
 /// both the node configuration and state together.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TelemetryPayload {

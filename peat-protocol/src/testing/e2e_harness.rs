@@ -157,7 +157,7 @@ impl E2EHarness {
     /// Create a new isolated Ditto backend for testing
     ///
     /// This is the recommended method for tests using CellStore, which requires
-    /// Arc<DittoBackend>. Each backend gets:
+    /// `Arc<DittoBackend>`. Each backend gets:
     /// - Unique persistence directory
     /// - Shared app_id and shared_key for sync mesh
     /// - Uses mDNS/LAN discovery (no TCP listener/client)

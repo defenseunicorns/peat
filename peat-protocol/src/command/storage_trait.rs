@@ -156,7 +156,7 @@ pub trait CommandStorage: Send + Sync {
 ///
 /// Dropping this handle should cancel the observation.
 pub struct ObserverHandle {
-    /// Implementation-specific handle (Arc<dyn Any> for type erasure)
+    /// Implementation-specific handle (`Arc<dyn Any>` for type erasure)
     inner: std::sync::Arc<dyn std::any::Any + Send + Sync>,
 }
 

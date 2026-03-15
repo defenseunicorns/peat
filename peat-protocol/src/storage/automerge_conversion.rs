@@ -117,7 +117,7 @@ pub fn automerge_to_node_state(doc: &Automerge) -> Result<NodeState> {
 
 /// Generic: Convert any serializable message to Automerge document
 ///
-/// This is the generic version used by TypedCollection<M>.
+/// This is the generic version used by `TypedCollection<M>`.
 /// Works with any type that implements Serialize.
 #[cfg(feature = "automerge-backend")]
 pub fn message_to_automerge<M: Serialize>(message: &M) -> Result<Automerge> {
@@ -140,7 +140,7 @@ pub fn message_to_automerge<M: Serialize>(message: &M) -> Result<Automerge> {
 
 /// Generic: Convert Automerge document to any deserializable message
 ///
-/// This is the generic version used by TypedCollection<M>.
+/// This is the generic version used by `TypedCollection<M>`.
 /// Works with any type that implements DeserializeOwned.
 #[cfg(feature = "automerge-backend")]
 pub fn automerge_to_message<M: DeserializeOwned>(doc: &Automerge) -> Result<M> {

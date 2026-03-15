@@ -16,7 +16,7 @@
 //! ## Supported Backends
 //!
 //! - **Ditto** - Current production backend (proprietary CBOR-based)
-//! - **Automerge** - Future open-source backend (columnar storage) [planned]
+//! - **Automerge** - Future open-source backend (columnar storage) (planned)
 //!
 //! ## Usage Example
 //!
