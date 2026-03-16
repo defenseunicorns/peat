@@ -31,13 +31,13 @@
 //!
 //! # Command Line Arguments
 //!
-//! --node-id <id>         Node identifier (e.g., "node1", "squad-1A-leader")
-//! --mode <mode>          "writer" (creates documents) or "reader" (waits for documents)
-//! --backend <type>       Sync backend to use (default: "ditto")
-//! --tcp-listen <port>    Optional: Listen for TCP connections on this port
-//! --tcp-connect <addr>   Optional: Connect to TCP peer at this address
-//! --node-type <type>     Node type for authorization (e.g., "soldier", "squad_leader")
-//! --update-rate-ms <ms>  Update rate in milliseconds (default: 5000)
+//! `--node-id <id>`         Node identifier (e.g., "node1", "squad-1A-leader")
+//! `--mode <mode>`          "writer" (creates documents) or "reader" (waits for documents)
+//! `--backend <type>`       Sync backend to use (default: "ditto")
+//! `--tcp-listen <port>`    Optional: Listen for TCP connections on this port
+//! `--tcp-connect <addr>`   Optional: Connect to TCP peer at this address
+//! `--node-type <type>`     Node type for authorization (e.g., "soldier", "squad_leader")
+//! `--update-rate-ms <ms>`  Update rate in milliseconds (default: 5000)
 //! --peat-filter          Enable Peat capability-based filtering
 //!
 //! # Environment Variables
