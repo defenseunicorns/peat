@@ -1,6 +1,6 @@
 # Peat
 
-> A hierarchical capability composition protocol using CRDTs for autonomous systems that scales to 1,000+ nodes with O(n log n) message complexity.
+> An Emergent Capability Synthesis (ECS) and composition protocol using a distributed data mesh for human-machine-AI teaming systems, that scales to 1,000+ nodes with O(n log n) message complexity.
 
 ## Overview
 
@@ -11,6 +11,14 @@ Peat enables scalable coordination of autonomous nodes through:
 - **Capability composition**: Additive, emergent, redundant, and constraint-based patterns
 - **Hierarchical aggregation**: 93–99% bandwidth reduction vs. flat mesh
 - **Multi-transport**: QUIC (Iroh), BLE mesh, UDP bypass, HTTP — simultaneous multi-path
+
+This is a parent project for a suite of sub-repositories:
+- https://github.com/defenseunicorns/peat-mesh
+- https://github.com/defenseunicorns/peat-btle
+- https://github.com/defenseunicorns/peat-lite
+- https://github.com/defenseunicorns/peat-gateway
+
+Some customer-facing is not made publicly available.
 
 ## Quick Start
 

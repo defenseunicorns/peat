@@ -1,303 +1,112 @@
-# Contributing to Peat Protocol
+# Contributing to Peat
 
-Thank you for your interest in contributing to the Peat Protocol! This document provides guidelines for contributing to both the specification and the reference implementation.
-
-## Table of Contents
-
-1. [Ways to Contribute](#ways-to-contribute)
-2. [Getting Started](#getting-started)
-3. [Specification Contributions](#specification-contributions)
-4. [Code Contributions](#code-contributions)
-5. [Review Process](#review-process)
-6. [Style Guidelines](#style-guidelines)
-7. [Legal](#legal)
-
----
-
-## Ways to Contribute
-
-### For Everyone
-
-- **Report bugs**: Found an issue? Open a GitHub issue with details
-- **Suggest features**: Have an idea? Start a discussion
-- **Improve documentation**: Typos, clarifications, examples welcome
-- **Test and validate**: Run the test suite, report flaky tests
-
-### For Developers
-
-- **Fix bugs**: Check issues labeled `good first issue` or `help wanted`
-- **Implement features**: Coordinate via issue before starting large work
-- **Write tests**: Increase coverage, especially E2E tests
-- **Review PRs**: Help review pending pull requests
-
-### For Researchers
-
-- **Validate claims**: Run experiments, publish results
-- **Propose improvements**: Back proposals with evidence
-- **Compare alternatives**: Benchmark against other approaches
-
-### For Standards Experts
-
-- **Review specification**: Check for ambiguity, inconsistency
-- **Suggest clarifications**: Where is the spec unclear?
-- **Alignment**: How does Peat relate to existing standards?
-
----
+Thank you for your interest in contributing to Peat. This document covers development setup, testing, and the pull request process.
 
 ## Getting Started
 
-### 1. Fork and Clone
+1. Fork the repository and clone your fork
+2. Create a feature branch from `main`
+3. Make your changes
+4. Run pre-commit checks
+5. Submit a pull request
+
+## Development Setup
+
+### Prerequisites
+
+- Rust stable toolchain (install via [rustup](https://rustup.rs))
+- Protobuf compiler (`protoc`)
+- [mold](https://github.com/rui314/mold) linker (configured in `.cargo/config.toml`)
+- System dependencies: `clang`, `libdbus-1-dev` (Linux)
+
+### Workspace Crates
+
+| Crate | Purpose |
+|-------|---------|
+| `peat-schema` | Protobuf wire format definitions |
+| `peat-protocol` | Core protocol: cells, hierarchy, sync, security, CRDT backends |
+| `peat-transport` | HTTP/REST API (Axum) |
+| `peat-persistence` | Storage abstraction (Redb, SQLite) |
+| `peat-discovery` | Peer discovery (mDNS, static, hybrid) |
+| `peat-ffi` | Mobile bindings (Kotlin/Swift via UniFFI + JNI) |
+| `peat-sim` | Network simulator |
+| `peat-inference` | Edge AI/ML pipeline |
+| `peat-tak-bridge` | TAK/ATAK CoT interoperability bridge |
+| `peat-ble-test` | BLE integration test harness |
+
+### Feature Flags
+
+The `peat-protocol` crate uses feature flags for backend selection:
+
+| Feature | Description |
+|---------|-------------|
+| `ditto-backend` (default) | Ditto CRDT backend (proprietary) |
+| `automerge-backend` | Automerge CRDT backend (open-source) |
+| `lite-transport` | Embedded node transport via peat-lite |
+| `bluetooth` | BLE mesh transport via peat-btle |
+
+### Building
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/peat.git
-cd peat
+make build                  # full workspace
+cargo build                 # default features
+cargo build --features automerge-backend  # Automerge backend
 ```
 
-### 2. Set Up Development Environment
+## Testing
 
 ```bash
-# Install Rust (1.70+)
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# Build
-cargo build
-
-# Run tests
-cargo test -- --test-threads=1
+make test-fast              # unit tests (~30s)
+make check                  # fmt + clippy + test
+make test                   # unit + integration + e2e
+make validate               # 24-node hierarchical simulation
 ```
 
-### 3. Create a Branch
+## Pre-Commit Checks
+
+Before submitting a PR, ensure all of the following pass locally:
 
 ```bash
-git checkout -b feature/your-feature-name
-# or
-git checkout -b fix/issue-number-description
+cargo fmt --check
+cargo clippy --all-targets --workspace --exclude peat-ffi --exclude peat-inference -- -D warnings
+cargo test --workspace --exclude peat-ffi --exclude peat-inference
 ```
 
-### 4. Make Changes
+The CI pipeline runs these same checks on every PR.
 
-- Follow the style guidelines below
-- Add tests for new functionality
-- Update documentation as needed
+## Branching Strategy
 
-### 5. Submit Pull Request
+We use **trunk-based development** on `main` with short-lived feature branches:
+
+- Branch from `main` for all changes
+- Keep branches small and focused (prefer multiple small PRs over one large one)
+- Squash-and-merge to `main`
+
+## Commit Requirements
+
+- **GPG-signed commits are required.** Configure commit signing per [GitHub's documentation](https://docs.github.com/en/authentication/managing-commit-signature-verification).
+- Write clear, descriptive commit messages
+
+## Pull Request Access
 
 Submitting pull requests requires contributor access to the repository. If you're interested in contributing, please open an issue to introduce yourself and discuss the change you'd like to make. A maintainer will grant PR access to active contributors.
 
-```bash
-git push origin your-branch-name
-# Then open PR on GitHub
-```
+## Pull Request Process
 
----
+1. Open a PR against `main` with a clear description of the change
+2. Focus each PR on a single concern
+3. Ensure CI passes (fmt, clippy, tests, feature builds)
+4. PRs require at least one approving review from a CODEOWNERS member
+5. PRs are squash-merged to maintain a clean history
 
-## Specification Contributions
+## Architectural Changes
 
-### Location
+For significant architectural changes, open an issue first to discuss the approach. Reference the relevant ADR in `docs/adr/` if one exists, or propose a new one. See the [Architecture Decision Summary](docs/ARCHITECTURE-DECISION-SUMMARY.md) for context.
 
-Specification content lives in `/spec/`:
+## Reporting Issues
 
-```
-spec/
-├── draft-peat-protocol-00.md   # Main specification
-├── proto/                       # Protocol Buffer definitions
-│   └── cap/v1/*.proto
-└── README.md
-```
+Use GitHub Issues to report bugs or request features. Include steps to reproduce, expected vs. actual behavior, and relevant log output.
 
-### Types of Spec Changes
+## License
 
-#### Editorial (Minor)
-
-- Typo fixes
-- Clarifications that don't change meaning
-- Formatting improvements
-
-Process: Direct PR, quick review
-
-#### Substantive (Major)
-
-- New protocol features
-- Changed semantics
-- Wire format modifications
-
-Process:
-1. Open issue describing proposed change
-2. Discussion period (2+ weeks)
-3. Draft RFC if significant
-4. Implementation proof-of-concept
-5. PR with specification change
-
-### RFC 2119 Language
-
-Use requirement keywords correctly:
-
-- **MUST** / **MUST NOT**: Absolute requirement
-- **SHOULD** / **SHOULD NOT**: Recommended
-- **MAY**: Optional
-
-### Versioning
-
-- Patch: Editorial, clarifications
-- Minor: Backward-compatible additions
-- Major: Breaking changes (new proto package version)
-
----
-
-## Code Contributions
-
-### Repository Structure
-
-```
-peat/
-├── spec/                    # Normative specification (CC0/CC BY)
-├── reference/               # Reference implementation (MIT/Apache-2.0)
-│   └── rust/
-│       ├── peat-protocol/   # Core library
-│       ├── peat-mesh/       # Mesh management
-│       └── ...
-├── tools/                   # Utilities and testing tools
-├── labs/                    # Experiments
-└── governance/              # Project governance
-```
-
-### Code Quality
-
-All code contributions must:
-
-1. **Build without warnings**: `cargo build` clean
-2. **Pass all tests**: `cargo test -- --test-threads=1`
-3. **Pass linting**: `cargo clippy`
-4. **Be formatted**: `cargo fmt`
-
-### Testing Requirements
-
-- **Unit tests**: For new functions/modules
-- **Integration tests**: For component interactions
-- **E2E tests**: For distributed behavior (when applicable)
-
-**Critical**: Flaky tests are not acceptable. If a test fails intermittently, it must be fixed or removed before merge.
-
-### Pre-Commit Checklist
-
-```bash
-# Run all checks
-make pre-commit
-
-# Or individually:
-cargo fmt --check
-cargo clippy -- -D warnings
-cargo test -- --test-threads=1
-```
-
----
-
-## Review Process
-
-### Pull Request Guidelines
-
-1. **Clear title**: Describe the change concisely
-2. **Description**: Explain what and why
-3. **Issue link**: Reference related issues
-4. **Small PRs**: Easier to review, faster to merge
-
-### Review Criteria
-
-Reviewers check for:
-
-- [ ] Correctness: Does it do what it claims?
-- [ ] Tests: Are changes tested?
-- [ ] Style: Does it follow guidelines?
-- [ ] Documentation: Are docs updated?
-- [ ] Security: Any security implications?
-- [ ] Performance: Any performance impact?
-
-### Approval Requirements
-
-- **Documentation/minor**: 1 maintainer approval
-- **Code changes**: 1 maintainer approval
-- **Spec changes**: 2 maintainer approvals + review period
-- **Breaking changes**: Project Lead approval
-
-### Merge Process
-
-1. All CI checks pass
-2. Required approvals obtained
-3. No unresolved conversations
-4. Squash and merge (clean history)
-
----
-
-## Style Guidelines
-
-### Rust Code
-
-Follow the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/):
-
-- Use `rustfmt` defaults
-- Prefer explicit error handling over `unwrap()`
-- Document public APIs with `///` comments
-- Use meaningful variable names
-
-### Protocol Buffers
-
-- Use `snake_case` for field names
-- Use `SCREAMING_SNAKE_CASE` for enum values
-- Include comments explaining each message and field
-- Use RFC 2119 keywords in normative comments
-
-### Markdown
-
-- Use ATX-style headers (`#`)
-- One sentence per line (easier diffs)
-- Reference links at document end
-- Code blocks with language specifier
-
-### Git Commits
-
-Format:
-```
-type(scope): short description
-
-Longer explanation if needed.
-
-Fixes #123
-```
-
-Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
-
----
-
-## Legal
-
-### Contributor License
-
-By contributing, you agree that:
-
-1. Your contributions are your original work
-2. You have the right to submit them
-3. You license them under the project's licenses:
-   - Specification: CC BY 4.0 / CC0 1.0
-   - Code: MIT OR Apache-2.0
-
-### Patent Grant
-
-Contributors grant a patent license consistent with [PATENT_PLEDGE.md](PATENT_PLEDGE.md).
-
-### Third-Party Code
-
-If including third-party code:
-
-1. Ensure license compatibility
-2. Preserve copyright notices
-3. Document the source
-
----
-
-## Questions?
-
-- **GitHub Issues**: For bugs, features, questions
-- **GitHub Discussions**: For open-ended discussion
-- **Email**: kitplummer@defenseunicorns.com
-
-Welcome to the Peat community!
+By contributing, you agree that your contributions will be licensed under the [Apache License 2.0](LICENSE).
