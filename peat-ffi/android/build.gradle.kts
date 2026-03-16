@@ -76,9 +76,17 @@ tasks.register<Exec>("buildNativeLibs") {
     val ndkToolchain = "$ndkPath/toolchains/llvm/prebuilt/linux-x86_64/bin"
     environment("ANDROID_NDK_HOME", ndkPath)
     environment("PATH", "$ndkToolchain:${System.getenv("PATH")}")
+    // Linker for cargo
     environment("CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER", "$ndkToolchain/aarch64-linux-android26-clang")
     environment("CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_LINKER", "$ndkToolchain/armv7a-linux-androideabi26-clang")
     environment("CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER", "$ndkToolchain/x86_64-linux-android26-clang")
+    // C compiler for cc-rs (ring crate)
+    environment("CC_aarch64-linux-android", "$ndkToolchain/aarch64-linux-android26-clang")
+    environment("CC_armv7-linux-androideabi", "$ndkToolchain/armv7a-linux-androideabi26-clang")
+    environment("CC_x86_64-linux-android", "$ndkToolchain/x86_64-linux-android26-clang")
+    environment("AR_aarch64-linux-android", "$ndkToolchain/llvm-ar")
+    environment("AR_armv7-linux-androideabi", "$ndkToolchain/llvm-ar")
+    environment("AR_x86_64-linux-android", "$ndkToolchain/llvm-ar")
 
     commandLine("bash", "-c", """
         set -e
@@ -86,17 +94,20 @@ tasks.register<Exec>("buildNativeLibs") {
 
         # Build for arm64-v8a (modern Android devices)
         echo "Building for aarch64-linux-android (arm64-v8a)..."
-        cargo build --release --lib -p peat-ffi --target aarch64-linux-android         mkdir -p peat-ffi/android/src/main/jniLibs/arm64-v8a
+        cargo build --release --lib -p peat-ffi --target aarch64-linux-android
+        mkdir -p peat-ffi/android/src/main/jniLibs/arm64-v8a
         cp target/aarch64-linux-android/release/libpeat_ffi.so peat-ffi/android/src/main/jniLibs/arm64-v8a/
 
         # Build for armeabi-v7a (older devices)
         echo "Building for armv7-linux-androideabi (armeabi-v7a)..."
-        cargo build --release --lib -p peat-ffi --target armv7-linux-androideabi         mkdir -p peat-ffi/android/src/main/jniLibs/armeabi-v7a
+        cargo build --release --lib -p peat-ffi --target armv7-linux-androideabi
+        mkdir -p peat-ffi/android/src/main/jniLibs/armeabi-v7a
         cp target/armv7-linux-androideabi/release/libpeat_ffi.so peat-ffi/android/src/main/jniLibs/armeabi-v7a/
 
         # Build for x86_64 (emulators)
         echo "Building for x86_64-linux-android (x86_64)..."
-        cargo build --release --lib -p peat-ffi --target x86_64-linux-android         mkdir -p peat-ffi/android/src/main/jniLibs/x86_64
+        cargo build --release --lib -p peat-ffi --target x86_64-linux-android
+        mkdir -p peat-ffi/android/src/main/jniLibs/x86_64
         cp target/x86_64-linux-android/release/libpeat_ffi.so peat-ffi/android/src/main/jniLibs/x86_64/
 
         echo "Native libraries built successfully!"
