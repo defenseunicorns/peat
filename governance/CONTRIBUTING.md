@@ -82,6 +82,8 @@ git checkout -b fix/issue-number-description
 
 ### 5. Submit Pull Request
 
+Submitting pull requests requires contributor access to the repository. If you're interested in contributing, please open an issue to introduce yourself and discuss the change you'd like to make. A maintainer will grant PR access to active contributors.
+
 ```bash
 git push origin your-branch-name
 # Then open PR on GitHub
