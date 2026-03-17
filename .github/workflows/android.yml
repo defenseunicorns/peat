@@ -1,5 +1,8 @@
 name: Android Build
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
   push:

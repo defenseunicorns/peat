@@ -147,7 +147,8 @@ def send_ota(firmware_path: str, target_ip: str = None, port: int = DEFAULT_PORT
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.bind(("0.0.0.0", port))
+    bind_addr = os.environ.get("OTA_BIND_ADDR", "0.0.0.0")  # noqa: S104
+    sock.bind((bind_addr, port))
     sock.settimeout(timeout)
 
     # Discover device if no target specified
