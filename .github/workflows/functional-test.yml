@@ -1,5 +1,8 @@
 name: Functional Test (BLE Lab)
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
   release:
