@@ -31,9 +31,10 @@ Peat organizes diverse systems through three phases:
 
 | Crate | What it connects | Links |
 |-------|-----------------|-------|
+| **peat** | Protocol workspace: cells, hierarchy, sync, security, TAK bridge, edge AI, Android FFI | [Maven Central](https://central.sonatype.com/artifact/com.defenseunicorns/peat-ffi) · [repo](https://github.com/defenseunicorns/peat) |
 | **peat-mesh** | P2P topology, QUIC/Iroh transport, Automerge CRDT sync, certificate enrollment | [crates.io](https://crates.io/crates/peat-mesh) · [repo](https://github.com/defenseunicorns/peat-mesh) |
-| **peat-btle** | BLE mesh for Android, iOS, Linux, macOS, ESP32 — short-range device-to-device | [crates.io](https://crates.io/crates/peat-btle) · [repo](https://github.com/defenseunicorns/peat-btle) |
-| **peat-lite** | Embedded wire protocol for microcontrollers (256KB RAM, `no_std`) | [crates.io](https://crates.io/crates/peat-lite) · [repo](https://github.com/defenseunicorns/peat-lite) |
+| **peat-btle** | BLE mesh for Android, iOS, Linux, macOS, ESP32 — short-range device-to-device | [crates.io](https://crates.io/crates/peat-btle) · [Maven Central](https://central.sonatype.com/artifact/com.defenseunicorns/peat-btle) · [repo](https://github.com/defenseunicorns/peat-btle) |
+| **peat-lite** | Embedded wire protocol for microcontrollers (256KB RAM, `no_std`) | [crates.io](https://crates.io/crates/peat-lite) · [Maven Central](https://central.sonatype.com/artifact/com.defenseunicorns/peat-lite) · [repo](https://github.com/defenseunicorns/peat-lite) |
 | **peat-gateway** | Multi-tenant control plane: enrollment, CDC, OIDC, envelope encryption | [repo](https://github.com/defenseunicorns/peat-gateway) |
 
 ## Quick Start
