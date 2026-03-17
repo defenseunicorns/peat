@@ -56,11 +56,16 @@ async fn main() -> anyhow::Result<()> {
         println!("Generated Formation Secret");
         println!("===========================");
         println!();
-        println!("Secret (base64): {}", secret);
+        println!(
+            "Secret generated ({} chars). Set as environment variable:",
+            secret.len()
+        );
         println!();
         println!("Usage:");
         println!("  export PEAT_APP_ID=\"my-formation\"");
-        println!("  export PEAT_SECRET_KEY=\"{}\"", secret);
+        println!("  export PEAT_SECRET_KEY=\"<generated secret>\"");
+        eprintln!("\nSecret value written to stderr (not logged):");
+        eprintln!("{}", secret);
         println!();
         println!("Share this secret with all nodes in the formation.");
         return Ok(());
@@ -143,8 +148,8 @@ async fn main() -> anyhow::Result<()> {
     // Initialize with credentials
     let shared_key = secret_key.unwrap_or_else(|| {
         let key = FormationKey::generate_secret();
-        println!("  Generated new secret: {}", key);
-        println!("  (Set PEAT_SECRET_KEY to share with other nodes)");
+        eprintln!("  Generated new secret (set PEAT_SECRET_KEY to share with other nodes)");
+        eprintln!("  Secret: {}", key);
         key
     });
 
