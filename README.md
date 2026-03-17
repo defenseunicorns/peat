@@ -3,28 +3,37 @@
 [![CI](https://github.com/defenseunicorns/peat/actions/workflows/ci.yml/badge.svg)](https://github.com/defenseunicorns/peat/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-> A distributed mesh protocol for human-machine-AI teaming that scales to 1,000+ nodes with O(n log n) message complexity. Designed for tactical edge environments with intermittent connectivity.
+> A mesh protocol that connects heterogeneous systems — phones, servers, sensors, embedded devices, AI models — into a coordinated whole, across any transport, even when the network is degraded or denied.
 
 ## Overview
 
-Peat enables scalable coordination of autonomous nodes through:
+Tactical environments are heterogeneous. TAK operators carry phones. Sensors run on microcontrollers. AI inference runs on edge servers. Robots carry embedded computers. These systems speak different protocols, use different transports, and often can't reach each other directly.
 
-- **Three-phase protocol**: Discovery → Cell Formation → Hierarchical Operations
-- **CRDT-based state**: Eventual consistency via Automerge — operates through network partitions
-- **Capability composition**: Additive, emergent, redundant, and constraint-based patterns
-- **Hierarchical aggregation**: 93–99% bandwidth reduction vs. flat mesh
-- **Multi-transport**: QUIC (Iroh), BLE mesh, UDP bypass, HTTP — simultaneous multi-path
-- **Certificate-based trust**: Ed25519 identity, enrollment protocol, tiered permissions
+Peat gives them a common coordination layer:
+
+- **Any device joins**: Servers, phones, ESP32 sensors, Raspberry Pis, AI platforms — each contributes what it can
+- **Any transport works**: QUIC, BLE mesh, UDP, HTTP — simultaneously, with automatic failover
+- **Interoperability built in**: TAK/CoT bridge, Android bindings (ATAK plugin), embedded wire protocol, edge AI pipeline
+- **Works disconnected**: CRDT-based state via Automerge — no central server, operates through network partitions
+- **Scales when you need it**: Hierarchical aggregation means the protocol that works for 5 nodes also works for 1,000+
+
+## How It Works
+
+Peat organizes diverse systems through three phases:
+
+**Discovery** — Nodes find each other via mDNS, BLE advertisements, static config, or geographic clustering. A phone discovers a nearby sensor. A server discovers edge nodes.
+
+**Cell Formation** — Discovered nodes form cells based on capabilities. A cell might be a squad leader's phone, two sensors, and a UGV. Each node advertises what it can do; the cell composes those capabilities.
+
+**Coordination** — Cells self-organize into a hierarchy for efficient state sharing. A sensor's reading flows up to its cell leader, aggregates with other cells at the zone level, and reaches the command post — without flooding the network.
 
 ## Ecosystem
 
-Peat is a workspace of protocol crates backed by standalone libraries published on crates.io:
-
-| Crate | Description | Links |
-|-------|-------------|-------|
-| **peat-mesh** | P2P topology, Iroh/QUIC transport, Automerge CRDT sync, certificate enrollment | [crates.io](https://crates.io/crates/peat-mesh) · [repo](https://github.com/defenseunicorns/peat-mesh) |
-| **peat-btle** | BLE GATT mesh for Android/iOS/Linux/macOS/ESP32 | [crates.io](https://crates.io/crates/peat-btle) · [repo](https://github.com/defenseunicorns/peat-btle) |
-| **peat-lite** | Embedded CRDT primitives and wire protocol (`no_std`) | [crates.io](https://crates.io/crates/peat-lite) · [repo](https://github.com/defenseunicorns/peat-lite) |
+| Crate | What it connects | Links |
+|-------|-----------------|-------|
+| **peat-mesh** | P2P topology, QUIC/Iroh transport, Automerge CRDT sync, certificate enrollment | [crates.io](https://crates.io/crates/peat-mesh) · [repo](https://github.com/defenseunicorns/peat-mesh) |
+| **peat-btle** | BLE mesh for Android, iOS, Linux, macOS, ESP32 — short-range device-to-device | [crates.io](https://crates.io/crates/peat-btle) · [repo](https://github.com/defenseunicorns/peat-btle) |
+| **peat-lite** | Embedded wire protocol for microcontrollers (256KB RAM, `no_std`) | [crates.io](https://crates.io/crates/peat-lite) · [repo](https://github.com/defenseunicorns/peat-lite) |
 | **peat-gateway** | Multi-tenant control plane: enrollment, CDC, OIDC, envelope encryption | [repo](https://github.com/defenseunicorns/peat-gateway) |
 
 ## Quick Start
@@ -50,17 +59,24 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and [DEVELOPMENT.md
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  APPLICATION       TAK Bridge · Peat Inference · ATAK Plugin    │
+│  APPLICATIONS    TAK Bridge · ATAK Plugin · Edge Inference      │
+│                  Your app — anything that produces or consumes   │
+│                  tactical data                                   │
 ├─────────────────────────────────────────────────────────────────┤
-│  BINDINGS          peat-ffi (Kotlin/Swift via UniFFI + JNI)     │
+│  BINDINGS        peat-ffi (Kotlin/Swift via UniFFI + JNI)       │
+│                  Android AAR on Maven Central                    │
 ├─────────────────────────────────────────────────────────────────┤
-│  TRANSPORT         peat-mesh · peat-btle · peat-lite · HTTP     │
+│  TRANSPORT       peat-mesh (QUIC) · peat-btle (BLE)             │
+│                  peat-lite (embedded UDP) · HTTP                 │
+│                  Multiple transports active simultaneously       │
 ├─────────────────────────────────────────────────────────────────┤
-│  PROTOCOL          peat-protocol (cells, hierarchy, sync, QoS)  │
+│  PROTOCOL        peat-protocol                                   │
+│                  Cells, hierarchy, sync, capabilities, QoS       │
 ├─────────────────────────────────────────────────────────────────┤
-│  SCHEMA            peat-schema (Protobuf wire format)           │
+│  SCHEMA          peat-schema (Protobuf wire format)              │
+│                  Beacons, missions, capabilities, CoT, AI        │
 ├─────────────────────────────────────────────────────────────────┤
-│  PERSISTENCE       peat-persistence (Redb, SQLite)              │
+│  PERSISTENCE     peat-persistence (Redb, SQLite)                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -78,52 +94,29 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full five-layer breakdo
 | `peat-ffi` | Mobile bindings (Kotlin/Swift via UniFFI + JNI) |
 | `peat-inference` | Edge AI/ML pipeline (ONNX Runtime, YOLOv8, GStreamer) |
 | `peat-tak-bridge` | TAK/ATAK CoT interoperability bridge |
-| `peat-sim` | Network simulator — validates hierarchical protocol at scale |
+| `peat-sim` | Network simulator |
 | `peat-ble-test` | BLE integration test harness (Pi-to-Android) |
 
 ## Feature Flags
 
-The `peat-protocol` crate uses feature flags for backend and transport selection:
-
 | Feature | Description |
 |---------|-------------|
-| `ditto-backend` (default) | Ditto CRDT backend (proprietary, production-grade) |
 | `automerge-backend` | Automerge CRDT backend (pure Rust, open-source) |
+| `ditto-backend` (default) | Ditto CRDT backend (proprietary, production-grade) |
 | `lite-transport` | Embedded node transport via peat-lite |
 | `bluetooth` | BLE mesh transport via peat-btle |
 
-The **Automerge backend** is the open-source default for community use. The Ditto backend is available under separate license for production deployments requiring its additional guarantees.
-
-## Three-Phase Protocol
-
-### Phase 1: Discovery
-Nodes discover peers via mDNS, static configuration, or geohash-based geographic clustering. O(sqrt(n)) message complexity.
-
-### Phase 2: Cell Formation
-Discovered nodes form cells with deterministic leader election based on capability scoring. Intra-cell capability exchange and role assignment.
-
-### Phase 3: Hierarchical Operations
-Cells organize into zones for multi-level coordination. Differential state updates propagate through the hierarchy with priority-based routing.
+The **Automerge backend** is the open-source default for community use.
 
 ## Deployment
 
-Peat components are packaged for Kubernetes via Helm, Zarf (air-gapped), and UDS (Unicorn Delivery Service):
+Peat components are packaged for Kubernetes via Helm, Zarf (air-gapped), and UDS:
 
 ```bash
-# Docker build
-make docker-build
-
-# Helm install (peat-mesh node)
-helm install peat-mesh deploy/helm/peat-mesh/
-
-# Zarf package (air-gapped)
-zarf package create
-```
-
-The ATAK plugin provides Android integration for TAK/CoT interoperability:
-
-```bash
-make build-atak-plugin    # Build ATAK plugin APK
+make docker-build                         # Container images
+helm install peat-mesh deploy/helm/peat-mesh/  # Helm
+zarf package create                       # Air-gapped
+make build-atak-plugin                    # ATAK plugin APK
 ```
 
 ## Technology Stack
@@ -136,18 +129,20 @@ make build-atak-plugin    # Build ATAK plugin APK
 | Security | Ed25519 identity, X25519 key exchange, ChaCha20-Poly1305, HKDF |
 | Serialization | Protobuf (prost) + Serde |
 | Async Runtime | Tokio |
-| Mobile | UniFFI (Kotlin/Swift) + JNI |
+| Mobile | UniFFI (Kotlin/Swift) + JNI — AAR on Maven Central |
 | Edge AI | ONNX Runtime, GStreamer |
 | Packaging | Helm, Zarf, UDS |
 
-## Validated Performance
+## Performance
+
+The protocol that works for a 5-node squad also works for a 1,000-node operation:
 
 | Metric | Result |
 |--------|--------|
-| Message complexity | O(n log n) vs. O(n^2) flat mesh |
 | Bandwidth reduction | 93-99% via hierarchical aggregation |
 | Priority 1 latency | <5 seconds end-to-end propagation |
-| Scale | 1,000+ nodes validated in simulation; 24-node lab validated |
+| Simulation validated | 1,000+ nodes; 24-node lab validated |
+| Message complexity | O(n log n) vs. O(n^2) flat mesh |
 
 ## Documentation
 
@@ -165,12 +160,12 @@ make build-atak-plugin    # Build ATAK plugin APK
 ## Roadmap
 
 **Completed**
-- Three-phase hierarchical protocol with CRDT sync
-- Multi-transport (QUIC, BLE, UDP, HTTP) with PACE failover
+- Multi-transport coordination (QUIC, BLE, UDP, HTTP) with PACE failover
+- TAK/CoT interoperability bridge and ATAK plugin
 - Certificate-based enrollment and tactical trust hierarchy
-- Network simulator with 1,000+ node validation
-- ATAK plugin with CoT interoperability
 - Edge inference pipeline (ONNX YOLOv8)
+- Three-phase hierarchical protocol with CRDT sync
+- Simulation validated to 1,000+ nodes
 
 **In Progress**
 - QoS enforcement: TTL, sync modes, bandwidth allocation
