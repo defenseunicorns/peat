@@ -170,12 +170,14 @@ jobs:
   # ============================================
   audit:
     name: Security Audit
-    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo generate-lockfile
-      - uses: rustsec/audit-check@v2.0.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --quiet
+      - name: Run audit (fail on vulnerabilities, warn on unmaintained)
+        run: |
+          cargo audit 2>&1 || true
+          cargo audit --json 2>/dev/null | jq -e '.vulnerabilities.count == 0'
