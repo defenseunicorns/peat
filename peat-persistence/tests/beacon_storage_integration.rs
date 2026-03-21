@@ -19,18 +19,29 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Helper to create a test Ditto backend with real credentials
-async fn create_test_backend(test_name: &str) -> Arc<DittoBackend> {
+/// Helper to create a test Ditto backend with real credentials.
+/// Returns None if credentials are not available (e.g. dependabot PRs).
+async fn create_test_backend(test_name: &str) -> Option<Arc<DittoBackend>> {
     // Load environment variables from .env
     dotenvy::dotenv().ok();
 
-    let app_id = std::env::var("PEAT_APP_ID")
-        .or_else(|_| std::env::var("DITTO_APP_ID"))
-        .expect("PEAT_APP_ID must be set in .env file");
-    let shared_key = std::env::var("PEAT_SECRET_KEY")
+    let app_id = match std::env::var("PEAT_APP_ID").or_else(|_| std::env::var("DITTO_APP_ID")) {
+        Ok(id) if !id.is_empty() => id,
+        _ => {
+            eprintln!("PEAT_APP_ID not set — skipping Ditto integration test");
+            return None;
+        }
+    };
+    let shared_key = match std::env::var("PEAT_SECRET_KEY")
         .or_else(|_| std::env::var("PEAT_SHARED_KEY"))
         .or_else(|_| std::env::var("DITTO_SHARED_KEY"))
-        .expect("PEAT_SECRET_KEY must be set in .env file");
+    {
+        Ok(k) if !k.is_empty() => k,
+        _ => {
+            eprintln!("PEAT_SECRET_KEY not set — skipping Ditto integration test");
+            return None;
+        }
+    };
     let offline_token = std::env::var("PEAT_OFFLINE_TOKEN")
         .or_else(|_| std::env::var("DITTO_OFFLINE_TOKEN"))
         .ok();
@@ -65,20 +76,23 @@ async fn create_test_backend(test_name: &str) -> Arc<DittoBackend> {
     };
 
     backend.initialize(config).await.unwrap();
-    backend
+    Some(backend)
 }
 
-/// Helper to create a beacon storage adapter backed by Ditto
-async fn create_beacon_storage(test_name: &str) -> Arc<PersistentBeaconStorage> {
-    let backend = create_test_backend(test_name).await;
+/// Helper to create a beacon storage adapter backed by Ditto.
+/// Returns None if credentials are not available.
+async fn create_beacon_storage(test_name: &str) -> Option<Arc<PersistentBeaconStorage>> {
+    let backend = create_test_backend(test_name).await?;
     let store = Arc::new(DittoStore::new(backend));
-    Arc::new(PersistentBeaconStorage::new(store))
+    Some(Arc::new(PersistentBeaconStorage::new(store)))
 }
 
 #[tokio::test]
 #[serial]
 async fn test_broadcaster_persists_beacons_to_ditto() {
-    let storage = create_beacon_storage("broadcaster_persist").await;
+    let Some(storage) = create_beacon_storage("broadcaster_persist").await else {
+        return;
+    };
 
     // Create broadcaster
     let broadcaster = BeaconBroadcaster::new(
@@ -109,7 +123,9 @@ async fn test_broadcaster_persists_beacons_to_ditto() {
 #[tokio::test]
 #[serial]
 async fn test_observer_receives_beacon_events_from_ditto() {
-    let storage = create_beacon_storage("observer_events").await;
+    let Some(storage) = create_beacon_storage("observer_events").await else {
+        return;
+    };
 
     // Create a beacon to get its geohash for the observer
     let observer_position = GeoPosition::new(37.7749, -122.4194);
@@ -168,7 +184,9 @@ async fn test_observer_receives_beacon_events_from_ditto() {
 #[tokio::test]
 #[serial]
 async fn test_multiple_nodes_beacon_interaction() {
-    let storage = create_beacon_storage("multi_node").await;
+    let Some(storage) = create_beacon_storage("multi_node").await else {
+        return;
+    };
 
     // Create multiple broadcasters at different locations
     let positions = vec![
@@ -216,7 +234,9 @@ async fn test_multiple_nodes_beacon_interaction() {
 #[tokio::test]
 #[serial]
 async fn test_beacon_updates_propagate() {
-    let storage = create_beacon_storage("beacon_updates").await;
+    let Some(storage) = create_beacon_storage("beacon_updates").await else {
+        return;
+    };
 
     // Create broadcaster with a profile
     let resources = NodeResources {
@@ -273,7 +293,9 @@ async fn test_beacon_updates_propagate() {
 #[tokio::test]
 #[serial]
 async fn test_observer_filters_nearby_beacons() {
-    let storage = create_beacon_storage("observer_filter").await;
+    let Some(storage) = create_beacon_storage("observer_filter").await else {
+        return;
+    };
 
     // Create observer at SF location
     let observer_position = GeoPosition::new(37.7749, -122.4194);
@@ -342,7 +364,9 @@ async fn test_observer_filters_nearby_beacons() {
 #[tokio::test]
 #[serial]
 async fn test_beacon_idempotency() {
-    let storage = create_beacon_storage("idempotency").await;
+    let Some(storage) = create_beacon_storage("idempotency").await else {
+        return;
+    };
 
     // Create broadcaster that will send multiple beacons
     let broadcaster = BeaconBroadcaster::new(
