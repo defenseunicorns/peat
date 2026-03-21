@@ -3,6 +3,9 @@
 
 .PHONY: help build clean deploy destroy lab4-24 lab4-48 lab4-96 lab4-384 lab4-start lab4-status lab4-metrics lab4-results lab4-watch lab4-experiment lab4-single lab4-analyze lab4-save-logs lab4-destroy
 .PHONY: lab5-packet-loss lab5a-sweep lab5a-collect-latency lab5a-report lab5-intermittent lab5b-sweep lab5b-report lab5-churn lab5c-sweep lab5c-report lab5-knockout lab5-leader-kill lab5-partition lab5-blackout lab5-all lab5-status lab5-inject lab5-recover lab5-recovery-time lab5-verify-consistency lab5-report
+.PHONY: lab-1000n lab-1000n-generate lab-1000n-staged lab-1000n-start lab-1000n-status lab-1000n-destroy
+.PHONY: lab-1200n lab-1200n-generate lab-1200n-destroy
+.PHONY: sim-10k sim-10k-1k sim-10k-5k sim-10k-metrics
 
 # Default target
 .DEFAULT_GOAL := help
@@ -1002,3 +1005,170 @@ lab5-report: ## Generate Lab 5 results report with pass/fail against targets
 	@echo "║  Lab 5: Test Results Report                                ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
 	@./lab5-report.sh
+
+##@ Scaling Tests: Plan A (1,000 Hierarchical CRDT Nodes)
+# See ADR-057 for full architecture details
+
+lab-1000n-generate: ## Generate ~895-node hierarchical topology (6 companies, under 1,023 bridge limit)
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Generating hierarchical topology (under 1,023 bridge limit)║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@cd topologies && python3 generate-scaling-topology.py \
+		--companies $${COMPANIES:-6} \
+		--platoons $${PLATOONS:-4} \
+		--squads $${SQUADS:-4} \
+		--soldiers $${SOLDIERS:-8} \
+		--name $${LAB_NAME:-lab-1000n}
+
+lab-1000n: lab-1000n-generate ## Deploy 1,015-node hierarchical topology with staged start
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Plan A: 1,015 Hierarchical CRDT Nodes                    ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@if [ ! -f ../.env ]; then \
+		echo "ERROR: ../.env file required with PEAT_APP_ID, PEAT_SHARED_KEY"; \
+		exit 1; \
+	fi
+	@LAB=$${LAB_NAME:-lab-1000n}; \
+	TOPO="topologies/$${LAB}-1gbps.yaml"; \
+	if [ ! -f "$$TOPO" ]; then \
+		echo "ERROR: Topology not found: $$TOPO (run make lab-1000n-generate first)"; \
+		exit 1; \
+	fi; \
+	./scripts/deploy-staged.sh "$$TOPO" \
+		--batch-size $${BATCH_SIZE:-100} \
+		--batch-delay $${BATCH_DELAY:-2} \
+		--tier-delay $${TIER_DELAY:-3} \
+		--timeout $${TIMEOUT:-15}
+
+lab-1000n-staged: ## Send staged start signals to existing 1K deployment
+	@echo "Sending tiered start signals to lab-1000n..."
+	@LAB=$${LAB_NAME:-lab-1000n}; \
+	TOPO="topologies/$${LAB}-1gbps.yaml"; \
+	./scripts/deploy-staged.sh "$$TOPO" --start-only \
+		--batch-size $${BATCH_SIZE:-100} \
+		--batch-delay $${BATCH_DELAY:-2}
+
+lab-1000n-start: ## Trigger immediate start for all 1K containers (no tiering)
+	@echo "Triggering start for all lab-1000n containers..."
+	@for container in $$(docker ps --format '{{.Names}}' | grep "clab-$${LAB_NAME:-lab-1000n}"); do \
+		docker exec "$$container" touch /data/start 2>/dev/null || true; \
+	done
+	@echo "Done."
+
+lab-1000n-status: ## Show 1K deployment status
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Plan A: 1K Deployment Status                             ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@LAB=$${LAB_NAME:-lab-1000n}; \
+	TOTAL=$$(docker ps --filter "name=clab-$$LAB" -q | wc -l); \
+	RUNNING=$$(docker ps --filter "name=clab-$$LAB" --filter "status=running" -q | wc -l); \
+	COMPANIES=$$(docker ps --filter "name=clab-$$LAB" --format '{{.Names}}' | grep "commander" | wc -l); \
+	PLATOONS=$$(docker ps --filter "name=clab-$$LAB" --format '{{.Names}}' | grep -E "platoon-[0-9]+-leader" | wc -l); \
+	SQUADS=$$(docker ps --filter "name=clab-$$LAB" --format '{{.Names}}' | grep -E "squad-[0-9]+-leader" | wc -l); \
+	SOLDIERS=$$(docker ps --filter "name=clab-$$LAB" --format '{{.Names}}' | grep -E "soldier-[0-9]+" | wc -l); \
+	echo "Containers: $$RUNNING running / $$TOTAL total"; \
+	echo "  Companies:  $$COMPANIES"; \
+	echo "  Platoons:   $$PLATOONS"; \
+	echo "  Squads:     $$SQUADS"; \
+	echo "  Soldiers:   $$SOLDIERS"
+	@echo ""
+	@echo "Memory (top 10 leaders):"
+	@docker stats --no-stream --format "  {{.Name}}: {{.MemUsage}}" | grep -E "clab-$${LAB_NAME:-lab-1000n}-.*(commander|leader)" | head -10
+	@echo ""
+	@echo "Errors:"
+	@docker ps --filter "name=clab-$${LAB_NAME:-lab-1000n}" -q | head -5 | xargs -I{} docker logs --tail 20 {} 2>&1 | grep -iE "error|panic|fatal" | grep -v "No error" | head -5 || echo "  None"
+
+lab-1000n-destroy: ## Destroy 1K deployment
+	@echo "Destroying lab-1000n deployment..."
+	@LAB=$${LAB_NAME:-lab-1000n}; \
+	TOPO="topologies/$${LAB}-1gbps.yaml"; \
+	if [ -f "$$TOPO" ]; then \
+		containerlab destroy -t "$$TOPO" --cleanup 2>/dev/null || true; \
+	fi
+	@docker ps -a --filter "name=clab-$${LAB_NAME:-lab-1000n}" -q | xargs -r docker rm -f 2>/dev/null || true
+	@docker network prune -f 2>/dev/null || true
+	@echo "Done."
+
+##@ Scaling Tests: Plan B (1,200 Dual-Bridge Nodes)
+# See ADR-057 — breaks the 1,023 veth pair limit with two bridges + router
+
+lab-1200n-generate: ## Generate dual-bridge split topology (8 companies, 4+4)
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Generating dual-bridge topology (8 co, split 4+4)        ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@cd topologies && python3 generate-scaling-topology.py \
+		--companies $${COMPANIES:-8} \
+		--platoons $${PLATOONS:-4} \
+		--squads $${SQUADS:-4} \
+		--soldiers $${SOLDIERS:-8} \
+		--split \
+		--name $${LAB_NAME:-peat-1200} \
+		--subnet-a 172.30.0.0/22 \
+		--subnet-b 172.31.0.0/22
+
+lab-1200n: lab-1200n-generate ## Deploy dual-bridge 1,200-node topology with router
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Plan B: 1,200 Dual-Bridge Nodes                         ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@if [ ! -f ../.env ]; then \
+		echo "ERROR: ../.env file required with PEAT_APP_ID, PEAT_SHARED_KEY"; \
+		exit 1; \
+	fi
+	@LAB=$${LAB_NAME:-peat-1200}; \
+	TOPO_A="topologies/$${LAB}-a-1gbps.yaml"; \
+	TOPO_B="topologies/$${LAB}-b-1gbps.yaml"; \
+	./scripts/deploy-dual-bridge.sh "$$TOPO_A" "$$TOPO_B" \
+		--timeout $${TIMEOUT:-10}
+
+lab-1200n-destroy: ## Destroy dual-bridge deployment
+	@echo "Destroying dual-bridge deployment..."
+	@LAB=$${LAB_NAME:-peat-1200}; \
+	TOPO_A="topologies/$${LAB}-a-1gbps.yaml"; \
+	TOPO_B="topologies/$${LAB}-b-1gbps.yaml"; \
+	./scripts/deploy-dual-bridge.sh "$$TOPO_A" "$$TOPO_B" --destroy
+
+##@ Scaling Tests: Plan C (10,000 Process-Per-Node)
+# See ADR-057 — runs peat-sim processes directly, no Docker overhead
+
+sim-10k: ## Run 10K process-per-node simulation (requires peat-sim binary)
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Plan C: 10,000 Process-Per-Node Simulation               ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@BINARY=$${BINARY:-../target/release/peat-sim}; \
+	if [ ! -f "$$BINARY" ]; then \
+		echo "ERROR: peat-sim binary not found at $$BINARY"; \
+		echo "Build with: cd .. && cargo build --release -p peat-sim"; \
+		exit 1; \
+	fi; \
+	python3 peat-sim-orchestrator/orchestrator.py \
+		--binary "$$BINARY" \
+		--companies $${COMPANIES:-67} \
+		--platoons-per-company $${PLATOONS:-4} \
+		--squads-per-platoon $${SQUADS:-4} \
+		--soldiers-per-squad $${SOLDIERS:-8} \
+		--batch-size $${BATCH_SIZE:-200} \
+		--batch-delay-secs $${BATCH_DELAY:-3} \
+		--backend $${BACKEND:-automerge} \
+		--log-dir $${LOG_DIR:-./logs/sim-10k} \
+		--duration-secs $${DURATION:-300}
+
+sim-10k-1k: ## Run 1K process-per-node test (quick validation)
+	@echo "Running 1K process-per-node validation..."
+	@$(MAKE) sim-10k COMPANIES=7 DURATION=$${DURATION:-120} LOG_DIR=./logs/sim-1k
+
+sim-10k-5k: ## Run 5K process-per-node test (intermediate)
+	@echo "Running 5K process-per-node test..."
+	@$(MAKE) sim-10k COMPANIES=34 DURATION=$${DURATION:-180} LOG_DIR=./logs/sim-5k
+
+sim-10k-metrics: ## Aggregate metrics from 10K simulation logs
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Plan C: Metrics Aggregation                              ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@LOG_DIR=$${LOG_DIR:-./logs/sim-10k}; \
+	if [ ! -d "$$LOG_DIR" ]; then \
+		echo "ERROR: Log directory not found: $$LOG_DIR"; \
+		exit 1; \
+	fi; \
+	python3 peat-sim-orchestrator/metrics.py \
+		--log-dir "$$LOG_DIR" \
+		--output "$$LOG_DIR/metrics-summary.csv"
