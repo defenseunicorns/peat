@@ -31,10 +31,15 @@ use std::time::Duration;
 async fn test_ditto_basic_document_operations() {
     dotenvy::dotenv().ok();
 
-    let ditto_app_id = std::env::var("PEAT_APP_ID")
-        .or_else(|_| std::env::var("DITTO_APP_ID"))
-        .expect("PEAT_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "PEAT_APP_ID cannot be empty");
+    let ditto_app_id = match std::env::var("PEAT_APP_ID").or_else(|_| std::env::var("DITTO_APP_ID"))
+    {
+        Ok(id) if !id.is_empty() => id,
+        _ => {
+            eprintln!("PEAT_APP_ID not set — skipping E2E test");
+            return;
+        }
+    };
+    let _ = ditto_app_id;
 
     println!("=== Backend Agnostic E2E: Ditto Basic Operations ===");
 
@@ -49,10 +54,15 @@ async fn test_ditto_basic_document_operations() {
 async fn test_ditto_two_instance_sync() {
     dotenvy::dotenv().ok();
 
-    let ditto_app_id = std::env::var("PEAT_APP_ID")
-        .or_else(|_| std::env::var("DITTO_APP_ID"))
-        .expect("PEAT_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "PEAT_APP_ID cannot be empty");
+    let ditto_app_id = match std::env::var("PEAT_APP_ID").or_else(|_| std::env::var("DITTO_APP_ID"))
+    {
+        Ok(id) if !id.is_empty() => id,
+        _ => {
+            eprintln!("PEAT_APP_ID not set — skipping E2E test");
+            return;
+        }
+    };
+    let _ = ditto_app_id;
 
     println!("=== Backend Agnostic E2E: Ditto Two-Instance Sync ===");
 
@@ -308,10 +318,15 @@ async fn run_two_instance_sync_test<B: DataSyncBackend>(
 async fn test_ditto_three_node_mesh() {
     dotenvy::dotenv().ok();
 
-    let ditto_app_id = std::env::var("PEAT_APP_ID")
-        .or_else(|_| std::env::var("DITTO_APP_ID"))
-        .expect("PEAT_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "PEAT_APP_ID cannot be empty");
+    let ditto_app_id = match std::env::var("PEAT_APP_ID").or_else(|_| std::env::var("DITTO_APP_ID"))
+    {
+        Ok(id) if !id.is_empty() => id,
+        _ => {
+            eprintln!("PEAT_APP_ID not set — skipping E2E test");
+            return;
+        }
+    };
+    let _ = ditto_app_id;
 
     println!("=== Backend Agnostic E2E: Ditto Three-Node Mesh ===");
 
@@ -555,10 +570,15 @@ async fn run_three_node_mesh_test<B: DataSyncBackend>(
 async fn test_ditto_concurrent_updates() {
     dotenvy::dotenv().ok();
 
-    let ditto_app_id = std::env::var("PEAT_APP_ID")
-        .or_else(|_| std::env::var("DITTO_APP_ID"))
-        .expect("PEAT_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "PEAT_APP_ID cannot be empty");
+    let ditto_app_id = match std::env::var("PEAT_APP_ID").or_else(|_| std::env::var("DITTO_APP_ID"))
+    {
+        Ok(id) if !id.is_empty() => id,
+        _ => {
+            eprintln!("PEAT_APP_ID not set — skipping E2E test");
+            return;
+        }
+    };
+    let _ = ditto_app_id;
 
     println!("=== Backend Agnostic E2E: Ditto Concurrent Updates ===");
 

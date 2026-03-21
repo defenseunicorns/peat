@@ -19,10 +19,15 @@ use std::sync::Arc;
 #[tokio::test]
 async fn test_squad_summary_delta_updates() {
     dotenvy::dotenv().ok();
-    let ditto_app_id = std::env::var("PEAT_APP_ID")
-        .or_else(|_| std::env::var("DITTO_APP_ID"))
-        .expect("PEAT_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "PEAT_APP_ID cannot be empty");
+    let ditto_app_id = match std::env::var("PEAT_APP_ID").or_else(|_| std::env::var("DITTO_APP_ID"))
+    {
+        Ok(id) if !id.is_empty() => id,
+        _ => {
+            eprintln!("PEAT_APP_ID not set — skipping E2E test");
+            return;
+        }
+    };
+    let _ = ditto_app_id;
 
     let mut harness = E2EHarness::new("e2e_squad_delta_updates");
     let ditto_store = Arc::new(harness.create_ditto_store().await.unwrap());
@@ -134,10 +139,15 @@ async fn test_squad_summary_delta_updates() {
 #[tokio::test]
 async fn test_upward_aggregation_flow() {
     dotenvy::dotenv().ok();
-    let ditto_app_id = std::env::var("PEAT_APP_ID")
-        .or_else(|_| std::env::var("DITTO_APP_ID"))
-        .expect("PEAT_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "PEAT_APP_ID cannot be empty");
+    let ditto_app_id = match std::env::var("PEAT_APP_ID").or_else(|_| std::env::var("DITTO_APP_ID"))
+    {
+        Ok(id) if !id.is_empty() => id,
+        _ => {
+            eprintln!("PEAT_APP_ID not set — skipping E2E test");
+            return;
+        }
+    };
+    let _ = ditto_app_id;
 
     let mut harness = E2EHarness::new("e2e_upward_aggregation");
     let ditto_store = Arc::new(harness.create_ditto_store().await.unwrap());
@@ -249,10 +259,15 @@ async fn test_upward_aggregation_flow() {
 #[tokio::test]
 async fn test_document_lifecycle_pattern() {
     dotenvy::dotenv().ok();
-    let ditto_app_id = std::env::var("PEAT_APP_ID")
-        .or_else(|_| std::env::var("DITTO_APP_ID"))
-        .expect("PEAT_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "PEAT_APP_ID cannot be empty");
+    let ditto_app_id = match std::env::var("PEAT_APP_ID").or_else(|_| std::env::var("DITTO_APP_ID"))
+    {
+        Ok(id) if !id.is_empty() => id,
+        _ => {
+            eprintln!("PEAT_APP_ID not set — skipping E2E test");
+            return;
+        }
+    };
+    let _ = ditto_app_id;
 
     let mut harness = E2EHarness::new("e2e_document_lifecycle");
     let ditto_store = Arc::new(harness.create_ditto_store().await.unwrap());
@@ -362,10 +377,15 @@ async fn test_document_lifecycle_pattern() {
 #[tokio::test]
 async fn test_bandwidth_efficiency() {
     dotenvy::dotenv().ok();
-    let ditto_app_id = std::env::var("PEAT_APP_ID")
-        .or_else(|_| std::env::var("DITTO_APP_ID"))
-        .expect("PEAT_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "PEAT_APP_ID cannot be empty");
+    let ditto_app_id = match std::env::var("PEAT_APP_ID").or_else(|_| std::env::var("DITTO_APP_ID"))
+    {
+        Ok(id) if !id.is_empty() => id,
+        _ => {
+            eprintln!("PEAT_APP_ID not set — skipping E2E test");
+            return;
+        }
+    };
+    let _ = ditto_app_id;
 
     let mut harness = E2EHarness::new("e2e_bandwidth_efficiency");
     let ditto_store = Arc::new(harness.create_ditto_store().await.unwrap());
