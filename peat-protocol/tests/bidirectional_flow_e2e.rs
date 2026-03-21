@@ -65,10 +65,15 @@ const SYNC_POLL_INTERVAL: Duration = Duration::from_millis(200);
 #[tokio::test]
 async fn test_e2e_command_propagation() {
     dotenvy::dotenv().ok();
-    let ditto_app_id = std::env::var("PEAT_APP_ID")
-        .or_else(|_| std::env::var("DITTO_APP_ID"))
-        .expect("PEAT_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "PEAT_APP_ID cannot be empty");
+    let ditto_app_id = match std::env::var("PEAT_APP_ID").or_else(|_| std::env::var("DITTO_APP_ID"))
+    {
+        Ok(id) if !id.is_empty() => id,
+        _ => {
+            eprintln!("PEAT_APP_ID not set — skipping E2E test");
+            return;
+        }
+    };
+    let _ = ditto_app_id;
 
     let mut harness = E2EHarness::new("command_propagation");
 
@@ -178,10 +183,15 @@ async fn test_e2e_command_propagation() {
 #[tokio::test]
 async fn test_e2e_acknowledgment_propagation() {
     dotenvy::dotenv().ok();
-    let ditto_app_id = std::env::var("PEAT_APP_ID")
-        .or_else(|_| std::env::var("DITTO_APP_ID"))
-        .expect("PEAT_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "PEAT_APP_ID cannot be empty");
+    let ditto_app_id = match std::env::var("PEAT_APP_ID").or_else(|_| std::env::var("DITTO_APP_ID"))
+    {
+        Ok(id) if !id.is_empty() => id,
+        _ => {
+            eprintln!("PEAT_APP_ID not set — skipping E2E test");
+            return;
+        }
+    };
+    let _ = ditto_app_id;
 
     let mut harness = E2EHarness::new("ack_propagation");
 
@@ -296,10 +306,15 @@ async fn test_e2e_acknowledgment_propagation() {
 #[tokio::test]
 async fn test_e2e_full_duplex_command_ack_flow() {
     dotenvy::dotenv().ok();
-    let ditto_app_id = std::env::var("PEAT_APP_ID")
-        .or_else(|_| std::env::var("DITTO_APP_ID"))
-        .expect("PEAT_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "PEAT_APP_ID cannot be empty");
+    let ditto_app_id = match std::env::var("PEAT_APP_ID").or_else(|_| std::env::var("DITTO_APP_ID"))
+    {
+        Ok(id) if !id.is_empty() => id,
+        _ => {
+            eprintln!("PEAT_APP_ID not set — skipping E2E test");
+            return;
+        }
+    };
+    let _ = ditto_app_id;
 
     let mut harness = E2EHarness::new("full_duplex");
 
@@ -522,10 +537,15 @@ async fn test_e2e_full_duplex_command_ack_flow() {
 #[tokio::test]
 async fn test_e2e_concurrent_commands() {
     dotenvy::dotenv().ok();
-    let ditto_app_id = std::env::var("PEAT_APP_ID")
-        .or_else(|_| std::env::var("DITTO_APP_ID"))
-        .expect("PEAT_APP_ID must be set for E2E tests");
-    assert!(!ditto_app_id.is_empty(), "PEAT_APP_ID cannot be empty");
+    let ditto_app_id = match std::env::var("PEAT_APP_ID").or_else(|_| std::env::var("DITTO_APP_ID"))
+    {
+        Ok(id) if !id.is_empty() => id,
+        _ => {
+            eprintln!("PEAT_APP_ID not set — skipping E2E test");
+            return;
+        }
+    };
+    let _ = ditto_app_id;
 
     let mut harness = E2EHarness::new("concurrent_commands");
 
