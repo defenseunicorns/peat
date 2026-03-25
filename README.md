@@ -102,7 +102,11 @@ Cells organize into zones for multi-level coordination. Differential state updat
 
 ## Security
 
-Peat implements a five-layer security model designed for contested environments where nodes may be captured, networks may be compromised, and connectivity is intermittent.
+Peat's security model starts from a fundamental design principle: **autonomy under human authority**. Within the human-machine-AI teaming framework, Peat enables machines and AI to coordinate at machine speed while humans retain command authority at every level of the hierarchy. The objective is decision superiority — giving human commanders better information faster and executing their intent more effectively — not replacing humans in the decision loop.
+
+This means the security architecture must enforce not just confidentiality and integrity, but also **authority boundaries**. Every autonomous action traces back to a human-delegated mandate. Humans set the rules of engagement, define formation policies, and retain the ability to override, revoke, or constrain autonomous behavior at any time. The hierarchy's role-based access control and downward authority propagation exist specifically to preserve this chain of command.
+
+With that context, Peat implements a five-layer security model designed for contested environments where nodes may be captured, networks may be compromised, and connectivity is intermittent.
 
 ### Cryptographic Primitives
 
@@ -136,7 +140,9 @@ Peat implements a five-layer security model designed for contested environments 
 | Leader | ✓ | ✓ | ✓ | ✓ | ✓ | Cell level |
 | Supervisor | ✓ | ✓ | ✓ | ✓ | ✓ | Parent level |
 
-Authority propagates as CRDT data — delegation flows downward through the hierarchy, and revocation is immediate. See [ADR-006](docs/adr/006-security-authentication-authorization.md) for the full specification.
+Authority propagates as CRDT data — delegation flows downward through the hierarchy, and revocation is immediate. Humans at any level can tighten constraints, revoke delegations, or assume direct control. Even when cells operate autonomously through network partitions, they do so within the authority boundaries last set by their human commanders.
+
+See [ADR-006](docs/adr/006-security-authentication-authorization.md) for the full specification.
 
 ## FAQs
 
