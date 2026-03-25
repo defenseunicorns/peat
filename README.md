@@ -136,7 +136,7 @@ Peat implements a five-layer security model designed for contested environments 
 | Leader | ✓ | ✓ | ✓ | ✓ | ✓ | Cell level |
 | Supervisor | ✓ | ✓ | ✓ | ✓ | ✓ | Parent level |
 
-Authority propagates as CRDT data — delegation flows downward through the hierarchy, and revocation is immediate. See [spec/005-security.md](spec/005-security.md) and [ADR-006](docs/adr/006-security-model.md) for the full specification.
+Authority propagates as CRDT data — delegation flows downward through the hierarchy, and revocation is immediate. See [ADR-006](docs/adr/006-security-authentication-authorization.md) for the full specification.
 
 ## FAQs
 
