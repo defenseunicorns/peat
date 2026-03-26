@@ -24,7 +24,7 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 dotenvy = { workspace = true }
 chrono = { workspace = true }
-geohash = "0.13"
+# geohash vendored in src/geohash.rs (supply chain audit 2026-03-26)
 tempfile = "3.13"
 base64 = "0.22"
 prost = "0.13"
