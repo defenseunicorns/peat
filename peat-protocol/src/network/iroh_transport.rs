@@ -1547,8 +1547,72 @@ impl peat_mesh::storage::sync_transport::SyncTransport for IrohTransport {
 }
 
 #[cfg(all(test, feature = "automerge-backend"))]
+impl IrohTransport {
+    /// Create a transport for local-only testing (no relay servers, no DNS discovery).
+    ///
+    /// Uses `RelayMode::Disabled` so tests don't depend on external infrastructure.
+    pub(crate) async fn new_local() -> Result<Self> {
+        let endpoint = Endpoint::empty_builder(iroh::RelayMode::Disabled)
+            .alpns(vec![CAP_AUTOMERGE_ALPN.to_vec()])
+            .transport_config(create_tactical_transport_config())
+            .bind()
+            .await
+            .context("Failed to create local-only Iroh endpoint")?;
+
+        Ok(Self {
+            endpoint,
+            connections: Arc::new(RwLock::new(HashMap::new())),
+            connection_timestamps: Arc::new(RwLock::new(HashMap::new())),
+            accept_running: Arc::new(AtomicBool::new(false)),
+            accept_task: Arc::new(RwLock::new(None)),
+            mdns_discovery: Arc::new(RwLock::new(None)),
+            event_senders: Arc::new(RwLock::new(Vec::new())),
+            runtime_handle: tokio::runtime::Handle::current(),
+        })
+    }
+
+    /// Create a transport with deterministic key for local-only testing.
+    ///
+    /// Like `from_seed` but uses `RelayMode::Disabled` so tests don't depend on
+    /// external relay servers.
+    pub(crate) async fn from_seed_local(seed: &str) -> Result<Self> {
+        use sha2::{Digest, Sha256};
+
+        let mut hasher = Sha256::new();
+        hasher.update(b"peat-iroh-key-v1:");
+        hasher.update(seed.as_bytes());
+        let hash = hasher.finalize();
+
+        let mut seed_bytes = [0u8; 32];
+        seed_bytes.copy_from_slice(&hash);
+
+        let secret_key = iroh::SecretKey::from_bytes(&seed_bytes);
+
+        let endpoint = Endpoint::empty_builder(iroh::RelayMode::Disabled)
+            .alpns(vec![CAP_AUTOMERGE_ALPN.to_vec()])
+            .secret_key(secret_key)
+            .transport_config(create_tactical_transport_config())
+            .bind()
+            .await
+            .context("Failed to create local-only Iroh endpoint from seed")?;
+
+        Ok(Self {
+            endpoint,
+            connections: Arc::new(RwLock::new(HashMap::new())),
+            connection_timestamps: Arc::new(RwLock::new(HashMap::new())),
+            accept_running: Arc::new(AtomicBool::new(false)),
+            accept_task: Arc::new(RwLock::new(None)),
+            mdns_discovery: Arc::new(RwLock::new(None)),
+            event_senders: Arc::new(RwLock::new(Vec::new())),
+            runtime_handle: tokio::runtime::Handle::current(),
+        })
+    }
+}
+
+#[cfg(all(test, feature = "automerge-backend"))]
 mod tests {
     use super::*;
+    use serial_test::serial;
 
     #[tokio::test]
     async fn test_transport_creation() {
@@ -1706,12 +1770,13 @@ mod tests {
 
     /// Test that disconnected peers are removed from the connections map (Issue #244)
     #[tokio::test]
+    #[serial]
     async fn test_stale_peer_cleanup_issue_244() {
         use std::sync::Arc;
 
         // Use deterministic keys
-        let transport_a = Arc::new(IrohTransport::from_seed("test/node-a").await.unwrap());
-        let transport_b = Arc::new(IrohTransport::from_seed("test/node-b").await.unwrap());
+        let transport_a = Arc::new(IrohTransport::from_seed_local("test/node-a").await.unwrap());
+        let transport_b = Arc::new(IrohTransport::from_seed_local("test/node-b").await.unwrap());
 
         // Either side can initiate now (conflict resolution handles races)
         let acceptor_addr = transport_b.endpoint_addr();
@@ -1775,6 +1840,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_peer_event_on_connect() {
         // Test that emit_peer_connected emits an event (Issue #275, #346)
         // Note: Since Issue #346, Connected events are only emitted AFTER handshake
@@ -1782,8 +1848,16 @@ mod tests {
         use std::sync::Arc;
 
         // Use deterministic keys for reliable testing
-        let transport = Arc::new(IrohTransport::from_seed("test-event/node-a").await.unwrap());
-        let transport2 = Arc::new(IrohTransport::from_seed("test-event/node-b").await.unwrap());
+        let transport = Arc::new(
+            IrohTransport::from_seed_local("test-event/node-a")
+                .await
+                .unwrap(),
+        );
+        let transport2 = Arc::new(
+            IrohTransport::from_seed_local("test-event/node-b")
+                .await
+                .unwrap(),
+        );
         let transport2_id = transport2.endpoint_id();
         let transport2_addr = transport2.endpoint_addr();
 
@@ -1861,12 +1935,21 @@ mod tests {
     /// This test verifies that with the reduced idle timeout (5s) and keep-alive (1s),
     /// disconnects are detected much faster than the default ~30-40 seconds.
     #[tokio::test]
+    #[serial]
     async fn test_fast_disconnect_detection_issue_315() {
         use std::sync::Arc;
 
         // Use deterministic keys for reliable testing
-        let transport_a = Arc::new(IrohTransport::from_seed("test-315/node-a").await.unwrap());
-        let transport_b = Arc::new(IrohTransport::from_seed("test-315/node-b").await.unwrap());
+        let transport_a = Arc::new(
+            IrohTransport::from_seed_local("test-315/node-a")
+                .await
+                .unwrap(),
+        );
+        let transport_b = Arc::new(
+            IrohTransport::from_seed_local("test-315/node-b")
+                .await
+                .unwrap(),
+        );
         let transport_b_id = transport_b.endpoint_id();
 
         let acceptor_addr = transport_b.endpoint_addr();
