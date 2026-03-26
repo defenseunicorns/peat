@@ -184,3 +184,33 @@ jobs:
         run: |
           cargo audit 2>&1 || true
           cargo audit --json 2>/dev/null | jq -e '.vulnerabilities.count == 0'
+
+  supply-chain:
+    name: Supply Chain
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h
+
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler mold clang libdbus-1-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: supply-chain
+
+      - name: Install cargo-deny and cargo-vet
+        run: cargo install cargo-deny cargo-vet --quiet
+
+      - name: Run cargo-deny
+        run: cargo deny check advisories bans licenses sources
+
+      - name: Run cargo-vet
+        run: cargo vet
