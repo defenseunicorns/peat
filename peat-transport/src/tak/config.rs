@@ -31,7 +31,7 @@ impl Default for TakTransportConfig {
     fn default() -> Self {
         Self {
             mode: TakTransportMode::TakServer {
-                address: "127.0.0.1:8087".parse().unwrap(),
+                address: "127.0.0.1:8087".parse().expect("valid default address"),
                 use_tls: false,
             },
             identity: None,

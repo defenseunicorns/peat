@@ -204,7 +204,8 @@ impl AuditLogEntry {
 fn format_timestamp(secs: u64) -> String {
     // Simple ISO 8601 format without external dependencies
     let dt = chrono::DateTime::from_timestamp(secs as i64, 0)
-        .unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap());
+        .or_else(|| chrono::DateTime::from_timestamp(0, 0))
+        .expect("Unix epoch is always a valid timestamp");
     dt.format("%Y-%m-%dT%H:%M:%SZ").to_string()
 }
 
@@ -262,14 +263,14 @@ impl MemoryAuditLogger {
 
     /// Get all logged entries
     pub fn entries(&self) -> Vec<AuditLogEntry> {
-        self.entries.lock().unwrap().clone()
+        self.entries.lock().expect("entries lock poisoned").clone()
     }
 
     /// Get entries filtered by event type
     pub fn entries_by_type(&self, event_type: AuditEventType) -> Vec<AuditLogEntry> {
         self.entries
             .lock()
-            .unwrap()
+            .expect("entries lock poisoned")
             .iter()
             .filter(|e| e.event_type == event_type)
             .cloned()
@@ -278,17 +279,20 @@ impl MemoryAuditLogger {
 
     /// Clear all entries
     pub fn clear(&self) {
-        self.entries.lock().unwrap().clear();
+        self.entries.lock().expect("entries lock poisoned").clear();
     }
 
     fn next_sequence(&self) -> u64 {
-        let mut seq = self.sequence.lock().unwrap();
+        let mut seq = self.sequence.lock().expect("sequence lock poisoned");
         *seq += 1;
         *seq
     }
 
     fn add_entry(&self, entry: AuditLogEntry) {
-        self.entries.lock().unwrap().push(entry);
+        self.entries
+            .lock()
+            .expect("entries lock poisoned")
+            .push(entry);
     }
 }
 
@@ -431,7 +435,7 @@ impl AuditLogger for MemoryAuditLogger {
     }
 
     fn entry_count(&self) -> u64 {
-        self.entries.lock().unwrap().len() as u64
+        self.entries.lock().expect("entries lock poisoned").len() as u64
     }
 
     fn flush(&self) -> Result<(), SecurityError> {
@@ -468,7 +472,7 @@ impl FileAuditLogger {
     }
 
     fn next_sequence(&self) -> u64 {
-        let mut seq = self.sequence.lock().unwrap();
+        let mut seq = self.sequence.lock().expect("sequence lock poisoned");
         *seq += 1;
         *seq
     }
@@ -625,7 +629,7 @@ impl AuditLogger for FileAuditLogger {
     }
 
     fn entry_count(&self) -> u64 {
-        *self.sequence.lock().unwrap()
+        *self.sequence.lock().expect("sequence lock poisoned")
     }
 
     fn flush(&self) -> Result<(), SecurityError> {

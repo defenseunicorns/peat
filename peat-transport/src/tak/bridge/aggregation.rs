@@ -30,7 +30,7 @@ impl Aggregator {
     /// Older messages for the same source are replaced.
     pub fn add(&self, message: PeatMessage) {
         let key = message.source_node().to_string();
-        let mut pending = self.pending.write().unwrap();
+        let mut pending = self.pending.write().expect("pending lock poisoned");
         pending.insert(key, message);
     }
 
@@ -38,13 +38,13 @@ impl Aggregator {
     ///
     /// Returns messages that should be published.
     pub fn flush(&self) -> Vec<PeatMessage> {
-        let mut pending = self.pending.write().unwrap();
+        let mut pending = self.pending.write().expect("pending lock poisoned");
         pending.drain().map(|(_, v)| v).collect()
     }
 
     /// Get the number of pending messages
     pub fn pending_count(&self) -> usize {
-        self.pending.read().unwrap().len()
+        self.pending.read().expect("pending lock poisoned").len()
     }
 
     /// Get the window duration for time-windowed policies

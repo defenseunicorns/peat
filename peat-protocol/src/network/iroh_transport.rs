@@ -140,7 +140,7 @@ fn create_tactical_transport_config() -> TransportConfig {
     config.max_idle_timeout(Some(
         Duration::from_secs(QUIC_MAX_IDLE_TIMEOUT_SECS)
             .try_into()
-            .unwrap(),
+            .expect("valid idle timeout duration"),
     ));
 
     // Enable keep-alive packets every 3 seconds to prevent healthy connections
@@ -638,7 +638,10 @@ impl IrohTransport {
     pub async fn enable_mdns_discovery(&self) -> Result<()> {
         // Check if already enabled
         {
-            let guard = self.mdns_discovery.read().unwrap();
+            let guard = self
+                .mdns_discovery
+                .read()
+                .expect("mdns_discovery lock poisoned");
             if guard.is_some() {
                 anyhow::bail!("mDNS discovery is already enabled");
             }
@@ -657,7 +660,10 @@ impl IrohTransport {
         );
 
         // Store the discovery service for later access
-        *self.mdns_discovery.write().unwrap() = Some(discovery);
+        *self
+            .mdns_discovery
+            .write()
+            .expect("mdns_discovery lock poisoned") = Some(discovery);
 
         Ok(())
     }
@@ -815,7 +821,7 @@ impl IrohTransport {
 
         // Check if we already have a live connection to this peer
         {
-            let connections = self.connections.read().unwrap();
+            let connections = self.connections.read().expect("connections lock poisoned");
             if let Some(existing) = connections.get(&remote_id) {
                 if existing.close_reason().is_none() {
                     tracing::debug!(
@@ -845,7 +851,7 @@ impl IrohTransport {
         // Issue #346: We always store and return our connection. Conflict resolution
         // happens in accept() if there's a simultaneous connection from the peer.
         // This supports both symmetric (both initiate) and asymmetric (one initiates) cases.
-        let mut connections = self.connections.write().unwrap();
+        let mut connections = self.connections.write().expect("connections lock poisoned");
         if let Some(existing) = connections.get(&remote_id) {
             if existing.close_reason().is_none() {
                 // Accept loop already stored a connection from this peer.
@@ -883,7 +889,7 @@ impl IrohTransport {
         // Track connection timestamp for recycling (Issue #435 workaround)
         self.connection_timestamps
             .write()
-            .unwrap()
+            .expect("connection_timestamps lock poisoned")
             .insert(remote_id, std::time::Instant::now());
 
         // NOTE: Connected event is NOT emitted here (Issue #346).
@@ -992,7 +998,10 @@ impl IrohTransport {
 
     /// Check if mDNS discovery is enabled
     pub fn has_discovery(&self) -> bool {
-        self.mdns_discovery.read().unwrap().is_some()
+        self.mdns_discovery
+            .read()
+            .expect("mdns_discovery lock poisoned")
+            .is_some()
     }
 
     /// Get a clone of the mDNS discovery service (Issue #233)
@@ -1025,7 +1034,10 @@ impl IrohTransport {
     /// }
     /// ```
     pub fn mdns_discovery(&self) -> Option<MdnsDiscovery> {
-        self.mdns_discovery.read().unwrap().clone()
+        self.mdns_discovery
+            .read()
+            .expect("mdns_discovery lock poisoned")
+            .clone()
     }
 
     /// Accept an incoming connection
@@ -1080,7 +1092,7 @@ impl IrohTransport {
         let remote_id = conn.remote_id();
         let our_id = self.endpoint_id();
 
-        let mut connections = self.connections.write().unwrap();
+        let mut connections = self.connections.write().expect("connections lock poisoned");
 
         // Check for existing connection (conflict detection)
         if let Some(existing) = connections.get(&remote_id) {
@@ -1124,7 +1136,7 @@ impl IrohTransport {
         // Track connection timestamp for recycling (Issue #435 workaround)
         self.connection_timestamps
             .write()
-            .unwrap()
+            .expect("connection_timestamps lock poisoned")
             .insert(remote_id, std::time::Instant::now());
 
         // NOTE: Connected event is NOT emitted here (Issue #346).
@@ -1139,7 +1151,11 @@ impl IrohTransport {
 
     /// Get an existing connection to a peer
     pub fn get_connection(&self, endpoint_id: &EndpointId) -> Option<Connection> {
-        self.connections.read().unwrap().get(endpoint_id).cloned()
+        self.connections
+            .read()
+            .expect("connections lock poisoned")
+            .get(endpoint_id)
+            .cloned()
     }
 
     /// Disconnect from a peer
@@ -1147,10 +1163,15 @@ impl IrohTransport {
         // Remove timestamp tracking (Issue #435 workaround)
         self.connection_timestamps
             .write()
-            .unwrap()
+            .expect("connection_timestamps lock poisoned")
             .remove(endpoint_id);
 
-        if let Some(conn) = self.connections.write().unwrap().remove(endpoint_id) {
+        if let Some(conn) = self
+            .connections
+            .write()
+            .expect("connections lock poisoned")
+            .remove(endpoint_id)
+        {
             conn.close(0u32.into(), b"disconnecting");
             // Emit disconnect event (Issue #275)
             self.emit_event(TransportPeerEvent::Disconnected {
@@ -1176,7 +1197,10 @@ impl IrohTransport {
     /// Vector of EndpointIds for connections older than `max_age`
     pub fn connections_older_than(&self, max_age: Duration) -> Vec<EndpointId> {
         let now = std::time::Instant::now();
-        let timestamps = self.connection_timestamps.read().unwrap();
+        let timestamps = self
+            .connection_timestamps
+            .read()
+            .expect("connection_timestamps lock poisoned");
         timestamps
             .iter()
             .filter_map(|(id, &connected_at)| {
@@ -1254,7 +1278,10 @@ impl IrohTransport {
     /// ```
     pub fn subscribe_peer_events(&self) -> TransportEventReceiver {
         let (tx, rx) = mpsc::channel(TRANSPORT_EVENT_CHANNEL_CAPACITY);
-        self.event_senders.write().unwrap().push(tx);
+        self.event_senders
+            .write()
+            .expect("event_senders lock poisoned")
+            .push(tx);
         rx
     }
 
@@ -1262,7 +1289,10 @@ impl IrohTransport {
     ///
     /// Called internally when connections are established or closed.
     fn emit_event(&self, event: TransportPeerEvent) {
-        let senders = self.event_senders.read().unwrap();
+        let senders = self
+            .event_senders
+            .read()
+            .expect("event_senders lock poisoned");
         for sender in senders.iter() {
             // Non-blocking send - drop if channel is full
             let _ = sender.try_send(event.clone());
@@ -1301,7 +1331,7 @@ impl IrohTransport {
             // 3. Monitor for A wakes up - must NOT remove B!
             let should_emit_disconnect;
             {
-                let mut conns = connections.write().unwrap();
+                let mut conns = connections.write().expect("connections lock poisoned");
                 if let Some(current_conn) = conns.get(&endpoint_id) {
                     if current_conn.stable_id() == monitored_stable_id {
                         // Same connection - safe to remove
@@ -1330,7 +1360,7 @@ impl IrohTransport {
                     endpoint_id,
                     reason,
                 };
-                let senders = event_senders.read().unwrap();
+                let senders = event_senders.read().expect("event_senders lock poisoned");
                 for sender in senders.iter() {
                     let _ = sender.try_send(event.clone());
                 }
@@ -1344,7 +1374,10 @@ impl IrohTransport {
     /// Automatically cleans up closed connections from the map.
     pub fn peer_count(&self) -> usize {
         self.cleanup_closed_connections();
-        self.connections.read().unwrap().len()
+        self.connections
+            .read()
+            .expect("connections lock poisoned")
+            .len()
     }
 
     /// Get all currently connected peer IDs
@@ -1353,7 +1386,12 @@ impl IrohTransport {
     /// Automatically cleans up closed connections from the map.
     pub fn connected_peers(&self) -> Vec<EndpointId> {
         self.cleanup_closed_connections();
-        self.connections.read().unwrap().keys().copied().collect()
+        self.connections
+            .read()
+            .expect("connections lock poisoned")
+            .keys()
+            .copied()
+            .collect()
     }
 
     /// Remove closed connections from the connections map
@@ -1364,7 +1402,7 @@ impl IrohTransport {
     pub fn cleanup_closed_connections(&self) {
         // Collect closed connections to emit events after releasing lock
         let closed_peers: Vec<(EndpointId, String)> = {
-            let mut connections = self.connections.write().unwrap();
+            let mut connections = self.connections.write().expect("connections lock poisoned");
             let mut closed = Vec::new();
 
             connections.retain(|endpoint_id, conn| {
@@ -1416,7 +1454,10 @@ impl IrohTransport {
 
         // Clean up timestamps for removed connections (Issue #435 workaround)
         if !closed_peers.is_empty() {
-            let mut timestamps = self.connection_timestamps.write().unwrap();
+            let mut timestamps = self
+                .connection_timestamps
+                .write()
+                .expect("connection_timestamps lock poisoned");
             for (endpoint_id, _) in &closed_peers {
                 timestamps.remove(endpoint_id);
             }
@@ -1474,7 +1515,7 @@ impl IrohTransport {
             tracing::debug!("Accept loop stopped");
         });
 
-        *self.accept_task.write().unwrap() = Some(task);
+        *self.accept_task.write().expect("accept_task lock poisoned") = Some(task);
 
         Ok(())
     }
@@ -1522,7 +1563,12 @@ impl IrohTransport {
         }
 
         // Close all connections
-        for (_endpoint_id, conn) in self.connections.write().unwrap().drain() {
+        for (_endpoint_id, conn) in self
+            .connections
+            .write()
+            .expect("connections lock poisoned")
+            .drain()
+        {
             conn.close(0u32.into(), b"shutdown");
         }
 
