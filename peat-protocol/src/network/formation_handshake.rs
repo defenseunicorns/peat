@@ -252,6 +252,7 @@ pub async fn perform_responder_handshake(
 mod tests {
     use super::*;
     use crate::network::iroh_transport::IrohTransport;
+    use serial_test::serial;
     use std::sync::Arc;
     use tokio::sync::oneshot;
 
@@ -260,8 +261,8 @@ mod tests {
         key1: FormationKey,
         key2: FormationKey,
     ) -> (Result<()>, Result<()>) {
-        let transport1 = Arc::new(IrohTransport::new().await.unwrap());
-        let transport2 = Arc::new(IrohTransport::new().await.unwrap());
+        let transport1 = Arc::new(IrohTransport::new_local().await.unwrap());
+        let transport2 = Arc::new(IrohTransport::new_local().await.unwrap());
 
         // With deterministic tie-breaking, only the lower ID initiates connections.
         // Determine which transport should be initiator vs responder.
@@ -314,6 +315,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_formation_handshake_success() {
         let secret = [0x42u8; 32];
         let key1 = FormationKey::new("test-formation", &secret);
@@ -334,6 +336,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_formation_handshake_wrong_key() {
         let key1 = FormationKey::new("test-formation", &[0x42u8; 32]);
         let key2 = FormationKey::new("test-formation", &[0x43u8; 32]); // Different secret
@@ -347,6 +350,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_formation_handshake_wrong_formation_id() {
         let secret = [0x42u8; 32];
         let key1 = FormationKey::new("formation-alpha", &secret);
