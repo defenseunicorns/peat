@@ -227,7 +227,11 @@ impl<T: MeshTransport + 'static, A: AuthenticationChannel + 'static> MeshTranspo
         // Return an authenticated connection wrapper
         Ok(Box::new(AuthenticatedConnection {
             inner: conn,
-            device_id: self.get_peer_device_id(peer_id).unwrap(), // Safe: just authenticated
+            device_id: self.get_peer_device_id(peer_id).ok_or_else(|| {
+                TransportError::ConnectionFailed(
+                    "peer device ID missing after authentication".to_string(),
+                )
+            })?,
         }))
     }
 

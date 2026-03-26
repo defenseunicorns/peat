@@ -213,7 +213,7 @@ impl TakTransport for MeshSaTransport {
             TakError::MulticastError(format!("Failed to create async socket: {}", e))
         })?;
 
-        *self.socket.write().unwrap() = Some(Arc::new(socket));
+        *self.socket.write().expect("socket lock poisoned") = Some(Arc::new(socket));
         self.connected.store(true, Ordering::SeqCst);
         self.metrics.record_connect();
 
@@ -225,7 +225,7 @@ impl TakTransport for MeshSaTransport {
         info!("Leaving Mesh SA multicast group");
 
         // Drop the socket
-        *self.socket.write().unwrap() = None;
+        *self.socket.write().expect("socket lock poisoned") = None;
         self.connected.store(false, Ordering::SeqCst);
         self.metrics.record_disconnect();
 
@@ -234,7 +234,7 @@ impl TakTransport for MeshSaTransport {
 
     async fn send_cot(&self, event: &CotEvent, priority: Priority) -> Result<(), TakError> {
         let socket = {
-            let guard = self.socket.read().unwrap();
+            let guard = self.socket.read().expect("socket lock poisoned");
             guard.clone()
         };
 
@@ -249,7 +249,7 @@ impl TakTransport for MeshSaTransport {
         }
 
         // Queue for later
-        let mut queue = self.queue.write().unwrap();
+        let mut queue = self.queue.write().expect("queue lock poisoned");
         queue.enqueue(event.clone(), priority)?;
         debug!("Queued CoT event {} (priority {})", event.uid, priority);
 
@@ -270,7 +270,7 @@ impl TakTransport for MeshSaTransport {
     }
 
     fn queue_depth(&self) -> QueueDepthMetrics {
-        self.queue.read().unwrap().metrics()
+        self.queue.read().expect("queue lock poisoned").metrics()
     }
 }
 

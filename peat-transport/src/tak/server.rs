@@ -400,7 +400,7 @@ impl TakServerTransport {
         let mut sent = 0;
         loop {
             let msg = {
-                let mut queue = self.queue.write().unwrap();
+                let mut queue = self.queue.write().expect("queue lock poisoned");
                 queue.dequeue()
             };
 
@@ -408,7 +408,7 @@ impl TakServerTransport {
                 Some(queued) => {
                     if let Err(e) = self.send_event_raw(stream, &queued.event).await {
                         // Re-queue the message
-                        let mut queue = self.queue.write().unwrap();
+                        let mut queue = self.queue.write().expect("queue lock poisoned");
                         let _ = queue.enqueue(queued.event, queued.priority);
                         return Err(e);
                     }
@@ -453,7 +453,10 @@ impl TakTransport for TakServerTransport {
         *self.reader_task.write().await = Some(reader_task);
         self.connected.store(true, Ordering::SeqCst);
         self.metrics.record_connect();
-        self.reconnect.write().unwrap().reset();
+        self.reconnect
+            .write()
+            .expect("reconnect lock poisoned")
+            .reset();
 
         Ok(())
     }
@@ -495,7 +498,7 @@ impl TakTransport for TakServerTransport {
         }
 
         // Queue for later
-        let mut queue = self.queue.write().unwrap();
+        let mut queue = self.queue.write().expect("queue lock poisoned");
         queue.enqueue(event.clone(), priority)?;
         debug!("Queued CoT event {} (priority {})", event.uid, priority);
 
@@ -547,7 +550,7 @@ impl TakTransport for TakServerTransport {
     }
 
     fn queue_depth(&self) -> QueueDepthMetrics {
-        self.queue.read().unwrap().metrics()
+        self.queue.read().expect("queue lock poisoned").metrics()
     }
 }
 

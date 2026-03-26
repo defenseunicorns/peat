@@ -485,7 +485,10 @@ impl AutomergeBackend {
         peer_id: &str,
     ) -> Result<Vec<u8>> {
         let key = Self::doc_key(collection, doc_id);
-        let docs = self.documents.lock().unwrap();
+        let docs = self
+            .documents
+            .lock()
+            .map_err(|_| Error::Internal("documents lock poisoned".into()))?;
 
         let automerge_doc = docs.get(&key).ok_or_else(|| Error::NotFound {
             resource_type: "Document".to_string(),
@@ -493,7 +496,10 @@ impl AutomergeBackend {
         })?;
 
         // Get or create sync state for this peer
-        let mut sync_states = self.sync_states.lock().unwrap();
+        let mut sync_states = self
+            .sync_states
+            .lock()
+            .map_err(|_| Error::Internal("sync_states lock poisoned".into()))?;
         let sync_state = sync_states
             .entry(format!("{}:{}", peer_id, key))
             .or_default();
@@ -519,7 +525,10 @@ impl AutomergeBackend {
         message: &[u8],
     ) -> Result<()> {
         let key = Self::doc_key(collection, doc_id);
-        let mut docs = self.documents.lock().unwrap();
+        let mut docs = self
+            .documents
+            .lock()
+            .map_err(|_| Error::Internal("documents lock poisoned".into()))?;
 
         let automerge_doc = docs.get_mut(&key).ok_or_else(|| Error::NotFound {
             resource_type: "Document".to_string(),
@@ -531,7 +540,10 @@ impl AutomergeBackend {
             .map_err(|e| Error::Internal(format!("Message decode failed: {:?}", e)))?;
 
         // Get sync state
-        let mut sync_states = self.sync_states.lock().unwrap();
+        let mut sync_states = self
+            .sync_states
+            .lock()
+            .map_err(|_| Error::Internal("sync_states lock poisoned".into()))?;
         let sync_state = sync_states
             .entry(format!("{}:{}", peer_id, key))
             .or_default();
@@ -565,7 +577,10 @@ impl DocumentStore for AutomergeBackend {
             .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
         let key = Self::doc_key(collection, &doc_id);
-        let mut docs = self.documents.lock().unwrap();
+        let mut docs = self
+            .documents
+            .lock()
+            .map_err(|_| Error::Internal("documents lock poisoned".into()))?;
 
         if let Some(existing_doc) = docs.get_mut(&key) {
             // Update existing document
@@ -581,7 +596,10 @@ impl DocumentStore for AutomergeBackend {
 
         // Notify observers
         drop(docs); // Release lock before notifying
-        let observers = self.observers.lock().unwrap();
+        let observers = self
+            .observers
+            .lock()
+            .map_err(|_| Error::Internal("observers lock poisoned".into()))?;
         for observer in observers.iter() {
             let _ = observer.send(ChangeEvent::Updated {
                 collection: collection.to_string(),
@@ -594,7 +612,10 @@ impl DocumentStore for AutomergeBackend {
     }
 
     async fn query(&self, collection: &str, query: &Query) -> anyhow::Result<Vec<Document>> {
-        let docs = self.documents.lock().unwrap();
+        let docs = self
+            .documents
+            .lock()
+            .map_err(|_| Error::Internal("documents lock poisoned".into()))?;
         let mut results = Vec::new();
 
         // Iterate all documents in collection
@@ -627,7 +648,10 @@ impl DocumentStore for AutomergeBackend {
 
     async fn remove(&self, collection: &str, doc_id: &DocumentId) -> anyhow::Result<()> {
         let key = Self::doc_key(collection, doc_id);
-        let mut docs = self.documents.lock().unwrap();
+        let mut docs = self
+            .documents
+            .lock()
+            .map_err(|_| Error::Internal("documents lock poisoned".into()))?;
 
         docs.remove(&key).ok_or_else(|| Error::NotFound {
             resource_type: "Document".to_string(),
@@ -636,7 +660,10 @@ impl DocumentStore for AutomergeBackend {
 
         // Notify observers
         drop(docs); // Release lock before notifying
-        let observers = self.observers.lock().unwrap();
+        let observers = self
+            .observers
+            .lock()
+            .map_err(|_| Error::Internal("observers lock poisoned".into()))?;
         for observer in observers.iter() {
             let _ = observer.send(ChangeEvent::Removed {
                 collection: collection.to_string(),
@@ -650,7 +677,10 @@ impl DocumentStore for AutomergeBackend {
 
     async fn get(&self, collection: &str, doc_id: &DocumentId) -> anyhow::Result<Option<Document>> {
         let key = Self::doc_key(collection, doc_id);
-        let docs = self.documents.lock().unwrap();
+        let docs = self
+            .documents
+            .lock()
+            .map_err(|_| Error::Internal("documents lock poisoned".into()))?;
 
         if let Some(automerge_doc) = docs.get(&key) {
             let document = Self::automerge_to_document(automerge_doc, doc_id.clone())?;
@@ -669,7 +699,10 @@ impl DocumentStore for AutomergeBackend {
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
         // Send initial snapshot of matching documents
-        let docs = self.documents.lock().unwrap();
+        let docs = self
+            .documents
+            .lock()
+            .map_err(|_| Error::Internal("documents lock poisoned".into()))?;
         let mut initial_docs = Vec::new();
 
         for (key, automerge_doc) in docs.iter() {
@@ -693,7 +726,10 @@ impl DocumentStore for AutomergeBackend {
         });
 
         // Register this observer for future updates
-        self.observers.lock().unwrap().push(tx.clone());
+        self.observers
+            .lock()
+            .map_err(|_| Error::Internal("observers lock poisoned".into()))?
+            .push(tx.clone());
 
         Ok(ChangeStream { receiver: rx })
     }
@@ -748,7 +784,7 @@ impl DocumentStore for AutomergeBackend {
                 // Store tombstone
                 self.tombstones
                     .lock()
-                    .unwrap()
+                    .map_err(|_| Error::Internal("tombstones lock poisoned".into()))?
                     .insert(tombstone_id.clone(), tombstone.clone());
 
                 // Remove the actual document
@@ -797,7 +833,12 @@ impl DocumentStore for AutomergeBackend {
         let key = format!("{}:{}", collection, doc_id);
 
         // Check if there's a tombstone
-        if self.tombstones.lock().unwrap().contains_key(&key) {
+        if self
+            .tombstones
+            .lock()
+            .map_err(|_| Error::Internal("tombstones lock poisoned".into()))?
+            .contains_key(&key)
+        {
             return Ok(true);
         }
 
@@ -816,7 +857,10 @@ impl DocumentStore for AutomergeBackend {
     }
 
     async fn get_tombstones(&self, collection: &str) -> anyhow::Result<Vec<crate::qos::Tombstone>> {
-        let tombstones = self.tombstones.lock().unwrap();
+        let tombstones = self
+            .tombstones
+            .lock()
+            .map_err(|_| Error::Internal("tombstones lock poisoned".into()))?;
         let prefix = format!("{}:", collection);
 
         Ok(tombstones
@@ -832,7 +876,7 @@ impl DocumentStore for AutomergeBackend {
         // Store the tombstone
         self.tombstones
             .lock()
-            .unwrap()
+            .map_err(|_| Error::Internal("tombstones lock poisoned".into()))?
             .insert(key, tombstone.clone());
 
         // Remove the document if it exists
@@ -900,7 +944,10 @@ impl SyncEngine for AutomergeBackend {
 
     async fn stop_sync(&self) -> anyhow::Result<()> {
         // Clean up sync states
-        self.sync_states.lock().unwrap().clear();
+        self.sync_states
+            .lock()
+            .map_err(|_| Error::Internal("sync_states lock poisoned".into()))?
+            .clear();
         Ok(())
     }
 
@@ -938,12 +985,18 @@ struct AutomergeSubscriptionHandle {
 #[async_trait]
 impl DataSyncBackend for AutomergeBackend {
     async fn initialize(&self, config: BackendConfig) -> anyhow::Result<()> {
-        let mut initialized = self.initialized.lock().unwrap();
+        let mut initialized = self
+            .initialized
+            .lock()
+            .map_err(|_| Error::Internal("initialized lock poisoned".into()))?;
         if *initialized {
             return Err(Error::Internal("Already initialized".into()).into());
         }
 
-        *self.config.lock().unwrap() = Some(config);
+        *self
+            .config
+            .lock()
+            .map_err(|_| Error::Internal("config lock poisoned".into()))? = Some(config);
         *initialized = true;
 
         Ok(())
@@ -951,9 +1004,18 @@ impl DataSyncBackend for AutomergeBackend {
 
     async fn shutdown(&self) -> anyhow::Result<()> {
         self.stop_sync().await?;
-        self.documents.lock().unwrap().clear();
-        self.sync_states.lock().unwrap().clear();
-        *self.initialized.lock().unwrap() = false;
+        self.documents
+            .lock()
+            .map_err(|_| Error::Internal("documents lock poisoned".into()))?
+            .clear();
+        self.sync_states
+            .lock()
+            .map_err(|_| Error::Internal("sync_states lock poisoned".into()))?
+            .clear();
+        *self
+            .initialized
+            .lock()
+            .map_err(|_| Error::Internal("initialized lock poisoned".into()))? = false;
 
         Ok(())
     }
@@ -975,7 +1037,7 @@ impl DataSyncBackend for AutomergeBackend {
     }
 
     async fn is_ready(&self) -> bool {
-        *self.initialized.lock().unwrap()
+        self.initialized.lock().map(|guard| *guard).unwrap_or(false)
     }
 
     fn backend_info(&self) -> BackendInfo {
@@ -1142,16 +1204,18 @@ impl AutomergeIrohBackend {
 
     /// Get the formation key (if initialized with credentials)
     pub fn formation_key(&self) -> Option<crate::security::FormationKey> {
-        self.formation_key.read().unwrap().clone()
+        self.formation_key
+            .read()
+            .ok()
+            .and_then(|guard| guard.clone())
     }
 
     /// Get the formation ID (app_id used as formation identifier)
     pub fn formation_id(&self) -> Option<String> {
         self.formation_key
             .read()
-            .unwrap()
-            .as_ref()
-            .map(|k| k.formation_id().to_string())
+            .ok()
+            .and_then(|guard| guard.as_ref().map(|k| k.formation_id().to_string()))
     }
 
     /// Create from store and transport (convenience method)
@@ -1416,7 +1480,7 @@ impl AutomergeIrohBackend {
         let formation_key = self
             .formation_key
             .read()
-            .unwrap()
+            .map_err(|_| Error::Internal("formation_key lock poisoned".into()))?
             .clone()
             .ok_or_else(|| Error::config_error("Backend not initialized", None))?;
 
@@ -1558,7 +1622,7 @@ impl DocumentStore for IrohDocumentStore {
             use std::time::SystemTime;
             let timestamp = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
+                .expect("system clock before UNIX epoch")
                 .as_nanos();
             format!("doc-{}", timestamp)
         });
@@ -1869,7 +1933,7 @@ impl PeerDiscovery for IrohPeerDiscovery {
         let formation_key = self
             .formation_key
             .read()
-            .unwrap()
+            .map_err(|_| Error::Internal("formation_key lock poisoned".into()))?
             .clone()
             .ok_or_else(|| Error::Internal("Formation key not initialized".to_string()))?;
 
@@ -2447,7 +2511,7 @@ impl PeerDiscovery for IrohPeerDiscovery {
         let formation_key = self
             .formation_key
             .read()
-            .unwrap()
+            .map_err(|_| Error::Internal("formation_key lock poisoned".into()))?
             .clone()
             .ok_or_else(|| Error::Internal("Formation key not initialized".to_string()))?;
 
@@ -2556,7 +2620,9 @@ impl PeerDiscovery for IrohPeerDiscovery {
     }
 
     fn on_peer_event(&self, callback: Box<dyn Fn(PeerEvent) + Send + Sync>) {
-        self.peer_callbacks.lock().unwrap().push(callback);
+        if let Ok(mut callbacks) = self.peer_callbacks.lock() {
+            callbacks.push(callback);
+        }
 
         // Start event forwarder on first callback registration (Issue #275)
         // Use compare_exchange to ensure we only start once
@@ -2856,9 +2922,16 @@ impl DataSyncBackend for AutomergeIrohBackend {
             })?;
 
         // Store the formation key for peer authentication
-        *self.formation_key.write().unwrap() = Some(formation_key);
+        *self
+            .formation_key
+            .write()
+            .map_err(|_| Error::Internal("formation_key lock poisoned".into()))? =
+            Some(formation_key);
 
-        *self.initialized.lock().unwrap() = true;
+        *self
+            .initialized
+            .lock()
+            .map_err(|_| Error::Internal("initialized lock poisoned".into()))? = true;
         self.peer_discovery().start().await?;
         Ok(())
     }
@@ -2868,7 +2941,10 @@ impl DataSyncBackend for AutomergeIrohBackend {
             let _ = self.sync_engine().stop_sync().await;
             let _ = self.peer_discovery().stop().await;
         }
-        *self.initialized.lock().unwrap() = false;
+        *self
+            .initialized
+            .lock()
+            .map_err(|_| Error::Internal("initialized lock poisoned".into()))? = false;
         Ok(())
     }
 
@@ -2903,7 +2979,7 @@ impl DataSyncBackend for AutomergeIrohBackend {
     }
 
     async fn is_ready(&self) -> bool {
-        *self.initialized.lock().unwrap()
+        self.initialized.lock().map(|guard| *guard).unwrap_or(false)
     }
 
     fn backend_info(&self) -> BackendInfo {

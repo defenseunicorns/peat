@@ -75,7 +75,7 @@ impl ConflictResolver {
         }
 
         if commands.len() == 1 {
-            return Ok(commands.into_iter().next().unwrap());
+            return Ok(commands.into_iter().next().expect("len checked to be 1"));
         }
 
         match policy {
@@ -141,7 +141,10 @@ impl ConflictResolver {
             b_time.cmp(&a_time) // Descending order (most recent first)
         });
 
-        Ok(commands.into_iter().next().unwrap())
+        Ok(commands
+            .into_iter()
+            .next()
+            .expect("commands verified non-empty at function entry"))
     }
 
     /// Resolve using HIGHEST_PRIORITY_WINS policy
@@ -159,7 +162,10 @@ impl ConflictResolver {
             b_priority.cmp(&a_priority) // Descending order (highest priority first)
         });
 
-        Ok(commands.into_iter().next().unwrap())
+        Ok(commands
+            .into_iter()
+            .next()
+            .expect("commands verified non-empty at function entry"))
     }
 
     /// Resolve using HIGHEST_AUTHORITY_WINS policy
@@ -179,7 +185,10 @@ impl ConflictResolver {
             b_authority.cmp(&a_authority) // Descending order (highest authority first)
         });
 
-        Ok(commands.into_iter().next().unwrap())
+        Ok(commands
+            .into_iter()
+            .next()
+            .expect("commands verified non-empty at function entry"))
     }
 
     /// Resolve using MERGE_COMPATIBLE policy
@@ -193,7 +202,10 @@ impl ConflictResolver {
     ) -> Result<HierarchicalCommand> {
         // TODO: Implement actual compatibility checking and merging
         // For now, just return the first command
-        Ok(commands.into_iter().next().unwrap())
+        Ok(commands
+            .into_iter()
+            .next()
+            .expect("commands verified non-empty at function entry"))
     }
 
     /// Derive authority level from node ID

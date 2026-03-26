@@ -124,7 +124,7 @@ impl CommandCoordinator {
             last_updated: Some(peat_schema::common::v1::Timestamp {
                 seconds: std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
+                    .expect("system clock is before Unix epoch")
                     .as_secs(),
                 nanos: 0,
             }),
@@ -258,7 +258,7 @@ impl CommandCoordinator {
                     last_updated: Some(peat_schema::common::v1::Timestamp {
                         seconds: std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap()
+                            .expect("system clock is before Unix epoch")
                             .as_secs(),
                         nanos: 0,
                     }),
@@ -301,7 +301,7 @@ impl CommandCoordinator {
             timestamp: Some(peat_schema::common::v1::Timestamp {
                 seconds: std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
+                    .expect("system clock is before Unix epoch")
                     .as_secs(),
                 nanos: 0,
             }),

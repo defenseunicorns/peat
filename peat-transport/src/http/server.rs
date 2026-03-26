@@ -23,7 +23,7 @@ pub struct ServerConfig {
 impl Default for ServerConfig {
     fn default() -> Self {
         Self {
-            bind_addr: "0.0.0.0:8080".parse().unwrap(),
+            bind_addr: "0.0.0.0:8080".parse().expect("valid default bind address"),
             timeout_secs: 30,
         }
     }

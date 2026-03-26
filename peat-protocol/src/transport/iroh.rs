@@ -186,7 +186,10 @@ impl IrohMeshTransport {
     /// Non-blocking: if a subscriber's channel is full, the event is dropped for that subscriber.
     /// Dead channels are automatically removed.
     fn emit_event(&self, event: PeerEvent) {
-        let mut senders = self.event_senders.write().unwrap();
+        let mut senders = self
+            .event_senders
+            .write()
+            .expect("event_senders lock poisoned");
 
         // Remove closed channels and send to remaining
         senders.retain(|sender| {
@@ -211,7 +214,7 @@ impl IrohMeshTransport {
     ///
     /// This should be called periodically to detect disconnected peers.
     pub fn cleanup_dead_connections(&self) {
-        let mut connections = self.connections.write().unwrap();
+        let mut connections = self.connections.write().expect("connections lock poisoned");
         let dead_peers: Vec<_> = connections
             .iter()
             .filter(|(_, conn)| !conn.is_alive())
@@ -239,11 +242,11 @@ impl IrohMeshTransport {
     pub fn register_peer(&self, node_id: NodeId, endpoint_id: EndpointId) {
         self.node_to_endpoint
             .write()
-            .unwrap()
+            .expect("node_to_endpoint lock poisoned")
             .insert(node_id.clone(), endpoint_id);
         self.endpoint_to_node
             .write()
-            .unwrap()
+            .expect("endpoint_to_node lock poisoned")
             .insert(endpoint_id, node_id);
     }
 
@@ -251,14 +254,18 @@ impl IrohMeshTransport {
     pub fn get_node_id(&self, endpoint_id: &EndpointId) -> Option<NodeId> {
         self.endpoint_to_node
             .read()
-            .unwrap()
+            .expect("endpoint_to_node lock poisoned")
             .get(endpoint_id)
             .cloned()
     }
 
     /// Get EndpointId from NodeId (for outgoing connections)
     pub fn get_endpoint_id(&self, node_id: &NodeId) -> Option<EndpointId> {
-        self.node_to_endpoint.read().unwrap().get(node_id).copied()
+        self.node_to_endpoint
+            .read()
+            .expect("node_to_endpoint lock poisoned")
+            .get(node_id)
+            .copied()
     }
 
     /// Get the underlying IrohTransport
@@ -300,7 +307,7 @@ impl IrohMeshTransport {
 
             // Helper to emit events
             let emit_event = |event: PeerEvent, senders: &Arc<RwLock<Vec<PeerEventSender>>>| {
-                let mut senders = senders.write().unwrap();
+                let mut senders = senders.write().expect("event_senders lock poisoned");
                 senders.retain(|sender| match sender.try_send(event.clone()) {
                     Ok(()) => true,
                     Err(mpsc::error::TrySendError::Full(_)) => true,
@@ -317,7 +324,7 @@ impl IrohMeshTransport {
 
                 // Phase 1: Check for dead connections
                 let dead_peers: Vec<_> = {
-                    let conns = connections.read().unwrap();
+                    let conns = connections.read().expect("connections lock poisoned");
                     conns
                         .iter()
                         .filter(|(_, conn)| !conn.is_alive())
@@ -329,9 +336,9 @@ impl IrohMeshTransport {
 
                 // Remove dead connections, emit events, schedule reconnection
                 if !dead_peers.is_empty() {
-                    let mut conns = connections.write().unwrap();
-                    let static_set = static_peers.read().unwrap();
-                    let mut recon = reconnection.write().unwrap();
+                    let mut conns = connections.write().expect("connections lock poisoned");
+                    let static_set = static_peers.read().expect("static_peers lock poisoned");
+                    let mut recon = reconnection.write().expect("reconnection lock poisoned");
 
                     for (peer_id, reason, connected_at) in dead_peers {
                         conns.remove(&peer_id);
@@ -364,9 +371,12 @@ impl IrohMeshTransport {
                     // If health monitor declares peer dead, we should disconnect
                     // The connection cleanup above will handle it on next iteration
                     // But we can proactively schedule reconnection for static peers
-                    let is_static = static_peers.read().unwrap().contains(&peer_id);
+                    let is_static = static_peers
+                        .read()
+                        .expect("static_peers lock poisoned")
+                        .contains(&peer_id);
                     if is_static {
-                        let mut recon = reconnection.write().unwrap();
+                        let mut recon = reconnection.write().expect("reconnection lock poisoned");
                         recon.schedule_reconnect(peer_id.clone(), true);
                         debug!(
                             "Health monitor detected dead peer, scheduling reconnection: {}",
@@ -377,7 +387,7 @@ impl IrohMeshTransport {
 
                 // Phase 3: Attempt due reconnections (Issue #253)
                 let due_peers: Vec<NodeId> = {
-                    let recon = reconnection.read().unwrap();
+                    let recon = reconnection.read().expect("reconnection lock poisoned");
                     if !recon.is_enabled() {
                         continue;
                     }
@@ -387,7 +397,7 @@ impl IrohMeshTransport {
                 for peer_id in due_peers {
                     // Get current attempt info
                     let (attempt, max_attempts) = {
-                        let recon = reconnection.read().unwrap();
+                        let recon = reconnection.read().expect("reconnection lock poisoned");
                         let state = recon.get_state(&peer_id);
                         let attempt = state.map(|s| s.attempts + 1).unwrap_or(1);
                         let max = recon.policy().max_retries;
@@ -406,7 +416,7 @@ impl IrohMeshTransport {
 
                     // Try to reconnect
                     let peer_info_opt = {
-                        let config = peer_config.read().unwrap();
+                        let config = peer_config.read().expect("peer_config lock poisoned");
                         config
                             .peers
                             .iter()
@@ -428,9 +438,12 @@ impl IrohMeshTransport {
                                 IrohMeshConnection::new(peer_id.clone(), conn, connected_at);
                             connections
                                 .write()
-                                .unwrap()
+                                .expect("connections lock poisoned")
                                 .insert(peer_id.clone(), mesh_conn);
-                            reconnection.write().unwrap().reconnected(&peer_id);
+                            reconnection
+                                .write()
+                                .expect("reconnection lock poisoned")
+                                .reconnected(&peer_id);
 
                             // Start health monitoring for reconnected peer (Issue #254)
                             health_monitor.start_monitoring(peer_id.clone());
@@ -446,13 +459,17 @@ impl IrohMeshTransport {
                         }
                         Ok(None) => {
                             // Accept path is handling connection
-                            reconnection.write().unwrap().reconnected(&peer_id);
+                            reconnection
+                                .write()
+                                .expect("reconnection lock poisoned")
+                                .reconnected(&peer_id);
                             debug!("Reconnection to {} handled by accept path", peer_id);
                         }
                         Err(e) => {
                             let error_msg = e.to_string();
                             let will_retry = {
-                                let mut recon = reconnection.write().unwrap();
+                                let mut recon =
+                                    reconnection.write().expect("reconnection lock poisoned");
                                 let will_retry = recon.failed(&peer_id, error_msg.clone());
                                 if !will_retry {
                                     recon.remove(&peer_id);
@@ -498,8 +515,11 @@ impl MeshTransport for IrohMeshTransport {
             .map_err(|e| TransportError::ConnectionFailed(e.to_string()))?;
 
         // Load static peer config and register peers
-        let config = self.peer_config.read().unwrap();
-        let mut static_peers = self.static_peers.write().unwrap();
+        let config = self.peer_config.read().expect("peer_config lock poisoned");
+        let mut static_peers = self
+            .static_peers
+            .write()
+            .expect("static_peers lock poisoned");
         for peer_info in &config.peers {
             let node_id = NodeId::new(peer_info.name.clone());
             if let Ok(endpoint_id) = peer_info.endpoint_id() {
@@ -532,7 +552,7 @@ impl MeshTransport for IrohMeshTransport {
         let connections = self
             .connections
             .write()
-            .unwrap()
+            .expect("connections lock poisoned")
             .drain()
             .collect::<Vec<_>>();
         for (_node_id, _conn) in connections {
@@ -557,14 +577,14 @@ impl MeshTransport for IrohMeshTransport {
         let _endpoint_id = self
             .node_to_endpoint
             .read()
-            .unwrap()
+            .expect("node_to_endpoint lock poisoned")
             .get(peer_id)
             .copied()
             .ok_or_else(|| TransportError::PeerNotFound(peer_id.as_str().to_string()))?;
 
         // Get peer info from static config
         let peer_info = {
-            let config = self.peer_config.read().unwrap();
+            let config = self.peer_config.read().expect("peer_config lock poisoned");
             config
                 .peers
                 .iter()
@@ -587,7 +607,7 @@ impl MeshTransport for IrohMeshTransport {
                 let mesh_conn = IrohMeshConnection::new(peer_id.clone(), conn, connected_at);
                 self.connections
                     .write()
-                    .unwrap()
+                    .expect("connections lock poisoned")
                     .insert(peer_id.clone(), mesh_conn.clone());
 
                 // Start health monitoring for this peer (Issue #254)
@@ -606,7 +626,7 @@ impl MeshTransport for IrohMeshTransport {
                 // Accept path is handling - check if connection exists
                 self.connections
                     .read()
-                    .unwrap()
+                    .expect("connections lock poisoned")
                     .get(peer_id)
                     .cloned()
                     .map(|c| Box::new(c) as Box<dyn MeshConnection>)
@@ -621,7 +641,12 @@ impl MeshTransport for IrohMeshTransport {
 
     async fn disconnect(&self, peer_id: &NodeId) -> Result<()> {
         // Remove connection from map
-        if let Some(conn) = self.connections.write().unwrap().remove(peer_id) {
+        if let Some(conn) = self
+            .connections
+            .write()
+            .expect("connections lock poisoned")
+            .remove(peer_id)
+        {
             // Stop health monitoring (Issue #254)
             self.health_monitor.stop_monitoring(peer_id);
 
@@ -641,23 +666,34 @@ impl MeshTransport for IrohMeshTransport {
     fn get_connection(&self, peer_id: &NodeId) -> Option<Box<dyn MeshConnection>> {
         self.connections
             .read()
-            .unwrap()
+            .expect("connections lock poisoned")
             .get(peer_id)
             .cloned()
             .map(|c| Box::new(c) as Box<dyn MeshConnection>)
     }
 
     fn peer_count(&self) -> usize {
-        self.connections.read().unwrap().len()
+        self.connections
+            .read()
+            .expect("connections lock poisoned")
+            .len()
     }
 
     fn connected_peers(&self) -> Vec<NodeId> {
-        self.connections.read().unwrap().keys().cloned().collect()
+        self.connections
+            .read()
+            .expect("connections lock poisoned")
+            .keys()
+            .cloned()
+            .collect()
     }
 
     fn subscribe_peer_events(&self) -> PeerEventReceiver {
         let (tx, rx) = mpsc::channel(PEER_EVENT_CHANNEL_CAPACITY);
-        self.event_senders.write().unwrap().push(tx);
+        self.event_senders
+            .write()
+            .expect("event_senders lock poisoned")
+            .push(tx);
         rx
     }
 
@@ -690,7 +726,10 @@ impl Transport for IrohMeshTransport {
     fn can_reach(&self, peer_id: &NodeId) -> bool {
         // Check if we have a mapping for this peer
         // This means we know how to reach them (via static config or discovery)
-        self.node_to_endpoint.read().unwrap().contains_key(peer_id)
+        self.node_to_endpoint
+            .read()
+            .expect("node_to_endpoint lock poisoned")
+            .contains_key(peer_id)
     }
 }
 
