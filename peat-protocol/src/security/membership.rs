@@ -369,7 +369,11 @@ impl MembershipCertificate {
                 "truncated issued_at".to_string(),
             ));
         }
-        let issued_at_ms = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
+        let issued_at_ms = u64::from_le_bytes(
+            data[offset..offset + 8]
+                .try_into()
+                .expect("slice length verified by preceding bounds check"),
+        );
         offset += 8;
 
         // expires_at_ms (8)
@@ -378,7 +382,11 @@ impl MembershipCertificate {
                 "truncated expires_at".to_string(),
             ));
         }
-        let expires_at_ms = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
+        let expires_at_ms = u64::from_le_bytes(
+            data[offset..offset + 8]
+                .try_into()
+                .expect("slice length verified by preceding bounds check"),
+        );
         offset += 8;
 
         // permissions (1)

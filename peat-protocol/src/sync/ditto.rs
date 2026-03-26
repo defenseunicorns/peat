@@ -60,7 +60,7 @@ impl DittoBackend {
     fn get_store(&self) -> Result<Arc<DittoStore>> {
         self.store
             .lock()
-            .unwrap()
+            .map_err(|_| Error::Internal("store lock poisoned".into()))?
             .as_ref()
             .cloned()
             .ok_or_else(|| Error::config_error("Backend not initialized", None))
@@ -116,13 +116,21 @@ impl DataSyncBackend for DittoBackend {
         let store = Arc::new(DittoStore::new(ditto_config)?);
 
         // Store it
-        *self.store.lock().unwrap() = Some(store);
+        *self
+            .store
+            .lock()
+            .map_err(|_| Error::Internal("store lock poisoned".into()))? = Some(store);
 
         Ok(())
     }
 
     async fn shutdown(&self) -> anyhow::Result<()> {
-        if let Some(store) = self.store.lock().unwrap().take() {
+        if let Some(store) = self
+            .store
+            .lock()
+            .map_err(|_| Error::Internal("store lock poisoned".into()))?
+            .take()
+        {
             store.stop_sync();
             drop(store);
         }
@@ -142,7 +150,10 @@ impl DataSyncBackend for DittoBackend {
     }
 
     async fn is_ready(&self) -> bool {
-        self.store.lock().unwrap().is_some()
+        self.store
+            .lock()
+            .map(|guard| guard.is_some())
+            .unwrap_or(false)
     }
 
     fn backend_info(&self) -> BackendInfo {
@@ -277,8 +288,12 @@ impl DocumentStore for DittoBackend {
                     })
                     .collect();
 
-                let mut is_first = initial_flag.lock().unwrap();
-                let mut prev = prev_ids.lock().unwrap();
+                let Ok(mut is_first) = initial_flag.lock() else {
+                    return;
+                };
+                let Ok(mut prev) = prev_ids.lock() else {
+                    return;
+                };
 
                 if *is_first {
                     // First callback - send initial snapshot
@@ -549,7 +564,9 @@ impl PeerDiscovery for DittoBackend {
     }
 
     fn on_peer_event(&self, callback: Box<dyn Fn(PeerEvent) + Send + Sync>) {
-        self.peer_callbacks.lock().unwrap().push(callback);
+        if let Ok(mut callbacks) = self.peer_callbacks.lock() {
+            callbacks.push(callback);
+        }
 
         // Register presence observer to trigger callbacks
         if let Ok(store) = self.get_store() {
@@ -568,7 +585,9 @@ impl PeerDiscovery for DittoBackend {
                         metadata: HashMap::new(),
                     };
 
-                    let callbacks = callbacks.lock().unwrap();
+                    let Ok(callbacks) = callbacks.lock() else {
+                        return;
+                    };
                     for callback in callbacks.iter() {
                         callback(PeerEvent::Connected(peer_info.clone()));
                     }
@@ -632,7 +651,11 @@ impl SyncEngine for DittoBackend {
     async fn is_syncing(&self) -> anyhow::Result<bool> {
         // In Ditto, if we have a store and it's initialized, sync is active
         // (it starts when we call start_sync and stops when we call stop_sync)
-        Ok(self.store.lock().unwrap().is_some())
+        Ok(self
+            .store
+            .lock()
+            .map(|guard| guard.is_some())
+            .unwrap_or(false))
     }
 }
 

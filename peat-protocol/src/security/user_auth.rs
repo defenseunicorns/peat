@@ -510,7 +510,7 @@ impl LocalUserStore {
     pub fn with_users(users: Vec<UserRecord>) -> Self {
         let store = Self::new();
         {
-            let mut map = store.users.write().unwrap();
+            let mut map = store.users.write().expect("users lock poisoned");
             for user in users {
                 map.insert(user.identity.username.clone(), user);
             }
@@ -521,11 +521,14 @@ impl LocalUserStore {
 
 impl UserStore for LocalUserStore {
     fn get_user(&self, username: &str) -> Option<UserRecord> {
-        self.users.read().unwrap().get(username).cloned()
+        self.users.read().ok()?.get(username).cloned()
     }
 
     fn store_user(&self, record: UserRecord) -> Result<(), SecurityError> {
-        let mut users = self.users.write().unwrap();
+        let mut users = self
+            .users
+            .write()
+            .map_err(|e| SecurityError::Internal(format!("users lock poisoned: {e}")))?;
         if users.contains_key(&record.identity.username) {
             return Err(SecurityError::UserAlreadyExists {
                 username: record.identity.username,
@@ -536,7 +539,10 @@ impl UserStore for LocalUserStore {
     }
 
     fn update_user(&self, record: UserRecord) -> Result<(), SecurityError> {
-        let mut users = self.users.write().unwrap();
+        let mut users = self
+            .users
+            .write()
+            .map_err(|e| SecurityError::Internal(format!("users lock poisoned: {e}")))?;
         if !users.contains_key(&record.identity.username) {
             return Err(SecurityError::UserNotFound {
                 username: record.identity.username,
@@ -547,7 +553,10 @@ impl UserStore for LocalUserStore {
     }
 
     fn delete_user(&self, username: &str) -> Result<(), SecurityError> {
-        let mut users = self.users.write().unwrap();
+        let mut users = self
+            .users
+            .write()
+            .map_err(|e| SecurityError::Internal(format!("users lock poisoned: {e}")))?;
         if users.remove(username).is_none() {
             return Err(SecurityError::UserNotFound {
                 username: username.to_string(),
@@ -557,7 +566,10 @@ impl UserStore for LocalUserStore {
     }
 
     fn list_users(&self) -> Vec<String> {
-        self.users.read().unwrap().keys().cloned().collect()
+        self.users
+            .read()
+            .map(|u| u.keys().cloned().collect())
+            .unwrap_or_default()
     }
 }
 
@@ -710,7 +722,7 @@ impl UserAuthenticator {
         // Store session
         self.sessions
             .write()
-            .unwrap()
+            .map_err(|e| SecurityError::Internal(format!("sessions lock poisoned: {e}")))?
             .insert(session.session_id, session.clone());
 
         Ok(session)
@@ -802,7 +814,7 @@ impl UserAuthenticator {
         // Store session
         self.sessions
             .write()
-            .unwrap()
+            .map_err(|e| SecurityError::Internal(format!("sessions lock poisoned: {e}")))?
             .insert(session.session_id, session.clone());
 
         Ok(session)
@@ -810,7 +822,10 @@ impl UserAuthenticator {
 
     /// Validate a session and return the user identity.
     pub fn validate_session(&self, session_id: &SessionId) -> Result<UserIdentity, SecurityError> {
-        let sessions = self.sessions.read().unwrap();
+        let sessions = self
+            .sessions
+            .read()
+            .map_err(|e| SecurityError::Internal(format!("sessions lock poisoned: {e}")))?;
         let session = sessions
             .get(session_id)
             .ok_or(SecurityError::SessionNotFound)?;
@@ -826,30 +841,34 @@ impl UserAuthenticator {
 
     /// Get a session by ID.
     pub fn get_session(&self, session_id: &SessionId) -> Option<UserSession> {
-        self.sessions.read().unwrap().get(session_id).cloned()
+        self.sessions.read().ok()?.get(session_id).cloned()
     }
 
     /// Invalidate (logout) a session.
     pub fn invalidate_session(&self, session_id: &SessionId) {
-        self.sessions.write().unwrap().remove(session_id);
+        if let Ok(mut sessions) = self.sessions.write() {
+            sessions.remove(session_id);
+        }
     }
 
     /// Invalidate all sessions for a user.
     pub fn invalidate_user_sessions(&self, username: &str) {
-        let mut sessions = self.sessions.write().unwrap();
-        sessions.retain(|_, session| session.identity.username != username);
+        if let Ok(mut sessions) = self.sessions.write() {
+            sessions.retain(|_, session| session.identity.username != username);
+        }
     }
 
     /// Clean up expired sessions.
     pub fn cleanup_expired_sessions(&self) {
         let now = SystemTime::now();
-        let mut sessions = self.sessions.write().unwrap();
-        sessions.retain(|_, session| session.expires_at > now);
+        if let Ok(mut sessions) = self.sessions.write() {
+            sessions.retain(|_, session| session.expires_at > now);
+        }
     }
 
     /// Get count of active sessions.
     pub fn active_session_count(&self) -> usize {
-        self.sessions.read().unwrap().len()
+        self.sessions.read().map(|s| s.len()).unwrap_or(0)
     }
 
     /// Bind a session to a device.
@@ -858,7 +877,10 @@ impl UserAuthenticator {
         session_id: &SessionId,
         device_id: DeviceId,
     ) -> Result<(), SecurityError> {
-        let mut sessions = self.sessions.write().unwrap();
+        let mut sessions = self
+            .sessions
+            .write()
+            .map_err(|e| SecurityError::Internal(format!("sessions lock poisoned: {e}")))?;
         let session = sessions
             .get_mut(session_id)
             .ok_or(SecurityError::SessionNotFound)?;

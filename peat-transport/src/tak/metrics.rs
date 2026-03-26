@@ -44,12 +44,18 @@ impl TakMetrics {
     /// Record a successful connection
     pub fn record_connect(&self) {
         self.connections.fetch_add(1, Ordering::Relaxed);
-        *self.connected_since.write().unwrap() = Some(Instant::now());
+        *self
+            .connected_since
+            .write()
+            .expect("connected_since lock poisoned") = Some(Instant::now());
     }
 
     /// Record a disconnection
     pub fn record_disconnect(&self) {
-        *self.connected_since.write().unwrap() = None;
+        *self
+            .connected_since
+            .write()
+            .expect("connected_since lock poisoned") = None;
     }
 
     /// Record a sent message
@@ -77,14 +83,14 @@ impl TakMetrics {
 
     /// Record an error
     pub fn record_error(&self, error: &str) {
-        *self.last_error.write().unwrap() = Some(error.to_string());
+        *self.last_error.write().expect("last_error lock poisoned") = Some(error.to_string());
     }
 
     /// Get connection uptime in seconds
     pub fn uptime_secs(&self) -> Option<u64> {
         self.connected_since
             .read()
-            .unwrap()
+            .expect("connected_since lock poisoned")
             .map(|since| since.elapsed().as_secs())
     }
 
@@ -98,7 +104,11 @@ impl TakMetrics {
             bytes_received: self.bytes_received.load(Ordering::Relaxed),
             messages_dropped: self.messages_dropped.load(Ordering::Relaxed),
             reconnect_attempts: self.reconnect_attempts.load(Ordering::Relaxed),
-            last_error: self.last_error.read().unwrap().clone(),
+            last_error: self
+                .last_error
+                .read()
+                .expect("last_error lock poisoned")
+                .clone(),
             uptime_secs: self.uptime_secs(),
         }
     }
@@ -114,8 +124,18 @@ impl Clone for TakMetrics {
             bytes_received: AtomicU64::new(self.bytes_received.load(Ordering::Relaxed)),
             messages_dropped: AtomicU64::new(self.messages_dropped.load(Ordering::Relaxed)),
             reconnect_attempts: AtomicU64::new(self.reconnect_attempts.load(Ordering::Relaxed)),
-            last_error: RwLock::new(self.last_error.read().unwrap().clone()),
-            connected_since: RwLock::new(*self.connected_since.read().unwrap()),
+            last_error: RwLock::new(
+                self.last_error
+                    .read()
+                    .expect("last_error lock poisoned")
+                    .clone(),
+            ),
+            connected_since: RwLock::new(
+                *self
+                    .connected_since
+                    .read()
+                    .expect("connected_since lock poisoned"),
+            ),
         }
     }
 }

@@ -115,7 +115,10 @@ impl MeshTransport for DittoMeshTransport {
 
     fn subscribe_peer_events(&self) -> PeerEventReceiver {
         let (tx, rx) = mpsc::channel(PEER_EVENT_CHANNEL_CAPACITY);
-        self.event_senders.write().unwrap().push(tx);
+        self.event_senders
+            .write()
+            .expect("event_senders lock poisoned")
+            .push(tx);
         // Note: Ditto handles peer events internally via PresenceObserver
         // In the future, we can bridge Ditto's events to this channel
         rx
