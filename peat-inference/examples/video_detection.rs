@@ -88,7 +88,9 @@ async fn main() -> anyhow::Result<()> {
     let config = OnnxConfig {
         model_path: model_path.into(),
         confidence_threshold: 0.5,
-        num_threads: num_cpus::get(),
+        num_threads: std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(1),
         execution_provider,
         ..Default::default()
     };

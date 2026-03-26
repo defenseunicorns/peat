@@ -74,3 +74,6 @@ peat-sim/topologies/lab4-automerge-24n-*.yaml
 peat-sim/topologies/lab4-automerge-192n-*.yaml
 peat-sim/topologies/lab4-ditto-*.yaml
 .embuild/
+
+# Supply chain audit cache
+.supply-chain-cache/

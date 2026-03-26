@@ -130,17 +130,13 @@ impl GeographicCluster {
 
 /// Encode a geographic coordinate as a geohash
 pub fn encode_geohash(coord: &GeoCoordinate, precision: usize) -> String {
-    let c = geohash::Coord {
-        x: coord.lon,
-        y: coord.lat,
-    };
-    geohash::encode(c, precision).expect("Valid coordinate")
+    crate::geohash::encode(coord.lon, coord.lat, precision).expect("Valid coordinate")
 }
 
 /// Decode a geohash back to a coordinate
 pub fn decode_geohash(hash: &str) -> Result<GeoCoordinate, &'static str> {
-    let (coord, _, _) = geohash::decode(hash).map_err(|_| "Invalid geohash")?;
-    GeoCoordinate::new(coord.y, coord.x, 0.0)
+    let ((lon, lat), _, _) = crate::geohash::decode(hash).map_err(|_| "Invalid geohash")?;
+    GeoCoordinate::new(lat, lon, 0.0)
 }
 
 /// Geographic discovery manager for organizing nodes into squads
