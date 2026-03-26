@@ -44,7 +44,9 @@ async fn main() -> anyhow::Result<()> {
         ExecutionProvider::Cpu
     };
 
-    let num_threads = num_cpus::get();
+    let num_threads = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1);
     println!("ONNX YOLOv8n Benchmark");
     println!("======================");
     println!("Model: {}", model_path);

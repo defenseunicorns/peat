@@ -70,7 +70,9 @@ impl JetsonInfo {
             cuda_version: cuda,
             tensorrt_version: trt,
             gpu_memory_mb: Self::detect_gpu_memory()?,
-            cpu_cores: num_cpus::get(),
+            cpu_cores: std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(1),
             dla_cores: Self::detect_dla_cores(),
         })
     }
