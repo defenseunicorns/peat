@@ -2,3 +2,207 @@
 # cargo-vet audits file
 
 [audits]
+
+[[trusted.argon2]]
+criteria = "safe-to-deploy"
+user-id = 267 # Tony Arcieri (tarcieri)
+start = "2021-01-29"
+end = "2027-03-26"
+
+[[trusted.argon2]]
+criteria = "safe-to-deploy"
+user-id = 5059 # Artyom Pavlov (newpavlov)
+start = "2021-07-20"
+end = "2027-03-26"
+
+[[trusted.aws-lc-rs]]
+criteria = "safe-to-deploy"
+user-id = 156764 # Justin W Smith (justsmth)
+start = "2023-04-11"
+end = "2027-03-26"
+
+[[trusted.aws-lc-sys]]
+criteria = "safe-to-deploy"
+user-id = 156764 # Justin W Smith (justsmth)
+start = "2022-11-09"
+end = "2027-03-26"
+
+[[trusted.blake2]]
+criteria = "safe-to-deploy"
+user-id = 5059 # Artyom Pavlov (newpavlov)
+start = "2019-08-25"
+end = "2027-03-26"
+
+[[trusted.blake3]]
+criteria = "safe-to-deploy"
+user-id = 3589 # Jack O'Connor (oconnor663)
+start = "2019-09-17"
+end = "2027-03-26"
+
+[[trusted.chacha20poly1305]]
+criteria = "safe-to-deploy"
+user-id = 267 # Tony Arcieri (tarcieri)
+start = "2019-08-30"
+end = "2027-03-26"
+
+[[trusted.chacha20poly1305]]
+criteria = "safe-to-deploy"
+user-id = 5059 # Artyom Pavlov (newpavlov)
+start = "2021-07-20"
+end = "2027-03-26"
+
+[[trusted.cipher]]
+criteria = "safe-to-deploy"
+user-id = 267 # Tony Arcieri (tarcieri)
+start = "2020-10-15"
+end = "2027-03-26"
+
+[[trusted.cipher]]
+criteria = "safe-to-deploy"
+user-id = 5059 # Artyom Pavlov (newpavlov)
+start = "2022-02-10"
+end = "2027-03-26"
+
+[[trusted.crypto_box]]
+criteria = "safe-to-deploy"
+user-id = 267 # Tony Arcieri (tarcieri)
+start = "2020-02-25"
+end = "2027-03-26"
+
+[[trusted.crypto_secretbox]]
+criteria = "safe-to-deploy"
+user-id = 267 # Tony Arcieri (tarcieri)
+start = "2022-11-29"
+end = "2027-03-26"
+
+[[trusted.hkdf]]
+criteria = "safe-to-deploy"
+user-id = 5059 # Artyom Pavlov (newpavlov)
+start = "2021-12-07"
+end = "2027-03-26"
+
+[[trusted.password-hash]]
+criteria = "safe-to-deploy"
+user-id = 267 # Tony Arcieri (tarcieri)
+start = "2021-01-29"
+end = "2027-03-26"
+
+[[trusted.password-hash]]
+criteria = "safe-to-deploy"
+user-id = 5059 # Artyom Pavlov (newpavlov)
+start = "2020-08-18"
+end = "2027-03-26"
+
+[[trusted.pem]]
+criteria = "safe-to-deploy"
+user-id = 3635 # Jonathan Creekmore (jcreekmore)
+start = "2019-04-22"
+end = "2027-03-26"
+
+[[trusted.rcgen]]
+criteria = "safe-to-deploy"
+user-id = 3941
+start = "2019-04-26"
+end = "2027-03-26"
+
+[[trusted.rcgen]]
+criteria = "safe-to-deploy"
+user-id = 4556 # Dirkjan Ochtman (djc)
+start = "2024-03-28"
+end = "2027-03-26"
+
+[[trusted.ring]]
+criteria = "safe-to-deploy"
+user-id = 2342 # Brian Smith (briansmith)
+start = "2019-07-03"
+end = "2027-03-26"
+
+[[trusted.rustls]]
+criteria = "safe-to-deploy"
+user-id = 4556 # Dirkjan Ochtman (djc)
+start = "2022-05-18"
+end = "2027-03-26"
+
+[[trusted.rustls]]
+criteria = "safe-to-deploy"
+user-id = 209038 # Daniel McCarney (cpu)
+start = "2023-07-05"
+end = "2027-03-26"
+
+[[trusted.rustls-webpki]]
+criteria = "safe-to-deploy"
+user-id = 2751 # Joe Birr-Pixton (ctz)
+start = "2023-01-09"
+end = "2027-03-26"
+
+[[trusted.rustls-webpki]]
+criteria = "safe-to-deploy"
+user-id = 4556 # Dirkjan Ochtman (djc)
+start = "2023-09-01"
+end = "2027-03-26"
+
+[[trusted.salsa20]]
+criteria = "safe-to-deploy"
+user-id = 267 # Tony Arcieri (tarcieri)
+start = "2019-06-24"
+end = "2027-03-26"
+
+[[trusted.salsa20]]
+criteria = "safe-to-deploy"
+user-id = 5059 # Artyom Pavlov (newpavlov)
+start = "2019-07-30"
+end = "2027-03-26"
+
+[[trusted.sha1]]
+criteria = "safe-to-deploy"
+user-id = 267 # Tony Arcieri (tarcieri)
+start = "2024-01-08"
+end = "2027-03-26"
+
+[[trusted.sha1]]
+criteria = "safe-to-deploy"
+user-id = 5059 # Artyom Pavlov (newpavlov)
+start = "2022-01-17"
+end = "2027-03-26"
+
+[[trusted.tokio-rustls]]
+criteria = "safe-to-deploy"
+user-id = 4556 # Dirkjan Ochtman (djc)
+start = "2023-06-09"
+end = "2027-03-26"
+
+[[trusted.untrusted]]
+criteria = "safe-to-deploy"
+user-id = 2342 # Brian Smith (briansmith)
+start = "2019-07-03"
+end = "2027-03-26"
+
+[[trusted.webpki-roots]]
+criteria = "safe-to-deploy"
+user-id = 2751 # Joe Birr-Pixton (ctz)
+start = "2019-07-21"
+end = "2027-03-26"
+
+[[trusted.webpki-roots]]
+criteria = "safe-to-deploy"
+user-id = 4556 # Dirkjan Ochtman (djc)
+start = "2023-03-31"
+end = "2027-03-26"
+
+[[trusted.x25519-dalek]]
+criteria = "safe-to-deploy"
+user-id = 5289
+start = "2019-02-28"
+end = "2027-03-26"
+
+[[trusted.x25519-dalek]]
+criteria = "safe-to-deploy"
+user-id = 6979 # Michael Rosenberg (rozbb)
+start = "2023-03-31"
+end = "2027-03-26"
+
+[[trusted.zeroize]]
+criteria = "safe-to-deploy"
+user-id = 267 # Tony Arcieri (tarcieri)
+start = "2021-11-05"
+end = "2027-03-26"
