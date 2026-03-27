@@ -1,0 +1,63 @@
+name: SBOM
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler mold clang libdbus-1-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-cyclonedx
+        run: cargo install cargo-cyclonedx --quiet
+
+      - name: Generate SBOMs
+        run: cargo cyclonedx --format json
+
+      - name: Collect SBOMs
+        run: |
+          mkdir -p sbom-artifacts
+          find . -name "*.cdx.json" -not -path "./sbom-artifacts/*" -exec cp {} sbom-artifacts/ \;
+          ls -la sbom-artifacts/
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cyclonedx
+          path: sbom-artifacts/*.cdx.json
+
+      - name: Attach SBOMs to release
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          # Wait for release to exist (may be created by another workflow)
+          for i in $(seq 1 30); do
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              break
+            fi
+            echo "Waiting for release $TAG to be created... ($i/30)"
+            sleep 10
+          done
+          # Create release if it doesn't exist
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --generate-notes
+          fi
+          gh release upload "$TAG" sbom-artifacts/*.cdx.json --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
