@@ -240,6 +240,16 @@ impl AutomergeBackend {
         &self.store
     }
 
+    /// Get reference to sync coordinator for tombstone propagation (Issue #668)
+    pub fn sync_coordinator(&self) -> Option<&Arc<AutomergeSyncCoordinator>> {
+        self.sync_coordinator.as_ref()
+    }
+
+    /// Get reference to Iroh transport for peer enumeration (Issue #668)
+    pub fn iroh_transport(&self) -> Option<&Arc<IrohTransport>> {
+        self.iroh_transport.as_ref()
+    }
+
     /// Manually trigger sync for a specific document with all connected peers
     ///
     /// This is useful for testing or for explicit sync triggering.
