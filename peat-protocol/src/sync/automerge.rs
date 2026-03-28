@@ -29,12 +29,13 @@
 use async_trait::async_trait;
 use automerge::{sync, sync::SyncDoc, transaction::Transactable, Automerge};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::mpsc;
 
 use crate::error::{Error, Result};
-use crate::qos::{DeletionPolicy, DeletionPolicyRegistry, Tombstone};
+use crate::qos::{DeletionPolicy, DeletionPolicyRegistry, Tombstone, TombstoneSyncMessage};
 #[cfg(feature = "automerge-backend")]
 use crate::storage::automerge_conversion::automerge_to_message;
 use crate::sync::traits::*;
@@ -66,6 +67,15 @@ pub struct AutomergeBackend {
 
     /// Deletion policy registry (ADR-034)
     deletion_policy_registry: Arc<DeletionPolicyRegistry>,
+
+    /// Monotonic Lamport counter for tombstone ordering (ADR-034, Issue #668)
+    lamport_counter: Arc<AtomicU64>,
+
+    /// Pending tombstones awaiting propagation to peers (ADR-034, Issue #668)
+    pending_tombstones: Arc<Mutex<Vec<TombstoneSyncMessage>>>,
+
+    /// GC task handle for periodic tombstone/TTL cleanup (ADR-034, Issue #668)
+    gc_handle: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
 }
 
 impl AutomergeBackend {
@@ -87,12 +97,42 @@ impl AutomergeBackend {
             observers: Arc::new(Mutex::new(Vec::new())),
             tombstones: Arc::new(Mutex::new(HashMap::new())),
             deletion_policy_registry: Arc::new(DeletionPolicyRegistry::new()),
+            lamport_counter: Arc::new(AtomicU64::new(0)),
+            pending_tombstones: Arc::new(Mutex::new(Vec::new())),
+            gc_handle: Arc::new(Mutex::new(None)),
         }
     }
 
     /// Helper: Generate document key from collection and ID
     fn doc_key(collection: &str, doc_id: &DocumentId) -> String {
         format!("{}:{}", collection, doc_id)
+    }
+
+    /// Get the node ID for tombstone attribution (ADR-034, Issue #668)
+    ///
+    /// Uses the app_id from BackendConfig if initialized, falls back to "local".
+    fn node_id(&self) -> String {
+        self.config
+            .lock()
+            .ok()
+            .and_then(|c| c.as_ref().map(|cfg| cfg.app_id.clone()))
+            .unwrap_or_else(|| "local".to_string())
+    }
+
+    /// Get the next Lamport timestamp for tombstone ordering (ADR-034, Issue #668)
+    fn next_lamport(&self) -> u64 {
+        self.lamport_counter.fetch_add(1, Ordering::SeqCst)
+    }
+
+    /// Drain pending tombstones for propagation to peers (ADR-034, Issue #668)
+    ///
+    /// Called by the sync coordinator to retrieve tombstones created since
+    /// the last drain. Returns and clears the pending queue.
+    pub fn drain_pending_tombstones(&self) -> Vec<TombstoneSyncMessage> {
+        self.pending_tombstones
+            .lock()
+            .map(|mut q| std::mem::take(&mut *q))
+            .unwrap_or_default()
     }
 
     /// Helper: Convert Automerge document to our Document type
@@ -762,22 +802,19 @@ impl DocumentStore for AutomergeBackend {
                 tombstone_ttl,
                 delete_wins: _,
             } => {
-                // Create tombstone
+                // Create tombstone with real node ID and Lamport (Issue #668)
+                let node_id = self.node_id();
+                let lamport = self.next_lamport();
                 let tombstone = if let Some(reason_str) = reason {
                     Tombstone::with_reason(
                         doc_id.clone(),
                         collection.to_string(),
-                        "local".to_string(), // TODO: Use actual node ID
-                        0,                   // TODO: Use actual Lamport timestamp
+                        node_id,
+                        lamport,
                         reason_str,
                     )
                 } else {
-                    Tombstone::new(
-                        doc_id.clone(),
-                        collection.to_string(),
-                        "local".to_string(), // TODO: Use actual node ID
-                        0,                   // TODO: Use actual Lamport timestamp
-                    )
+                    Tombstone::new(doc_id.clone(), collection.to_string(), node_id, lamport)
                 };
                 let tombstone_id = format!("{}:{}", collection, doc_id);
 
@@ -786,6 +823,11 @@ impl DocumentStore for AutomergeBackend {
                     .lock()
                     .map_err(|_| Error::Internal("tombstones lock poisoned".into()))?
                     .insert(tombstone_id.clone(), tombstone.clone());
+
+                // Enqueue for propagation to peers (Issue #668)
+                if let Ok(mut pending) = self.pending_tombstones.lock() {
+                    pending.push(TombstoneSyncMessage::from_tombstone(tombstone));
+                }
 
                 // Remove the actual document
                 self.remove(collection, doc_id).await.ok(); // Ignore if not found
@@ -885,6 +927,74 @@ impl DocumentStore for AutomergeBackend {
             .ok();
 
         Ok(())
+    }
+}
+
+// ============================================================================
+// GcStore Trait Implementation (ADR-034, Issue #668)
+// ============================================================================
+
+impl crate::qos::GcStore for AutomergeBackend {
+    fn get_all_tombstones(&self) -> anyhow::Result<Vec<Tombstone>> {
+        Ok(self
+            .tombstones
+            .lock()
+            .map_err(|_| Error::Internal("tombstones lock poisoned".into()))?
+            .values()
+            .cloned()
+            .collect())
+    }
+
+    fn remove_tombstone(&self, collection: &str, document_id: &str) -> anyhow::Result<bool> {
+        let key = format!("{}:{}", collection, document_id);
+        Ok(self
+            .tombstones
+            .lock()
+            .map_err(|_| Error::Internal("tombstones lock poisoned".into()))?
+            .remove(&key)
+            .is_some())
+    }
+
+    fn has_tombstone(&self, collection: &str, document_id: &str) -> anyhow::Result<bool> {
+        let key = format!("{}:{}", collection, document_id);
+        Ok(self
+            .tombstones
+            .lock()
+            .map_err(|_| Error::Internal("tombstones lock poisoned".into()))?
+            .contains_key(&key))
+    }
+
+    fn get_expired_documents(
+        &self,
+        _collection: &str,
+        _cutoff: std::time::SystemTime,
+    ) -> anyhow::Result<Vec<String>> {
+        // In-memory backend doesn't track document timestamps for TTL expiry
+        Ok(Vec::new())
+    }
+
+    fn hard_delete(&self, collection: &str, document_id: &str) -> anyhow::Result<()> {
+        let key = format!("{}:{}", collection, document_id);
+        self.documents
+            .lock()
+            .map_err(|_| Error::Internal("documents lock poisoned".into()))?
+            .remove(&key);
+        Ok(())
+    }
+
+    fn list_collections(&self) -> anyhow::Result<Vec<String>> {
+        let docs = self
+            .documents
+            .lock()
+            .map_err(|_| Error::Internal("documents lock poisoned".into()))?;
+        let mut collections: Vec<String> = docs
+            .keys()
+            .filter_map(|k| k.split(':').next().map(|s| s.to_string()))
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+        collections.sort();
+        Ok(collections)
     }
 }
 
@@ -999,10 +1109,29 @@ impl DataSyncBackend for AutomergeBackend {
             .map_err(|_| Error::Internal("config lock poisoned".into()))? = Some(config);
         *initialized = true;
 
+        // Start periodic garbage collection for tombstones and TTL (Issue #668)
+        let gc = Arc::new(crate::qos::GarbageCollector::with_policy_registry(
+            Arc::new(self.clone()),
+            Arc::clone(&self.deletion_policy_registry),
+            crate::qos::GcConfig::default(),
+        ));
+        let handle = crate::qos::start_periodic_gc(gc);
+        *self
+            .gc_handle
+            .lock()
+            .map_err(|_| Error::Internal("gc_handle lock poisoned".into()))? = Some(handle);
+
         Ok(())
     }
 
     async fn shutdown(&self) -> anyhow::Result<()> {
+        // Stop GC task (Issue #668)
+        if let Ok(mut handle) = self.gc_handle.lock() {
+            if let Some(h) = handle.take() {
+                h.abort();
+            }
+        }
+
         self.stop_sync().await?;
         self.documents
             .lock()
@@ -1131,6 +1260,12 @@ pub struct AutomergeIrohBackend {
     /// provided, this limit is ignored (topology manager controls connections).
     #[cfg(feature = "automerge-backend")]
     max_connections: usize,
+
+    /// Deletion policy registry for tombstone/soft-delete dispatch (Issue #668)
+    deletion_policy_registry: Arc<DeletionPolicyRegistry>,
+
+    /// Monotonic Lamport counter for tombstone ordering (Issue #668)
+    lamport_counter: Arc<AtomicU64>,
 }
 
 impl AutomergeIrohBackend {
@@ -1155,6 +1290,8 @@ impl AutomergeIrohBackend {
             topology_event_rx: Arc::new(tokio::sync::Mutex::new(None)),
             #[cfg(feature = "automerge-backend")]
             max_connections: DEFAULT_MAX_CONNECTIONS,
+            deletion_policy_registry: Arc::new(DeletionPolicyRegistry::new()),
+            lamport_counter: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -1610,6 +1747,12 @@ impl PeerDiscoveryHandle {
 // DocumentStore implementation for AutomergeIrohBackend
 struct IrohDocumentStore {
     backend: Arc<crate::storage::AutomergeBackend>,
+    /// Deletion policy registry for tombstone/soft-delete dispatch (Issue #668)
+    deletion_policy_registry: Arc<DeletionPolicyRegistry>,
+    /// Monotonic Lamport counter for tombstone ordering (Issue #668)
+    lamport_counter: Arc<AtomicU64>,
+    /// Node ID for tombstone attribution (Issue #668)
+    node_id: String,
 }
 
 #[async_trait]
@@ -1702,6 +1845,202 @@ impl DocumentStore for IrohDocumentStore {
             key: Some(doc_id.clone()),
             source: None,
         })?;
+        Ok(())
+    }
+
+    async fn delete(
+        &self,
+        collection: &str,
+        doc_id: &DocumentId,
+        reason: Option<&str>,
+    ) -> anyhow::Result<crate::qos::DeleteResult> {
+        let policy = self.deletion_policy(collection);
+        let store = self.backend.automerge_store();
+
+        match policy {
+            DeletionPolicy::Immutable => Ok(crate::qos::DeleteResult::immutable()),
+            DeletionPolicy::ImplicitTTL { .. } => Ok(crate::qos::DeleteResult {
+                deleted: false,
+                tombstone_id: None,
+                expires_at: None,
+                policy: policy.clone(),
+            }),
+            DeletionPolicy::Tombstone {
+                tombstone_ttl,
+                delete_wins: _,
+            } => {
+                let lamport = self.lamport_counter.fetch_add(1, Ordering::SeqCst);
+                let tombstone = if let Some(reason_str) = reason {
+                    Tombstone::with_reason(
+                        doc_id.clone(),
+                        collection.to_string(),
+                        self.node_id.clone(),
+                        lamport,
+                        reason_str,
+                    )
+                } else {
+                    Tombstone::new(
+                        doc_id.clone(),
+                        collection.to_string(),
+                        self.node_id.clone(),
+                        lamport,
+                    )
+                };
+                let tombstone_id = format!("{}:{}", collection, doc_id);
+
+                // Store tombstone in AutomergeStore (persisted to RocksDB)
+                store
+                    .put_tombstone(&tombstone)
+                    .map_err(|e| Error::Storage {
+                        message: e.to_string(),
+                        operation: Some("put_tombstone".to_string()),
+                        key: Some(tombstone_id.clone()),
+                        source: None,
+                    })?;
+
+                // Remove the document
+                let doc_key = format!("{}:{}", collection, doc_id);
+                store.delete(&doc_key).ok();
+
+                // Propagate tombstone to all connected peers (Issue #668)
+                // The tombstone is already stored in AutomergeStore, so
+                // sync_tombstones_with_peer will include it in the batch.
+                if let Some(coordinator) = self.backend.sync_coordinator() {
+                    let coordinator = coordinator.clone();
+                    let backend = Arc::clone(&self.backend);
+                    tokio::spawn(async move {
+                        // Get connected peers via the transport
+                        if let Some(transport) = backend.iroh_transport() {
+                            for peer_id in transport.connected_peers() {
+                                if let Err(e) = coordinator.sync_tombstones_with_peer(peer_id).await
+                                {
+                                    tracing::debug!(
+                                        "Tombstone propagation to peer {:?} failed: {}",
+                                        peer_id,
+                                        e
+                                    );
+                                }
+                            }
+                        }
+                    });
+                }
+
+                Ok(crate::qos::DeleteResult {
+                    deleted: true,
+                    tombstone_id: Some(tombstone_id),
+                    expires_at: Some(std::time::SystemTime::now() + tombstone_ttl),
+                    policy: policy.clone(),
+                })
+            }
+            DeletionPolicy::SoftDelete {
+                include_deleted_default: _,
+            } => {
+                // Soft delete: get doc, mark _deleted=true, upsert back
+                let doc_key = format!("{}:{}", collection, doc_id);
+                if let Some(automerge_doc) = store.get(&doc_key).map_err(|e| Error::Storage {
+                    message: e.to_string(),
+                    operation: Some("get".to_string()),
+                    key: Some(doc_key.clone()),
+                    source: None,
+                })? {
+                    // Apply soft-delete fields via Automerge transaction
+                    let mut doc = automerge_doc;
+                    let mut tx = doc.transaction();
+                    let root = automerge::ROOT;
+                    tx.put(&root, "_deleted", true).ok();
+                    tx.put(
+                        &root,
+                        "_deleted_at",
+                        chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+                    )
+                    .ok();
+                    if let Some(r) = reason {
+                        tx.put(&root, "_deleted_reason", r).ok();
+                    }
+                    tx.commit();
+                    store.put(&doc_key, &doc).map_err(|e| Error::Storage {
+                        message: e.to_string(),
+                        operation: Some("put".to_string()),
+                        key: Some(doc_key.clone()),
+                        source: None,
+                    })?;
+
+                    // Trigger sync so soft-delete propagates via normal document sync
+                    if let Ok(()) = self.backend.sync_document(&doc_key).await {
+                        tracing::debug!("Sync triggered for soft-deleted document {}", doc_key);
+                    }
+
+                    Ok(crate::qos::DeleteResult::soft_deleted(policy.clone()))
+                } else {
+                    Ok(crate::qos::DeleteResult {
+                        deleted: false,
+                        tombstone_id: None,
+                        expires_at: None,
+                        policy: policy.clone(),
+                    })
+                }
+            }
+        }
+    }
+
+    async fn is_deleted(&self, collection: &str, doc_id: &DocumentId) -> anyhow::Result<bool> {
+        let store = self.backend.automerge_store();
+
+        // Check tombstone first
+        if store.has_tombstone(collection, doc_id).unwrap_or(false) {
+            return Ok(true);
+        }
+
+        // Check soft-delete field
+        let doc_key = format!("{}:{}", collection, doc_id);
+        if let Ok(Some(automerge_doc)) = store.get(&doc_key) {
+            use automerge::ReadDoc;
+            if let Ok(Some((automerge::Value::Scalar(s), _))) =
+                automerge_doc.get(automerge::ROOT, "_deleted")
+            {
+                if let automerge::ScalarValue::Boolean(true) = s.as_ref() {
+                    return Ok(true);
+                }
+            }
+        }
+
+        Ok(false)
+    }
+
+    fn deletion_policy(&self, collection: &str) -> crate::qos::DeletionPolicy {
+        self.deletion_policy_registry.get(collection)
+    }
+
+    async fn get_tombstones(&self, collection: &str) -> anyhow::Result<Vec<Tombstone>> {
+        self.backend
+            .automerge_store()
+            .get_tombstones_for_collection(collection)
+            .map_err(|e| {
+                Error::Storage {
+                    message: e.to_string(),
+                    operation: Some("get_tombstones".to_string()),
+                    key: None,
+                    source: None,
+                }
+                .into()
+            })
+    }
+
+    async fn apply_tombstone(&self, tombstone: &Tombstone) -> anyhow::Result<()> {
+        let store = self.backend.automerge_store();
+        store.put_tombstone(tombstone).map_err(|e| Error::Storage {
+            message: e.to_string(),
+            operation: Some("put_tombstone".to_string()),
+            key: Some(format!(
+                "{}:{}",
+                tombstone.collection, tombstone.document_id
+            )),
+            source: None,
+        })?;
+
+        // Remove the document if it exists
+        let doc_key = format!("{}:{}", tombstone.collection, tombstone.document_id);
+        store.delete(&doc_key).ok();
         Ok(())
     }
 
@@ -2949,8 +3288,13 @@ impl DataSyncBackend for AutomergeIrohBackend {
     }
 
     fn document_store(&self) -> Arc<dyn DocumentStore> {
+        // Derive node ID from transport endpoint (unique per node)
+        let node_id = self.transport.endpoint_id().to_string();
         Arc::new(IrohDocumentStore {
             backend: Arc::clone(&self.backend),
+            deletion_policy_registry: Arc::clone(&self.deletion_policy_registry),
+            lamport_counter: Arc::clone(&self.lamport_counter),
+            node_id,
         })
     }
 
@@ -4162,7 +4506,7 @@ mod issue_271_clone_tests {
             .unwrap();
         assert!(removed_doc.is_none());
 
-        // Tombstone should exist
+        // Tombstone should exist with real node ID and lamport (Issue #668)
         let tombstones = backend
             .document_store()
             .get_tombstones("tombstone_collection")
@@ -4171,6 +4515,10 @@ mod issue_271_clone_tests {
         assert_eq!(tombstones.len(), 1);
         assert_eq!(tombstones[0].document_id, doc_id);
         assert_eq!(tombstones[0].reason, Some("removed".to_string()));
+        // After initialize(), node_id should be app_id from config
+        assert_eq!(tombstones[0].deleted_by, "deletion_test");
+        // First delete should get lamport=0
+        assert_eq!(tombstones[0].lamport, 0);
     }
 
     #[tokio::test]
@@ -4246,6 +4594,207 @@ mod issue_271_clone_tests {
             .await
             .unwrap();
         assert!(removed_doc.is_none());
+    }
+
+    // === Issue #668: Lamport, Node ID, Pending Tombstones, GC Tests ===
+
+    #[tokio::test]
+    async fn test_delete_increments_lamport() {
+        let backend = AutomergeBackend::new();
+        backend.initialize(deletion_test_config()).await.unwrap();
+        backend.deletion_policy_registry.set(
+            "nodes",
+            crate::qos::DeletionPolicy::Tombstone {
+                tombstone_ttl: std::time::Duration::from_secs(3600),
+                delete_wins: true,
+            },
+        );
+
+        // Insert two documents
+        let doc1 = Document::new(HashMap::from([("x".to_string(), serde_json::json!(1))]));
+        let doc2 = Document::new(HashMap::from([("x".to_string(), serde_json::json!(2))]));
+        let id1 = backend
+            .document_store()
+            .upsert("nodes", doc1)
+            .await
+            .unwrap();
+        let id2 = backend
+            .document_store()
+            .upsert("nodes", doc2)
+            .await
+            .unwrap();
+
+        // Delete both
+        backend
+            .document_store()
+            .delete("nodes", &id1, None)
+            .await
+            .unwrap();
+        backend
+            .document_store()
+            .delete("nodes", &id2, None)
+            .await
+            .unwrap();
+
+        // Verify monotonic lamport
+        let tombstones = backend
+            .document_store()
+            .get_tombstones("nodes")
+            .await
+            .unwrap();
+        assert_eq!(tombstones.len(), 2);
+        let lamports: Vec<u64> = tombstones.iter().map(|t| t.lamport).collect();
+        assert!(
+            lamports.contains(&0) && lamports.contains(&1),
+            "Expected lamport 0 and 1, got {:?}",
+            lamports
+        );
+    }
+
+    #[tokio::test]
+    async fn test_delete_uses_config_node_id() {
+        let backend = AutomergeBackend::new();
+
+        // Before initialization, node_id falls back to "local"
+        backend.deletion_policy_registry.set(
+            "test_coll",
+            crate::qos::DeletionPolicy::Tombstone {
+                tombstone_ttl: std::time::Duration::from_secs(3600),
+                delete_wins: true,
+            },
+        );
+        let doc = Document::new(HashMap::from([("x".to_string(), serde_json::json!(1))]));
+        let id = backend
+            .document_store()
+            .upsert("test_coll", doc)
+            .await
+            .unwrap();
+        backend
+            .document_store()
+            .delete("test_coll", &id, None)
+            .await
+            .unwrap();
+        let tombstones = backend
+            .document_store()
+            .get_tombstones("test_coll")
+            .await
+            .unwrap();
+        assert_eq!(tombstones[0].deleted_by, "local");
+
+        // After initialization, node_id should be app_id
+        let backend2 = AutomergeBackend::new();
+        backend2.initialize(deletion_test_config()).await.unwrap();
+        backend2.deletion_policy_registry.set(
+            "test_coll",
+            crate::qos::DeletionPolicy::Tombstone {
+                tombstone_ttl: std::time::Duration::from_secs(3600),
+                delete_wins: true,
+            },
+        );
+        let doc = Document::new(HashMap::from([("x".to_string(), serde_json::json!(2))]));
+        let id2 = backend2
+            .document_store()
+            .upsert("test_coll", doc)
+            .await
+            .unwrap();
+        backend2
+            .document_store()
+            .delete("test_coll", &id2, None)
+            .await
+            .unwrap();
+        let tombstones2 = backend2
+            .document_store()
+            .get_tombstones("test_coll")
+            .await
+            .unwrap();
+        assert_eq!(tombstones2[0].deleted_by, "deletion_test");
+    }
+
+    #[tokio::test]
+    async fn test_drain_pending_tombstones() {
+        let backend = AutomergeBackend::new();
+        backend.initialize(deletion_test_config()).await.unwrap();
+        backend.deletion_policy_registry.set(
+            "nodes",
+            crate::qos::DeletionPolicy::Tombstone {
+                tombstone_ttl: std::time::Duration::from_secs(3600),
+                delete_wins: true,
+            },
+        );
+
+        // Initially empty
+        assert!(backend.drain_pending_tombstones().is_empty());
+
+        // Insert and delete
+        let doc = Document::new(HashMap::from([("x".to_string(), serde_json::json!(1))]));
+        let id = backend.document_store().upsert("nodes", doc).await.unwrap();
+        backend
+            .document_store()
+            .delete("nodes", &id, Some("test"))
+            .await
+            .unwrap();
+
+        // Should have one pending tombstone
+        let pending = backend.drain_pending_tombstones();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].tombstone.document_id, id);
+        assert_eq!(pending[0].tombstone.collection, "nodes");
+
+        // After drain, should be empty again
+        assert!(backend.drain_pending_tombstones().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_gc_starts_on_init() {
+        let backend = AutomergeBackend::new();
+        // Before init, no GC handle
+        assert!(backend.gc_handle.lock().unwrap().is_none());
+
+        backend.initialize(deletion_test_config()).await.unwrap();
+        // After init, GC handle should exist
+        assert!(backend.gc_handle.lock().unwrap().is_some());
+
+        // Shutdown should clear it
+        backend.shutdown().await.unwrap();
+        assert!(backend.gc_handle.lock().unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_gc_store_impl() {
+        use crate::qos::GcStore;
+
+        let backend = AutomergeBackend::new();
+        backend.initialize(deletion_test_config()).await.unwrap();
+        backend.deletion_policy_registry.set(
+            "nodes",
+            crate::qos::DeletionPolicy::Tombstone {
+                tombstone_ttl: std::time::Duration::from_secs(3600),
+                delete_wins: true,
+            },
+        );
+
+        // Insert, delete, create tombstone
+        let doc = Document::new(HashMap::from([("x".to_string(), serde_json::json!(1))]));
+        let id = backend.document_store().upsert("nodes", doc).await.unwrap();
+        backend
+            .document_store()
+            .delete("nodes", &id, None)
+            .await
+            .unwrap();
+
+        // GcStore methods should work
+        assert!(backend.has_tombstone("nodes", &id).unwrap());
+        assert_eq!(backend.get_all_tombstones().unwrap().len(), 1);
+
+        // Remove tombstone
+        assert!(backend.remove_tombstone("nodes", &id).unwrap());
+        assert!(!backend.has_tombstone("nodes", &id).unwrap());
+        assert_eq!(backend.get_all_tombstones().unwrap().len(), 0);
+
+        // list_collections
+        let collections = backend.list_collections().unwrap();
+        // May be empty since we deleted the only doc; that's OK
+        assert!(collections.is_empty() || collections.contains(&"nodes".to_string()));
     }
 
     // ============================================================================

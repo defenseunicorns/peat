@@ -393,8 +393,8 @@ async fn test_tombstone_prevents_resurrection() {
 /// 1. Node A and Node B connect
 /// 2. Create document on Node B
 /// 3. Wait for document to sync to Node A
-/// 4. Create tombstone on Node A
-/// 5. Verify Node B receives tombstone via batch exchange
+/// 4. Delete document on Node A via DocumentStore::delete() (creates tombstone + propagates)
+/// 5. Verify Node B receives tombstone via sync
 /// 6. Verify document is deleted on Node B
 #[tokio::test]
 async fn test_full_tombstone_sync_e2e() {
@@ -542,25 +542,32 @@ async fn test_full_tombstone_sync_e2e() {
         return;
     }
 
-    // Create tombstone on Node A (representing deletion)
-    let tombstone = Tombstone::with_reason(
-        "track-to-delete",
-        "tracks",
-        hex::encode(endpoint_a.as_bytes()),
-        1000,
-        "Test deletion",
+    // Delete via the DocumentStore API (routes through IrohDocumentStore::delete
+    // which creates the tombstone, stores it, removes the doc, and propagates
+    // to all connected peers via sync_tombstones_with_peer)
+    let delete_result = doc_store_a
+        .delete(
+            "tracks",
+            &"track-to-delete".to_string(),
+            Some("Test deletion"),
+        )
+        .await
+        .expect("delete should succeed");
+    assert!(
+        delete_result.deleted,
+        "Delete should succeed for tracks (Tombstone policy)"
     );
-    store_a.put_tombstone(&tombstone).unwrap();
-    println!("  ✓ Tombstone created on Node A");
+    assert!(
+        delete_result.tombstone_id.is_some(),
+        "Should create a tombstone"
+    );
+    println!("  ✓ Document deleted on Node A via DocumentStore::delete()");
 
-    // Delete the document on Node A (local deletion)
-    store_a.delete("tracks:track-to-delete").unwrap();
-    println!("  ✓ Document deleted on Node A");
+    // Brief pause to let the spawned propagation task run
+    tokio::time::sleep(Duration::from_millis(200)).await;
 
-    // Now we need to trigger a reconnect or tombstone sync
-    // The tombstone exchange happens on peer connect, so let's verify
-    // Node B has the tombstone after some time (the batch exchange should happen)
-    println!("  Waiting for tombstone batch exchange...");
+    // Wait for tombstone to propagate to Node B
+    println!("  Waiting for tombstone propagation to Node B...");
     let mut tombstone_received = false;
     for i in 0..20 {
         tokio::time::sleep(Duration::from_millis(500)).await;
@@ -571,18 +578,18 @@ async fn test_full_tombstone_sync_e2e() {
         }
     }
 
-    // Verify outcome
-    if tombstone_received {
-        // Check if document was deleted on Node B
-        let doc_b = store_b.get("tracks:track-to-delete").unwrap();
-        if doc_b.is_none() {
-            println!("  ✓ Document deleted on Node B via tombstone sync");
-        } else {
-            println!("  ⚠ Document still exists on Node B despite tombstone");
-        }
-    } else {
-        println!("  ⚠ Tombstone not received on Node B (batch exchange may need reconnect)");
-    }
+    assert!(
+        tombstone_received,
+        "Tombstone should propagate from Node A to Node B"
+    );
+
+    // Verify document was deleted on Node B
+    let doc_b = store_b.get("tracks:track-to-delete").unwrap();
+    assert!(
+        doc_b.is_none(),
+        "Document should be deleted on Node B after receiving tombstone"
+    );
+    println!("  ✓ Document deleted on Node B via tombstone sync");
 
     // Cleanup
     let _ = backend_a.shutdown().await;
@@ -725,13 +732,14 @@ async fn test_tombstone_batch_exchange_on_connect() {
     let _ = backend_a.shutdown().await;
     let _ = backend_b.shutdown().await;
 
-    // This test documents current behavior - tombstone batch exchange on connect
-    // If none received, it indicates the batch exchange path needs work
-    if tombstones_on_b.is_empty() {
-        println!("  ⚠ No tombstones exchanged on connect - investigate batch exchange");
-    } else {
-        println!("  ✓ Tombstone batch exchange working!");
-    }
+    assert!(
+        !tombstones_on_b.is_empty(),
+        "Node B should receive tombstones from Node A via batch exchange on connect"
+    );
+    assert!(has_doc1, "Tombstone for tracks:old-doc-1 should propagate");
+    assert!(has_doc2, "Tombstone for alerts:old-doc-2 should propagate");
+    assert!(has_doc3, "Tombstone for nodes:old-doc-3 should propagate");
+    println!("  ✓ Tombstone batch exchange working!");
 }
 
 /// Test 12: Document Sync Blocked by Existing Tombstone
