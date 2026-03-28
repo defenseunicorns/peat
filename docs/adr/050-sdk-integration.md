@@ -779,6 +779,262 @@ pub enum TransportConfig {
 **Cons**: Duplicate implementation, must reimplement Automerge/Iroh in Go
 **Decision**: Rejected - maintain single Rust implementation, bind via cgo
 
+### 5. Sidecar + IPC for Go/Cloud-Native (No cgo)
+
+**Pros**: Pure Go client library, proven pattern (peat-registry mesh mode), Kubernetes-native, independent lifecycle
+**Cons**: IPC latency (~1-5ms), additional process to manage
+**Decision**: See Amendment 1 below — **Accepted for cloud-native/Kubernetes Go integration**
+
+---
+
+## Amendment 1: Sidecar Pattern for Go / Cloud-Native Integration
+
+**Date**: 2026-03-28
+**Authors**: Kit Plummer
+**Status**: Proposed
+**Supersedes**: Phase 3 (Go Bindings via cgo) for Kubernetes/cloud-native use cases
+
+### Context
+
+The original ADR proposed cgo bindings (cbindgen → C headers → Go cgo wrapper) as the Go integration path. Investigation into integrating Peat with UDS Remote Agent and other Go-based UDS components revealed that cgo introduces significant friction for the Go/cloud-native ecosystem:
+
+1. **Cross-compilation breaks**: Go's trivial `GOOS=linux GOARCH=arm64 go build` stops working. cgo requires a C cross-compiler toolchain for each target, complicating CI/CD pipelines.
+2. **Static binary distribution**: UDS/Zarf relies heavily on static Go binaries. cgo complicates static linking (musl vs glibc, system library dependencies).
+3. **Threading model mismatch**: Go goroutines (M:N green threads) and Rust async (tokio) compete for OS threads. cgo calls pin goroutines to OS threads, degrading Go's scheduler under load.
+4. **Dependency cascade**: Every Go binary that imports a cgo-dependent package inherits the C toolchain requirement. This cascades through the entire UDS dependency tree.
+5. **Build reproducibility**: Rust + C + Go in one build is harder to reproduce than Rust-only + Go-only.
+
+Meanwhile, **peat-registry mesh mode already demonstrates the correct pattern**: a Rust binary that runs as a sidecar alongside a service, communicates with it over localhost, and participates as a full CRDT node in peat-mesh.
+
+### Decision
+
+For Go and cloud-native integration, replace the cgo binding approach with a **sidecar + IPC pattern**:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Kubernetes Pod                                                          │
+│                                                                          │
+│  ┌──────────────────────────┐    ┌──────────────────────────────────┐  │
+│  │  Go Application          │    │  peat-sidecar                    │  │
+│  │  (UDS Remote Agent,      │    │  (Rust binary)                   │  │
+│  │   Zarf, operator, etc.)  │    │                                  │  │
+│  │                          │    │  ┌────────────────────────────┐  │  │
+│  │  ┌────────────────────┐  │    │  │  peat-protocol             │  │  │
+│  │  │  peat-sdk-go       │──┼────┼──│  (full CRDT participant)   │  │  │
+│  │  │  (pure Go, thin    │  │    │  │                            │  │  │
+│  │  │   gRPC client)     │  │    │  │  Automerge + Iroh          │  │  │
+│  │  └────────────────────┘  │    │  │  BLE, QUIC, etc.           │  │  │
+│  │                          │    │  └────────────────────────────┘  │  │
+│  └──────────────────────────┘    └──────────────────────────────────┘  │
+│           │                                    │                        │
+│           │  gRPC over Unix socket             │  peat-mesh P2P        │
+│           │  (localhost:50051 or                │  (Iroh QUIC, BLE)     │
+│           │   /var/run/peat.sock)              │                        │
+│           └────────────────────────────────────┘                        │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+#### peat-sidecar (new Rust crate)
+
+A lightweight Rust binary that:
+
+1. **Embeds peat-protocol** as a full CRDT mesh participant (Automerge sync, Iroh transport, BLE, etc.)
+2. **Exposes a gRPC API** over Unix domain socket or localhost TCP for co-located applications
+3. **Uses peat-schema protobuf definitions** — the same protos that define the mesh wire format also define the sidecar API, ensuring type consistency
+4. **Ships as a container image** for Kubernetes sidecar injection
+
+The gRPC service definition follows naturally from the existing High-Level API:
+
+```protobuf
+syntax = "proto3";
+package peat.sidecar.v1;
+
+service PeatSidecar {
+  // Node lifecycle
+  rpc Start(StartRequest) returns (StartResponse);
+  rpc Stop(StopRequest) returns (StopResponse);
+  rpc Status(StatusRequest) returns (StatusResponse);
+
+  // Platform state (this node)
+  rpc SetPosition(SetPositionRequest) returns (SetPositionResponse);
+  rpc SetOperational(SetOperationalRequest) returns (SetOperationalResponse);
+  rpc AdvertiseCapability(AdvertiseCapabilityRequest) returns (AdvertiseCapabilityResponse);
+  rpc RemoveCapability(RemoveCapabilityRequest) returns (RemoveCapabilityResponse);
+
+  // Mesh queries
+  rpc QueryPlatforms(QueryPlatformsRequest) returns (QueryPlatformsResponse);
+  rpc QueryCells(QueryCellsRequest) returns (QueryCellsResponse);
+
+  // Subscriptions (server-streaming)
+  rpc SubscribePlatforms(SubscribePlatformsRequest) returns (stream PlatformUpdate);
+  rpc SubscribeCells(SubscribeCellsRequest) returns (stream CellUpdate);
+
+  // Document store (CRDT-backed)
+  rpc PutDocument(PutDocumentRequest) returns (PutDocumentResponse);
+  rpc GetDocument(GetDocumentRequest) returns (GetDocumentResponse);
+  rpc SubscribeDocuments(SubscribeDocumentsRequest) returns (stream DocumentChange);
+
+  // Commands
+  rpc SendCommand(SendCommandRequest) returns (CommandReceipt);
+  rpc SubscribeCommands(SubscribeCommandsRequest) returns (stream IncomingCommand);
+}
+```
+
+#### peat-sdk-go (pure Go client library)
+
+A thin, idiomatic Go wrapper around the gRPC client:
+
+```go
+package peat
+
+import (
+    "context"
+    "google.golang.org/grpc"
+    "google.golang.org/grpc/credentials/insecure"
+    pb "github.com/defenseunicorns/peat-sdk-go/proto/peat/sidecar/v1"
+)
+
+// Client connects to a peat-sidecar instance over Unix socket or TCP.
+type Client struct {
+    conn   *grpc.ClientConn
+    sidecar pb.PeatSidecarClient
+}
+
+// Connect to the peat-sidecar. Default: unix:///var/run/peat.sock
+func Connect(ctx context.Context, target string) (*Client, error) {
+    conn, err := grpc.NewClient(target,
+        grpc.WithTransportCredentials(insecure.NewCredentials()),
+    )
+    if err != nil {
+        return nil, err
+    }
+    return &Client{
+        conn:    conn,
+        sidecar: pb.NewPeatSidecarClient(conn),
+    }, nil
+}
+
+// SetPosition updates this node's position in the mesh.
+func (c *Client) SetPosition(ctx context.Context, lat, lon, alt float64) error {
+    _, err := c.sidecar.SetPosition(ctx, &pb.SetPositionRequest{
+        Latitude:  lat,
+        Longitude: lon,
+        AltitudeM: alt,
+    })
+    return err
+}
+
+// SubscribePlatforms returns a channel of platform updates.
+// Cancelling the context stops the subscription.
+func (c *Client) SubscribePlatforms(ctx context.Context) (<-chan *pb.PlatformUpdate, error) {
+    stream, err := c.sidecar.SubscribePlatforms(ctx, &pb.SubscribePlatformsRequest{})
+    if err != nil {
+        return nil, err
+    }
+    ch := make(chan *pb.PlatformUpdate, 64)
+    go func() {
+        defer close(ch)
+        for {
+            update, err := stream.Recv()
+            if err != nil {
+                return
+            }
+            select {
+            case ch <- update:
+            case <-ctx.Done():
+                return
+            }
+        }
+    }()
+    return ch, nil
+}
+
+func (c *Client) Close() error { return c.conn.Close() }
+```
+
+### Precedent: peat-registry Mesh Mode
+
+peat-registry already validates this architecture in production:
+
+| Aspect | peat-registry (mesh mode) | peat-sidecar (proposed) |
+|--------|---------------------------|-------------------------|
+| **Rust binary** | `peat-registry` | `peat-sidecar` |
+| **Embeds** | peat-mesh + OCI sync logic | peat-protocol + gRPC server |
+| **Local service** | OCI registry (HTTP, port 5000) | Go app (gRPC, Unix socket) |
+| **Mesh participation** | Full CRDT via Automerge + Iroh | Full CRDT via Automerge + Iroh |
+| **Deployment** | Sidecar container in K8s pod | Sidecar container in K8s pod |
+| **Communication** | HTTP to localhost registry | gRPC to localhost app |
+| **State** | DigestSets synced via CRDT | Platform/Cell/Doc state via CRDT |
+
+The key insight: peat-registry proves that a Rust sidecar can be a full mesh participant while exposing a simple local API to a co-located service. peat-sidecar generalizes this pattern for any application.
+
+### When to Use Which
+
+| Integration Target | Approach | Rationale |
+|-------------------|----------|-----------|
+| **Go in Kubernetes** (UDS Remote Agent, Zarf, operators) | **Sidecar + peat-sdk-go** | Pure Go binary, K8s-native lifecycle, independent upgrades |
+| **Go on embedded/edge** (single-process constraint) | **cgo bindings** (original Phase 3) | No sidecar overhead, tight integration |
+| **Kotlin/Android** | **UniFFI + JNI** (unchanged) | Mobile apps are single-process, UniFFI is proven |
+| **Swift/iOS** | **UniFFI** (unchanged) | Same rationale as Android |
+| **Python** | **PyO3** (unchanged) | Python ecosystem expects in-process libraries |
+| **Rust** | **Native** (unchanged) | Direct crate dependency |
+
+### Revised Implementation Plan (Phase 3)
+
+Phase 3 splits into 3a and 3b:
+
+#### Phase 3a: peat-sidecar (Week 6-8)
+
+- [ ] Create `peat-sidecar` crate
+- [ ] Define `peat.sidecar.v1` protobuf service (extend peat-schema)
+- [ ] Implement gRPC server wrapping peat-protocol
+- [ ] Unix domain socket + TCP listen modes
+- [ ] Container image (`ghcr.io/defenseunicorns/peat-sidecar`)
+- [ ] Helm chart with sidecar injection
+- [ ] Integration tests against peat-mesh
+
+**Deliverable**: `peat-sidecar` container image deployable as K8s sidecar
+
+#### Phase 3b: peat-sdk-go (Week 9-10)
+
+- [ ] Generate Go protobuf stubs from `peat.sidecar.v1`
+- [ ] Idiomatic Go client wrapper (channels for subscriptions, context for cancellation)
+- [ ] Go module: `github.com/defenseunicorns/peat-sdk-go`
+- [ ] UDS Remote Agent integration example
+- [ ] Kubernetes operator example
+
+**Deliverable**: `go get github.com/defenseunicorns/peat-sdk-go` works, pure Go, no cgo
+
+### Consequences
+
+#### Positive
+
+- **Pure Go toolchain** for all UDS/Zarf consumers — no cgo, no C compiler, trivial cross-compilation
+- **Independent lifecycle** — upgrade peat-sidecar without rebuilding Go applications
+- **Proven pattern** — peat-registry mesh mode validates the architecture
+- **Language-agnostic** — any language with a gRPC client can use peat-sidecar, not just Go
+- **Kubernetes-native** — sidecar injection, health probes, independent resource limits
+
+#### Negative
+
+- **Additional process** — one more container per pod (mitigated: sidecar containers are a well-understood K8s pattern)
+- **IPC latency** — ~1-5ms per call vs in-process (mitigated: negligible for control-plane operations; not on the tactical data path)
+- **Two artifacts** — must ship both sidecar image and Go module (mitigated: same CI pipeline, same repo)
+
+#### Trade-off vs cgo
+
+| Concern | cgo | Sidecar |
+|---------|-----|---------|
+| Build complexity | High (Rust + C + Go) | Low (Rust-only + Go-only) |
+| Cross-compilation | Requires C cross-toolchain | Trivial for both |
+| Static binaries | Complicated (musl/glibc) | Native Go static binary |
+| Runtime overhead | FFI call cost (~100ns) | gRPC call cost (~1-5ms) |
+| Deployment | Single binary | Two containers |
+| Upgrade independence | Coupled | Independent |
+| Debugging | Mixed stacks (Go + Rust) | Clean separation |
+
+For Kubernetes workloads, the sidecar trade-offs are strictly better. cgo remains available for embedded/edge Go where a single process is required.
+
 ---
 
 ## References
@@ -792,6 +1048,8 @@ pub enum TransportConfig {
 - ADR-043: Consumer Interface Adapters (Compatibility Path)
 - ADR-045: Zarf/UDS Integration
 - ADR-049: peat-mesh Extraction
+- ADR-054: Peat UDS Registry Replication-to-Synchronization for DDIL Networks
+- peat-registry mesh mode: Validated sidecar pattern (Rust binary + localhost IPC + full CRDT participation)
 
 ---
 
@@ -804,3 +1062,5 @@ pub enum TransportConfig {
 | 2025-01-31 | PyO3 for Python | Best Rust-Python interop, async support |
 | 2025-01-31 | UniFFI for mobile | Mozilla-backed, supports both iOS and Android |
 | 2025-01-31 | ROS2 as dedicated bridge | Robotics is key use case, deserves first-class support |
+| 2026-03-28 | Sidecar + gRPC for Go/K8s integration (Amendment 1) | cgo breaks Go cross-compilation and static binary model; peat-registry mesh mode validates the sidecar pattern |
+| 2026-03-28 | cgo retained for embedded/edge Go only | Single-process constraint on drones/robots justifies FFI overhead |
