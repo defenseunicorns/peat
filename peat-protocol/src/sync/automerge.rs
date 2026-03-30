@@ -2386,7 +2386,7 @@ impl PeerDiscovery for IrohPeerDiscovery {
         #[cfg(feature = "automerge-backend")]
         if let Some(mdns) = self.transport.mdns_discovery() {
             use futures_lite::StreamExt;
-            use iroh::discovery::mdns::DiscoveryEvent;
+            use iroh::address_lookup::mdns::DiscoveryEvent;
 
             let mdns = mdns.clone();
             let transport = Arc::clone(&self.transport);

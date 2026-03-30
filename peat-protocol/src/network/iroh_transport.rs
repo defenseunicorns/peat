@@ -28,9 +28,9 @@ use super::peer_config::PeerInfo;
 #[cfg(feature = "automerge-backend")]
 use anyhow::{Context, Result};
 #[cfg(feature = "automerge-backend")]
-use iroh::discovery::mdns::MdnsDiscovery;
+use iroh::address_lookup::mdns::MdnsAddressLookup;
 #[cfg(feature = "automerge-backend")]
-use iroh::endpoint::{Connection, Endpoint, TransportConfig};
+use iroh::endpoint::{Connection, Endpoint};
 #[cfg(feature = "automerge-backend")]
 use iroh::{EndpointAddr, EndpointId};
 #[cfg(feature = "automerge-backend")]
@@ -121,7 +121,7 @@ pub const QUIC_MAX_IDLE_TIMEOUT_SECS: u64 = 5;
 #[cfg(feature = "automerge-backend")]
 pub const QUIC_KEEP_ALIVE_INTERVAL_SECS: u64 = 1;
 
-/// Create a TransportConfig with optimized timeout settings for tactical applications (Issue #315)
+/// Create a QuicTransportConfig with optimized timeout settings for tactical applications (Issue #315)
 ///
 /// Key settings:
 /// - `max_idle_timeout`: 5 seconds (reduced from default ~30s)
@@ -132,20 +132,18 @@ pub const QUIC_KEEP_ALIVE_INTERVAL_SECS: u64 = 1;
 /// - Immediate awareness of connection state changes
 /// - Designed for tactical radio networks where connections can drop unexpectedly
 #[cfg(feature = "automerge-backend")]
-fn create_tactical_transport_config() -> TransportConfig {
-    let mut config = TransportConfig::default();
-
-    // Set maximum idle timeout to 10 seconds for faster disconnect detection
-    // The IdleTimeout type requires conversion from Duration
-    config.max_idle_timeout(Some(
-        Duration::from_secs(QUIC_MAX_IDLE_TIMEOUT_SECS)
-            .try_into()
-            .expect("valid idle timeout duration"),
-    ));
-
-    // Enable keep-alive packets every 3 seconds to prevent healthy connections
-    // from timing out and to detect dead connections faster
-    config.keep_alive_interval(Some(Duration::from_secs(QUIC_KEEP_ALIVE_INTERVAL_SECS)));
+fn create_tactical_transport_config() -> iroh::endpoint::QuicTransportConfig {
+    let config = iroh::endpoint::QuicTransportConfig::builder()
+        // Set maximum idle timeout for faster disconnect detection
+        .max_idle_timeout(Some(
+            Duration::from_secs(QUIC_MAX_IDLE_TIMEOUT_SECS)
+                .try_into()
+                .expect("valid idle timeout duration"),
+        ))
+        // Enable keep-alive packets to prevent healthy connections
+        // from timing out and to detect dead connections faster
+        .keep_alive_interval(Duration::from_secs(QUIC_KEEP_ALIVE_INTERVAL_SECS))
+        .build();
 
     tracing::debug!(
         max_idle_timeout_secs = QUIC_MAX_IDLE_TIMEOUT_SECS,
@@ -181,7 +179,7 @@ pub struct IrohTransport {
     accept_task: Arc<RwLock<Option<JoinHandle<()>>>>,
     /// mDNS discovery (optional, for automatic peer discovery on local network)
     /// Uses interior mutability to support deferred initialization via enable_mdns_discovery()
-    mdns_discovery: Arc<RwLock<Option<MdnsDiscovery>>>,
+    mdns_discovery: Arc<RwLock<Option<MdnsAddressLookup>>>,
     /// Event senders for peer events (Issue #275)
     /// Multiple receivers can subscribe via subscribe_peer_events()
     event_senders: Arc<RwLock<Vec<TransportEventSender>>>,
@@ -214,7 +212,7 @@ impl IrohTransport {
     /// // transport.endpoint_addr() now contains ALL interface addresses
     /// ```
     pub async fn new() -> Result<Self> {
-        let endpoint = Endpoint::builder()
+        let endpoint = Endpoint::builder(iroh::endpoint::presets::N0)
             .alpns(vec![CAP_AUTOMERGE_ALPN.to_vec()])
             .transport_config(create_tactical_transport_config())
             .bind()
@@ -267,15 +265,15 @@ impl IrohTransport {
         let endpoint_id = secret_key.public();
 
         // Create mDNS discovery service using the endpoint_id
-        let discovery = MdnsDiscovery::builder()
+        let discovery = MdnsAddressLookup::builder()
             .build(endpoint_id)
             .context("Failed to create mDNS discovery")?;
 
         // Create endpoint with the same secret key and discovery enabled
-        let endpoint = Endpoint::builder()
+        let endpoint = Endpoint::builder(iroh::endpoint::presets::N0)
             .alpns(vec![CAP_AUTOMERGE_ALPN.to_vec()])
             .secret_key(secret_key)
-            .discovery(discovery.clone())
+            .address_lookup(discovery.clone())
             .transport_config(create_tactical_transport_config())
             .bind()
             .await
@@ -350,7 +348,7 @@ impl IrohTransport {
             "Created IrohTransport with deterministic key from seed"
         );
 
-        let endpoint = Endpoint::builder()
+        let endpoint = Endpoint::builder(iroh::endpoint::presets::N0)
             .alpns(vec![CAP_AUTOMERGE_ALPN.to_vec()])
             .secret_key(secret_key)
             .transport_config(create_tactical_transport_config())
@@ -403,7 +401,7 @@ impl IrohTransport {
         let endpoint_id = secret_key.public();
 
         // Create mDNS discovery service
-        let discovery = MdnsDiscovery::builder()
+        let discovery = MdnsAddressLookup::builder()
             .build(endpoint_id)
             .context("Failed to create mDNS discovery")?;
 
@@ -413,10 +411,10 @@ impl IrohTransport {
             "Created IrohTransport with deterministic key and mDNS discovery"
         );
 
-        let endpoint = Endpoint::builder()
+        let endpoint = Endpoint::builder(iroh::endpoint::presets::N0)
             .alpns(vec![CAP_AUTOMERGE_ALPN.to_vec()])
             .secret_key(secret_key)
-            .discovery(discovery.clone())
+            .address_lookup(discovery.clone())
             .transport_config(create_tactical_transport_config())
             .bind()
             .await
@@ -460,12 +458,6 @@ impl IrohTransport {
     ) -> Result<Self> {
         use sha2::{Digest, Sha256};
 
-        // Convert SocketAddr to SocketAddrV4 if it's IPv4
-        let bind_addr_v4 = match bind_addr {
-            SocketAddr::V4(addr) => addr,
-            SocketAddr::V6(_) => anyhow::bail!("Only IPv4 addresses supported for now"),
-        };
-
         // Derive 32 bytes from seed using SHA-256
         let mut hasher = Sha256::new();
         hasher.update(b"peat-iroh-key-v1:"); // Domain separator
@@ -481,7 +473,7 @@ impl IrohTransport {
         let endpoint_id = secret_key.public();
 
         // Create mDNS discovery service
-        let discovery = MdnsDiscovery::builder()
+        let discovery = MdnsAddressLookup::builder()
             .build(endpoint_id)
             .context("Failed to create mDNS discovery")?;
 
@@ -492,11 +484,12 @@ impl IrohTransport {
             "Created IrohTransport with deterministic key, mDNS discovery, and bind address"
         );
 
-        let endpoint = Endpoint::builder()
+        let endpoint = Endpoint::builder(iroh::endpoint::presets::N0)
             .alpns(vec![CAP_AUTOMERGE_ALPN.to_vec()])
             .secret_key(secret_key)
-            .discovery(discovery.clone())
-            .bind_addr_v4(bind_addr_v4)
+            .address_lookup(discovery.clone())
+            .bind_addr(bind_addr)
+            .context("Invalid bind address")?
             .transport_config(create_tactical_transport_config())
             .bind()
             .await
@@ -549,12 +542,6 @@ impl IrohTransport {
     pub async fn from_seed_at_addr(seed: &str, bind_addr: SocketAddr) -> Result<Self> {
         use sha2::{Digest, Sha256};
 
-        // Convert SocketAddr to SocketAddrV4 if it's IPv4
-        let bind_addr_v4 = match bind_addr {
-            SocketAddr::V4(addr) => addr,
-            SocketAddr::V6(_) => anyhow::bail!("Only IPv4 addresses supported for now"),
-        };
-
         // Derive 32 bytes from seed using SHA-256
         let mut hasher = Sha256::new();
         hasher.update(b"peat-iroh-key-v1:"); // Domain separator
@@ -576,10 +563,11 @@ impl IrohTransport {
             "Created IrohTransport with deterministic key (NO mDNS discovery - fast startup)"
         );
 
-        let endpoint = Endpoint::builder()
+        let endpoint = Endpoint::builder(iroh::endpoint::presets::N0)
             .alpns(vec![CAP_AUTOMERGE_ALPN.to_vec()])
             .secret_key(secret_key)
-            .bind_addr_v4(bind_addr_v4)
+            .bind_addr(bind_addr)
+            .context("Invalid bind address")?
             .transport_config(create_tactical_transport_config())
             .bind()
             .await
@@ -606,7 +594,7 @@ impl IrohTransport {
     /// # How It Works
     ///
     /// Since Iroh endpoints don't support adding discovery after creation, this method:
-    /// 1. Creates an MdnsDiscovery service for this endpoint's ID
+    /// 1. Creates an MdnsAddressLookup service for this endpoint's ID
     /// 2. Stores it for later access via `mdns_discovery()`
     /// 3. The caller can subscribe to discovery events and connect to discovered peers
     ///
@@ -650,7 +638,7 @@ impl IrohTransport {
         let endpoint_id = self.endpoint.id();
 
         // Create mDNS discovery service
-        let discovery = MdnsDiscovery::builder()
+        let discovery = MdnsAddressLookup::builder()
             .build(endpoint_id)
             .context("Failed to create mDNS discovery")?;
 
@@ -738,15 +726,10 @@ impl IrohTransport {
     /// let transport = IrohTransport::bind(addr).await?;
     /// ```
     pub async fn bind(bind_addr: SocketAddr) -> Result<Self> {
-        // Convert SocketAddr to SocketAddrV4 if it's IPv4
-        let bind_addr_v4 = match bind_addr {
-            SocketAddr::V4(addr) => addr,
-            SocketAddr::V6(_) => anyhow::bail!("Only IPv4 addresses supported for now"),
-        };
-
-        let endpoint = Endpoint::builder()
+        let endpoint = Endpoint::builder(iroh::endpoint::presets::N0)
             .alpns(vec![CAP_AUTOMERGE_ALPN.to_vec()])
-            .bind_addr_v4(bind_addr_v4)
+            .bind_addr(bind_addr)
+            .context("Invalid bind address")?
             .transport_config(create_tactical_transport_config())
             .bind()
             .await
@@ -1012,7 +995,7 @@ impl IrohTransport {
     ///
     /// # Returns
     ///
-    /// `Some(MdnsDiscovery)` if mDNS discovery is enabled, `None` otherwise.
+    /// `Some(MdnsAddressLookup)` if mDNS discovery is enabled, `None` otherwise.
     /// The discovery service is cloned (Arc internally) so this is cheap.
     ///
     /// # Example
@@ -1033,7 +1016,7 @@ impl IrohTransport {
     ///     }
     /// }
     /// ```
-    pub fn mdns_discovery(&self) -> Option<MdnsDiscovery> {
+    pub fn mdns_discovery(&self) -> Option<MdnsAddressLookup> {
         self.mdns_discovery
             .read()
             .expect("mdns_discovery lock poisoned")
@@ -1598,7 +1581,7 @@ impl IrohTransport {
     ///
     /// Uses `RelayMode::Disabled` so tests don't depend on external infrastructure.
     pub(crate) async fn new_local() -> Result<Self> {
-        let endpoint = Endpoint::empty_builder(iroh::RelayMode::Disabled)
+        let endpoint = Endpoint::empty_builder()
             .alpns(vec![CAP_AUTOMERGE_ALPN.to_vec()])
             .transport_config(create_tactical_transport_config())
             .bind()
@@ -1634,7 +1617,7 @@ impl IrohTransport {
 
         let secret_key = iroh::SecretKey::from_bytes(&seed_bytes);
 
-        let endpoint = Endpoint::empty_builder(iroh::RelayMode::Disabled)
+        let endpoint = Endpoint::empty_builder()
             .alpns(vec![CAP_AUTOMERGE_ALPN.to_vec()])
             .secret_key(secret_key)
             .transport_config(create_tactical_transport_config())

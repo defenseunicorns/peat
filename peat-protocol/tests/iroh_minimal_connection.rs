@@ -20,22 +20,18 @@ async fn test_minimal_iroh_connection() {
 
     println!("  Creating endpoints...");
 
-    let ep1 = iroh::Endpoint::builder()
+    let ep1 = iroh::Endpoint::empty_builder()
         .alpns(vec![ALPN.to_vec()])
-        .bind_addr_v4(match addr1 {
-            SocketAddr::V4(a) => a,
-            _ => unreachable!(),
-        })
+        .bind_addr(addr1)
+        .unwrap()
         .bind()
         .await
         .unwrap();
 
-    let ep2 = iroh::Endpoint::builder()
+    let ep2 = iroh::Endpoint::empty_builder()
         .alpns(vec![ALPN.to_vec()])
-        .bind_addr_v4(match addr2 {
-            SocketAddr::V4(a) => a,
-            _ => unreachable!(),
-        })
+        .bind_addr(addr2)
+        .unwrap()
         .bind()
         .await
         .unwrap();
