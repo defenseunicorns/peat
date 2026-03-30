@@ -1,6 +1,6 @@
 # ADR-058: Peat-MAVLink Protocol Bridge Crate
 
-**Status**: Proposed
+**Status**: Proposed (Amended 2026-03-30)
 **Date**: 2026-03-18
 **Authors**: Kit Plummer
 **Organization**: Defense Unicorns (https://defenseunicorns.com)
@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-This ADR defines the architecture for `peat-mavlink`, a Rust crate providing bidirectional MAVLink protocol integration for the Peat ecosystem. Unlike transport crates (peat-btle, peat-lora, peat-sbd) that carry opaque Peat sync bytes over a physical link, `peat-mavlink` is a **protocol bridge** — it translates between MAVLink's semantic message vocabulary (telemetry, commands, missions) and Peat CRDT documents. The primary API surface is peat-rmw topic integration, mapping MAVLink messages to typed pub/sub topics following the pattern established by mavros in ROS 2. A standalone bridge mode using direct Automerge store access is also supported for deployments without peat-rmw.
+This ADR defines the architecture for `peat-mavlink`, a Rust **library crate** providing bidirectional MAVLink protocol integration for the Peat ecosystem. Unlike transport crates (peat-btle, peat-lora, peat-sbd) that carry opaque Peat sync bytes over a physical link, `peat-mavlink` is a **protocol bridge** — it translates between MAVLink's semantic message vocabulary (telemetry, commands, missions) and Peat document types defined in `peat-schema`. The crate has **no dependency on `peat-mesh`** — it is composed by the integrator's mission application alongside `peat-mesh` (and optionally `peat-rmw`), following the same external crate pattern as peat-btle et al. but with the integration point at the document layer rather than the transport layer.
 
 ---
 
@@ -94,8 +94,8 @@ Key message categories relevant to Peat:
 
 1. **Bidirectional**: Ingest MAVLink telemetry into Peat CRDTs; translate Peat commands into MAVLink messages
 2. **Multi-Vehicle**: Support multiple simultaneous vehicles via MAVLink system IDs
-3. **peat-rmw Integration**: Map MAVLink messages to peat-rmw pub/sub topics as the primary API
-4. **Standalone Mode**: Support direct Automerge store access without peat-rmw dependency
+3. **peat-rmw Integration**: Optionally map MAVLink messages to peat-rmw pub/sub topics (feature-gated)
+4. **No peat-mesh dependency**: Produce `peat-schema` document types; the integrator's mission application wires them into `peat-mesh`
 5. **Standard Dialects**: Support common.xml and ardupilot.xml dialects via feature flags
 6. **Connection Types**: Serial (UART/USB), UDP, TCP connections to autopilots and GCS
 7. **DIL Resilience**: Queue outbound commands when vehicle link is degraded; replay on reconnect
@@ -129,8 +129,8 @@ peat-mavlink/
 │   ├── mission.rs          # Mission state synchronization
 │   └── error.rs            # Error types
 ├── examples/
-│   ├── bridge.rs           # Standalone bridge (serial → mesh)
-│   ├── rmw_bridge.rs       # peat-rmw integrated bridge
+│   ├── mission_app.rs      # Mission app wiring peat-mavlink + peat-mesh
+│   ├── serial_dump.rs      # Parse and print MAVLink from serial (no mesh)
 │   ├── multi_vehicle.rs    # Multiple vehicle monitoring
 │   └── companion.rs        # Companion computer deployment
 └── tests/
@@ -259,32 +259,38 @@ Individual field topics (`/position`, `/attitude`, etc.) are available for high-
 ```rust
 /// Core MAVLink bridge
 ///
-/// Manages MAVLink connections and translates between MAVLink messages
-/// and peat-rmw topics (or direct Automerge store access).
+/// Manages MAVLink connections, parses MAVLink messages into Peat document
+/// types, and emits them via a channel. The integrator's mission application
+/// receives VehicleState updates and writes them into peat-mesh.
+/// peat-mavlink has NO dependency on peat-mesh — only on peat-schema.
 pub struct MavlinkBridge {
     config: MavlinkBridgeConfig,
     /// Active MAVLink connections
     connections: Vec<MavlinkConnection>,
     /// Per-vehicle state tracking
     vehicles: Arc<RwLock<HashMap<u8, VehicleState>>>,
+    /// Channel for emitting vehicle state updates to the integrator
+    state_tx: tokio::sync::broadcast::Sender<VehicleStateUpdate>,
     /// Outbound command queue (DIL resilient)
     command_queue: CommandQueue,
 }
 
+/// Update emitted to the integrator's mission application
+pub struct VehicleStateUpdate {
+    pub system_id: u8,
+    pub state: VehicleState,
+    /// Which field(s) changed in this update
+    pub changed: VehicleStateField,
+}
+
 impl MavlinkBridge {
-    /// Create bridge with peat-rmw node integration
-    pub async fn with_rmw_node(
+    /// Create a new bridge. Returns the bridge and a receiver for state updates.
+    /// The integrator consumes the receiver and writes updates into peat-mesh.
+    pub async fn new(
         config: MavlinkBridgeConfig,
-        node: &mut peat_rmw::Node,
-    ) -> Result<Self, MavlinkError>;
+    ) -> Result<(Self, tokio::sync::broadcast::Receiver<VehicleStateUpdate>), MavlinkError>;
 
-    /// Create standalone bridge with direct store access
-    pub async fn with_store(
-        config: MavlinkBridgeConfig,
-        store: Arc<AutomergeStore>,
-    ) -> Result<Self, MavlinkError>;
-
-    /// Start the bridge (spawns connection + translation tasks)
+    /// Start the bridge (spawns connection + parsing tasks)
     pub async fn start(&mut self) -> Result<(), MavlinkError>;
 
     /// Stop the bridge gracefully
@@ -321,14 +327,17 @@ mavlink::Message::parse()          ← mavlink-rs dialect parsing
     ▼
 Bridge::handle_message()           ← Route by message ID
     │
-    ├── HEARTBEAT → update VehicleState, publish /heartbeat + /state
-    ├── GLOBAL_POSITION_INT → update position, publish /position + /state
-    ├── ATTITUDE → update attitude, publish /attitude + /state
-    ├── BATTERY_STATUS → update battery, publish /battery + /state
-    ├── GPS_RAW_INT → update gps, publish /gps + /state
-    ├── STATUSTEXT → update status, publish /status + /state
-    ├── MISSION_CURRENT → update mission, publish /mission/current + /state
+    ├── HEARTBEAT → update VehicleState, emit VehicleStateUpdate
+    ├── GLOBAL_POSITION_INT → update position, emit VehicleStateUpdate
+    ├── ATTITUDE → update attitude, emit VehicleStateUpdate
+    ├── BATTERY_STATUS → update battery, emit VehicleStateUpdate
+    ├── GPS_RAW_INT → update gps, emit VehicleStateUpdate
+    ├── STATUSTEXT → update status, emit VehicleStateUpdate
+    ├── MISSION_CURRENT → update mission, emit VehicleStateUpdate
     └── COMMAND_ACK → resolve pending command future
+    │
+    ▼
+state_tx.send(VehicleStateUpdate)  ← Mission app receives via broadcast channel
 ```
 
 **Outbound (Peat → MAVLink)**:
@@ -352,12 +361,11 @@ Wait for COMMAND_ACK               ← Timeout + retry logic
 ### Multi-Vehicle Support
 
 Each vehicle (identified by MAVLink system ID) gets:
-- Independent `VehicleState` tracking
-- Separate topic subtree (`/mavlink/1/...`, `/mavlink/2/...`)
-- Independent CRDT documents in the Automerge store
+- Independent `VehicleState` tracking within the bridge
+- Distinct `VehicleStateUpdate` emissions keyed by `system_id` — the mission app decides how to map these to CRDT documents or peat-rmw topic subtrees
 - Heartbeat timeout monitoring (configurable, default 5s)
 
-Vehicle discovery is implicit — the first HEARTBEAT from a new system ID creates the vehicle entry and topic publishers.
+Vehicle discovery is implicit — the first HEARTBEAT from a new system ID creates the vehicle entry and begins emitting updates.
 
 ### DIL Resilience
 
@@ -368,31 +376,59 @@ Following the pattern from ADR-029 (TAK Transport Adapter):
 - **Configurable timeouts**: Heartbeat loss threshold is configurable per deployment (tight for SITL, loose for LoRa links)
 - **Telemetry rate limiting**: Prevents flooding constrained mesh links with high-rate autopilot telemetry
 
-### Standalone vs peat-rmw Mode
+### Mission Application Integration Pattern
 
-The crate supports two integration modes:
+`peat-mavlink` is a library crate with **no dependency on `peat-mesh`**. The integrator's mission application composes both crates:
 
-**peat-rmw mode** (recommended):
-```rust
-let mut node = NodeBuilder::new("mavlink_bridge", "formation-secret")
-    .build().await?;
-
-let bridge = MavlinkBridge::with_rmw_node(config, &mut node).await?;
-bridge.start().await?;
-
-// Other peat-rmw nodes on the mesh see /mavlink/* topics automatically
+```
+mission-app (integrator's binary)
+├── peat-mesh       — mesh participation, CRDT storage
+├── peat-mavlink    — MAVLink parsing, Peat document mapping
+└── mission logic   — routing, filtering, app-specific behavior
 ```
 
-**Standalone mode** (for deployments without peat-rmw):
+The bridge emits `VehicleStateUpdate` values via a broadcast channel. The mission app receives them and decides how to write them into the mesh:
+
 ```rust
-let store = Arc::new(AutomergeStore::new());
-let bridge = MavlinkBridge::with_store(config, store.clone()).await?;
+// Mission application — the integrator writes this, not peat-mavlink
+use peat_mavlink::{MavlinkBridge, MavlinkBridgeConfig};
+use peat_mesh::DocumentStore;
+
+// Create the MAVLink bridge (no peat-mesh involved)
+let config = MavlinkBridgeConfig {
+    connections: vec![MavlinkConnectionConfig::Serial {
+        port: "/dev/ttyACM0".into(),
+        baud_rate: 57600,
+    }],
+    system_id: 254,
+    component_id: 191,
+    ..Default::default()
+};
+let (mut bridge, mut rx) = MavlinkBridge::new(config).await?;
 bridge.start().await?;
 
-// Access vehicle state via store.collection("mavlink.vehicle.1")
+// Create the peat-mesh node (no peat-mavlink involved)
+let store = DocumentStore::open("./mesh-data").await?;
+
+// The mission app wires them together
+tokio::spawn(async move {
+    while let Ok(update) = rx.recv().await {
+        // Write vehicle state into mesh as a Peat document
+        store.put(
+            format!("mavlink.vehicle.{}", update.system_id),
+            &update.state,
+        ).await?;
+    }
+});
 ```
 
-The peat-rmw dependency is feature-gated (`feature = "rmw"`), so standalone deployments don't pull in peat-rmw.
+This separation means:
+- `peat-mavlink` depends only on `peat-schema` for document types — clean dependency graph
+- The integrator controls what gets written to the mesh and at what rate
+- Mission-specific logic (filtering, aggregation, rate limiting) lives in the mission app, not the library
+- The same `peat-mavlink` crate works whether the integrator uses peat-mesh directly, peat-rmw, or a custom storage backend
+
+**Optional peat-rmw integration** remains available via `feature = "rmw"` for integrators who want automatic topic publication, but it is no longer the primary API.
 
 ---
 
@@ -401,7 +437,7 @@ The peat-rmw dependency is feature-gated (`feature = "rmw"`), so standalone depl
 | Crate | Version | Role |
 |-------|---------|------|
 | `mavlink` | 0.14 | MAVLink v2 message parsing, dialect support |
-| `peat-mesh` | 0.5 | Automerge store, CRDT sync (standalone mode) |
+| `peat-schema` | workspace | Peat document types (VehicleState maps to schema types) |
 | `peat-rmw` | 0.1 (optional) | Topic pub/sub integration (feature = "rmw") |
 | `tokio` | 1 | Async runtime, timers, channels |
 | `tokio-serial` | 5 | Async serial port (feature = "serial") |
@@ -503,6 +539,36 @@ Build a pure peat-rmw node with no standalone capability.
 4. **Video Streaming**: MAVLink camera control + GStreamer pipeline integration (ties to peat-inference)
 5. **Swarm Coordination**: Multi-vehicle coordination primitives built on peat-rmw service calls
 6. **ArduPilot Dialect**: Extended support for ArduPilot-specific messages (RANGEFINDER, TERRAIN_REPORT, etc.)
+
+---
+
+## Amendment 1: Library Crate / Mission App Composition Pattern (2026-03-30)
+
+**Effective**: 2026-03-30
+
+The original ADR described `peat-mavlink` with a direct dependency on `peat-mesh` (for standalone `AutomergeStore` access) and `peat-rmw` as the primary API. This amendment revises the integration model based on the following reasoning:
+
+**Problem with the original design**: Having `peat-mavlink` depend on `peat-mesh` couples two independently useful crates. A mission computer integrating a MAVLink autopilot is building a **mission application** — it needs both MAVLink parsing and mesh participation, but the library providing MAVLink translation should not dictate how or where documents are stored.
+
+**Revised model**: `peat-mavlink` is a pure library crate that depends on `peat-schema` for Peat document types but has **no dependency on `peat-mesh`**. The integrator's mission application composes both crates:
+
+```
+mission-app (Cargo.toml)
+├── peat-mavlink = "0.1"    # MAVLink parsing + Peat document mapping
+├── peat-mesh = "0.7"       # Mesh participation, CRDT storage
+└── (mission-specific deps)
+```
+
+The bridge emits `VehicleStateUpdate` values via a `tokio::sync::broadcast` channel. The mission app receives updates and writes them into `peat-mesh` (or any other storage backend) as it sees fit.
+
+**Key changes from the original design**:
+1. `MavlinkBridge::with_store()` removed — the bridge does not own or reference a store
+2. `MavlinkBridge::with_rmw_node()` moved behind `feature = "rmw"` — no longer the primary API
+3. `MavlinkBridge::new()` returns `(Self, Receiver<VehicleStateUpdate>)` — the integrator consumes the channel
+4. Dependency on `peat-mesh` replaced with `peat-schema`
+5. Examples updated to show the mission app composition pattern
+
+This follows the same principle as the `mavlink` crate itself — it parses MAVLink, it doesn't decide what you do with the parsed messages.
 
 ---
 
