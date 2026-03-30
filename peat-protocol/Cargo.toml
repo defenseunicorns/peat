@@ -46,8 +46,8 @@ subtle = "2.6"             # Constant-time comparison (formation key auth)
 automerge = { version = "0.7.1", optional = true }  # Automerge CRDT library for evaluation
 
 # AutomergeIrohBackend dependencies (ADR-011)
-iroh = { version = "0.95", optional = true, features = ["discovery-local-network"] }  # QUIC-based P2P networking with local mDNS discovery
-iroh-blobs = { version = "0.97", optional = true }  # Content-addressed blob storage (ADR-025)
+iroh = { version = "0.97", optional = true, features = ["address-lookup-mdns"] }  # QUIC-based P2P networking with local mDNS discovery
+iroh-blobs = { version = "0.99", optional = true }  # Content-addressed blob storage (ADR-025)
 redb = { version = "2.4", optional = true }  # Pure Rust embedded database (pinned to 2.x - 3.x has memory regression, Issue #446)
 lru = { version = "0.16.3", optional = true }  # LRU cache for hot documents
 toml = { version = "0.8", optional = true }  # Static peer configuration
