@@ -1,7 +1,11 @@
 
 # cargo-vet audits file
 
-[audits]
+[[audits.identity-hash]]
+who = "Kit Plummer <kitplummer@defenseunicorns.com>"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+notes = "Fork of paritytech/nohash-hasher. Pure safe Rust identity hasher for integer keys. No unsafe, no deps, no I/O. ~300 lines."
 
 [[trusted.acto]]
 criteria = "safe-to-deploy"
@@ -11,7 +15,7 @@ end = "2027-03-26"
 
 [[trusted.addr2line]]
 criteria = "safe-to-deploy"
-user-id = 4415 # Philip Craig (philipc)
+user-id = 4415
 start = "2019-05-01"
 end = "2027-03-26"
 
@@ -20,6 +24,18 @@ criteria = "safe-to-deploy"
 user-id = 267 # Tony Arcieri (tarcieri)
 start = "2020-06-05"
 end = "2027-03-26"
+
+[[trusted.aes]]
+criteria = "safe-to-deploy"
+user-id = 267 # Tony Arcieri (tarcieri)
+start = "2020-01-01"
+end = "2027-12-31"
+
+[[trusted.aes-gcm]]
+criteria = "safe-to-deploy"
+user-id = 267 # Tony Arcieri (tarcieri)
+start = "2020-01-01"
+end = "2027-12-31"
 
 [[trusted.ahash]]
 criteria = "safe-to-deploy"
@@ -83,7 +99,7 @@ end = "2027-03-26"
 
 [[trusted.approx]]
 criteria = "safe-to-deploy"
-user-id = 86 # Sébastien Crozet (sebcrozet)
+user-id = 86
 start = "2020-10-25"
 end = "2027-03-26"
 
@@ -329,7 +345,7 @@ end = "2027-03-26"
 
 [[trusted.btparse]]
 criteria = "safe-to-deploy"
-user-id = 8663 # Joel Höner (athre0z)
+user-id = 8663
 start = "2024-10-31"
 end = "2027-03-26"
 
@@ -461,7 +477,7 @@ end = "2027-03-26"
 
 [[trusted.color-backtrace]]
 criteria = "safe-to-deploy"
-user-id = 8663 # Joel Höner (athre0z)
+user-id = 8663
 start = "2019-04-18"
 end = "2027-03-26"
 
@@ -603,6 +619,12 @@ user-id = 267 # Tony Arcieri (tarcieri)
 start = "2022-11-29"
 end = "2027-03-26"
 
+[[trusted.ctr]]
+criteria = "safe-to-deploy"
+user-id = 5059 # Artyom Pavlov (newpavlov)
+start = "2020-01-01"
+end = "2027-12-31"
+
 [[trusted.curve25519-dalek]]
 criteria = "safe-to-deploy"
 user-id = 6979 # Michael Rosenberg (rozbb)
@@ -681,6 +703,24 @@ user-id = 4791 # Pierre Chifflier (chifflier)
 start = "2019-06-18"
 end = "2027-03-26"
 
+[[trusted.derive_builder]]
+criteria = "safe-to-deploy"
+user-id = 6324 # Ted Driggs (TedDriggs)
+start = "2020-01-01"
+end = "2027-12-31"
+
+[[trusted.derive_builder_core]]
+criteria = "safe-to-deploy"
+user-id = 6324 # Ted Driggs (TedDriggs)
+start = "2020-01-01"
+end = "2027-12-31"
+
+[[trusted.derive_builder_macro]]
+criteria = "safe-to-deploy"
+user-id = 6324 # Ted Driggs (TedDriggs)
+start = "2020-01-01"
+end = "2027-12-31"
+
 [[trusted.derive_more]]
 criteria = "safe-to-deploy"
 user-id = 3797 # Jelte Fennema-Nio (JelteF)
@@ -704,6 +744,12 @@ criteria = "safe-to-deploy"
 user-id = 267 # Tony Arcieri (tarcieri)
 start = "2020-06-10"
 end = "2027-03-26"
+
+[[trusted.dispatch2]]
+criteria = "safe-to-deploy"
+user-id = 36629 # Mads Marquart (madsmtm)
+start = "2020-01-01"
+end = "2027-12-31"
 
 [[trusted.dittolive-ditto]]
 criteria = "safe-to-deploy"
@@ -953,13 +999,13 @@ end = "2027-03-26"
 
 [[trusted.geo-types]]
 criteria = "safe-to-deploy"
-user-id = 87352 # Michael Kirk (michaelkirk)
+user-id = 87352
 start = "2020-11-24"
 end = "2027-03-26"
 
 [[trusted.geohash]]
 criteria = "safe-to-deploy"
-user-id = 250 # Ning Sun (sunng87)
+user-id = 250
 start = "2020-08-29"
 end = "2027-03-26"
 
@@ -974,6 +1020,12 @@ criteria = "safe-to-deploy"
 user-id = 39279 # Joe Richey (josephlr)
 start = "2020-09-10"
 end = "2027-03-26"
+
+[[trusted.ghash]]
+criteria = "safe-to-deploy"
+user-id = 267 # Tony Arcieri (tarcieri)
+start = "2020-01-01"
+end = "2027-12-31"
 
 [[trusted.gio-sys]]
 criteria = "safe-to-deploy"
@@ -1247,7 +1299,7 @@ end = "2027-03-26"
 
 [[trusted.instant]]
 criteria = "safe-to-deploy"
-user-id = 86 # Sébastien Crozet (sebcrozet)
+user-id = 86
 start = "2019-04-09"
 end = "2027-03-26"
 
@@ -1271,15 +1323,33 @@ end = "2027-03-26"
 
 [[trusted.iroh]]
 criteria = "safe-to-deploy"
+user-id = 3079 # Friedel Ziegelmayer (dignifiedquire)
+start = "2020-01-01"
+end = "2027-12-31"
+
+[[trusted.iroh]]
+criteria = "safe-to-deploy"
 user-id = 192066 # ramfox (ramfox)
 start = "2024-08-20"
 end = "2027-03-26"
 
 [[trusted.iroh-base]]
 criteria = "safe-to-deploy"
+user-id = 3079 # Friedel Ziegelmayer (dignifiedquire)
+start = "2020-01-01"
+end = "2027-12-31"
+
+[[trusted.iroh-base]]
+criteria = "safe-to-deploy"
 user-id = 192066 # ramfox (ramfox)
 start = "2024-08-20"
 end = "2027-03-26"
+
+[[trusted.iroh-blobs]]
+criteria = "safe-to-deploy"
+user-id = 3079 # Friedel Ziegelmayer (dignifiedquire)
+start = "2020-01-01"
+end = "2027-12-31"
 
 [[trusted.iroh-blobs]]
 criteria = "safe-to-deploy"
@@ -1292,6 +1362,12 @@ criteria = "safe-to-deploy"
 user-id = 65577 # Rüdiger Klaehn (rklaehn)
 start = "2023-06-20"
 end = "2027-03-26"
+
+[[trusted.iroh-metrics]]
+criteria = "safe-to-deploy"
+user-id = 3079 # Friedel Ziegelmayer (dignifiedquire)
+start = "2020-01-01"
+end = "2027-12-31"
 
 [[trusted.iroh-metrics]]
 criteria = "safe-to-deploy"
@@ -1325,9 +1401,21 @@ end = "2027-03-26"
 
 [[trusted.iroh-relay]]
 criteria = "safe-to-deploy"
+user-id = 3079 # Friedel Ziegelmayer (dignifiedquire)
+start = "2020-01-01"
+end = "2027-12-31"
+
+[[trusted.iroh-relay]]
+criteria = "safe-to-deploy"
 user-id = 192066 # ramfox (ramfox)
 start = "2025-01-14"
 end = "2027-03-26"
+
+[[trusted.iroh-tickets]]
+criteria = "safe-to-deploy"
+user-id = 3079 # Friedel Ziegelmayer (dignifiedquire)
+start = "2020-01-01"
+end = "2027-12-31"
 
 [[trusted.iroh-tickets]]
 criteria = "safe-to-deploy"
@@ -1337,9 +1425,21 @@ end = "2027-03-26"
 
 [[trusted.irpc]]
 criteria = "safe-to-deploy"
+user-id = 3079 # Friedel Ziegelmayer (dignifiedquire)
+start = "2020-01-01"
+end = "2027-12-31"
+
+[[trusted.irpc]]
+criteria = "safe-to-deploy"
 user-id = 192066 # ramfox (ramfox)
 start = "2025-06-26"
 end = "2027-03-26"
+
+[[trusted.irpc-derive]]
+criteria = "safe-to-deploy"
+user-id = 3079 # Friedel Ziegelmayer (dignifiedquire)
+start = "2020-01-01"
+end = "2027-12-31"
 
 [[trusted.irpc-derive]]
 criteria = "safe-to-deploy"
@@ -1479,6 +1579,12 @@ user-id = 5298 # Benjamin Saunders (Ralith)
 start = "2024-05-31"
 end = "2027-03-26"
 
+[[trusted.mac-addr]]
+criteria = "safe-to-deploy"
+user-id = 117934 # Shintaro Ito (shellrow)
+start = "2020-01-01"
+end = "2027-12-31"
+
 [[trusted.macaddr]]
 criteria = "safe-to-deploy"
 user-id = 4153 # svartalf (svartalf)
@@ -1599,6 +1705,12 @@ user-id = 3079 # Friedel Ziegelmayer (dignifiedquire)
 start = "2025-05-19"
 end = "2027-03-26"
 
+[[trusted.n0-watcher]]
+criteria = "safe-to-deploy"
+user-id = 172951 # Philipp Krüger (matheus23)
+start = "2020-01-01"
+end = "2027-12-31"
+
 [[trusted.native-tls]]
 criteria = "safe-to-deploy"
 user-id = 988 # Kornel (kornelski)
@@ -1661,6 +1773,12 @@ end = "2027-03-26"
 
 [[trusted.netwatch]]
 criteria = "safe-to-deploy"
+user-id = 3079 # Friedel Ziegelmayer (dignifiedquire)
+start = "2020-01-01"
+end = "2027-12-31"
+
+[[trusted.netwatch]]
+criteria = "safe-to-deploy"
 user-id = 192066 # ramfox (ramfox)
 start = "2025-01-14"
 end = "2027-03-26"
@@ -1676,6 +1794,24 @@ criteria = "safe-to-deploy"
 user-id = 146703 # SteveLauC (SteveLauC)
 start = "2024-02-24"
 end = "2027-03-26"
+
+[[trusted.noq]]
+criteria = "safe-to-deploy"
+user-id = 3079 # Friedel Ziegelmayer (dignifiedquire)
+start = "2020-01-01"
+end = "2027-12-31"
+
+[[trusted.noq-proto]]
+criteria = "safe-to-deploy"
+user-id = 3079 # Friedel Ziegelmayer (dignifiedquire)
+start = "2026-03-09"
+end = "2027-03-30"
+
+[[trusted.noq-udp]]
+criteria = "safe-to-deploy"
+user-id = 3079 # Friedel Ziegelmayer (dignifiedquire)
+start = "2026-03-09"
+end = "2027-03-30"
 
 [[trusted.ntimestamp]]
 criteria = "safe-to-deploy"
@@ -1707,6 +1843,12 @@ user-id = 14455 # Daniel Wagner-Hall (illicitonion)
 start = "2019-08-09"
 end = "2027-03-26"
 
+[[trusted.num_threads]]
+criteria = "safe-to-deploy"
+user-id = 15682 # Jacob Pratt (jhpratt)
+start = "2020-01-01"
+end = "2027-12-31"
+
 [[trusted.objc-sys]]
 criteria = "safe-to-deploy"
 user-id = 36629 # Mads Marquart (madsmtm)
@@ -1731,9 +1873,21 @@ user-id = 36629 # Mads Marquart (madsmtm)
 start = "2021-11-19"
 end = "2027-03-26"
 
+[[trusted.objc2-security]]
+criteria = "safe-to-deploy"
+user-id = 36629 # Mads Marquart (madsmtm)
+start = "2024-05-18"
+end = "2027-03-30"
+
+[[trusted.objc2-system-configuration]]
+criteria = "safe-to-deploy"
+user-id = 36629 # Mads Marquart (madsmtm)
+start = "2025-01-11"
+end = "2027-03-30"
+
 [[trusted.object]]
 criteria = "safe-to-deploy"
-user-id = 4415 # Philip Craig (philipc)
+user-id = 4415
 start = "2019-04-26"
 end = "2027-03-26"
 
@@ -1796,6 +1950,12 @@ criteria = "safe-to-deploy"
 user-id = 152041 # decahedron1
 start = "2023-11-12"
 end = "2027-03-26"
+
+[[trusted.papaya]]
+criteria = "safe-to-deploy"
+user-id = 103448 # Ibraheem Ahmed (ibraheemdev)
+start = "2021-11-10"
+end = "2027-03-30"
 
 [[trusted.parking_lot]]
 criteria = "safe-to-deploy"
@@ -1917,11 +2077,23 @@ user-id = 267 # Tony Arcieri (tarcieri)
 start = "2019-08-15"
 end = "2027-03-26"
 
+[[trusted.polyval]]
+criteria = "safe-to-deploy"
+user-id = 267 # Tony Arcieri (tarcieri)
+start = "2020-01-01"
+end = "2027-12-31"
+
 [[trusted.portable-atomic]]
 criteria = "safe-to-deploy"
 user-id = 33035 # Taiki Endo (taiki-e)
 start = "2022-02-24"
 end = "2027-03-26"
+
+[[trusted.portmapper]]
+criteria = "safe-to-deploy"
+user-id = 3079 # Friedel Ziegelmayer (dignifiedquire)
+start = "2020-01-01"
+end = "2027-12-31"
 
 [[trusted.portmapper]]
 criteria = "safe-to-deploy"
@@ -2331,6 +2503,12 @@ user-id = 988 # Kornel (kornelski)
 start = "2019-02-27"
 end = "2027-03-26"
 
+[[trusted.seize]]
+criteria = "safe-to-deploy"
+user-id = 103448 # Ibraheem Ahmed (ibraheemdev)
+start = "2021-09-27"
+end = "2027-03-30"
+
 [[trusted.self_cell]]
 criteria = "safe-to-deploy"
 user-id = 18325 # Lukas Bergdoll (Voultapher)
@@ -2483,13 +2661,13 @@ end = "2027-03-26"
 
 [[trusted.snafu]]
 criteria = "safe-to-deploy"
-user-id = 1060 # Jake Goulding (shepmaster)
+user-id = 1060
 start = "2019-02-24"
 end = "2027-03-26"
 
 [[trusted.snafu-derive]]
 criteria = "safe-to-deploy"
-user-id = 1060 # Jake Goulding (shepmaster)
+user-id = 1060
 start = "2019-02-24"
 end = "2027-03-26"
 
@@ -2498,6 +2676,12 @@ criteria = "safe-to-deploy"
 user-id = 6025 # Thomas de Zeeuw (Thomasdezeeuw)
 start = "2020-09-09"
 end = "2027-03-26"
+
+[[trusted.sorted-index-buffer]]
+criteria = "safe-to-deploy"
+user-id = 65577 # Rüdiger Klaehn (rklaehn)
+start = "2020-01-01"
+end = "2027-12-31"
 
 [[trusted.spez]]
 criteria = "safe-to-deploy"
