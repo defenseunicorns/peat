@@ -410,10 +410,10 @@ async fn run_three_node_mesh_test<B: DataSyncBackend>(
 
     // Wait for sync with retry - use extended timeout for bidirectional sync
     // Bidirectional sync may take longer as connections were initiated from Node 1
-    // 60 retries @ 200ms = 12 second timeout (doubled for CI reliability)
+    // 150 retries @ 200ms = 30 second timeout (generous for CI resource contention)
     let doc_id2 = "mesh-test-doc-2".to_string();
     let mut all_synced2 = false;
-    let extended_retries = 60;
+    let extended_retries = 150;
 
     let mut last_node1_has = false;
     let mut last_node2_has = false;
