@@ -144,8 +144,28 @@ criteria = "safe-to-deploy"
 version = "0.17.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.noq-proto]]
+version = "0.16.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.noq-udp]]
+version = "0.9.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.num_threads]]
 version = "0.1.7"
+criteria = "safe-to-deploy"
+
+[[exemptions.objc2-security]]
+version = "0.3.2"
+criteria = "safe-to-deploy"
+
+[[exemptions.objc2-system-configuration]]
+version = "0.3.2"
+criteria = "safe-to-deploy"
+
+[[exemptions.papaya]]
+version = "0.2.4"
 criteria = "safe-to-deploy"
 
 [[exemptions.pin-project]]
@@ -186,6 +206,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.reflink-copy]]
 version = "0.1.29"
+criteria = "safe-to-deploy"
+
+[[exemptions.seize]]
+version = "0.5.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.serde_with]]
