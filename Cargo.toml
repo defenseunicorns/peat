@@ -29,7 +29,7 @@ repository = "https://github.com/defenseunicorns/peat"
 
 [workspace.dependencies]
 # Mesh networking
-peat-mesh = "0.5.1"
+peat-mesh = "0.7.0"
 
 # BLE mesh transport (ADR-039)
 peat-btle = "0.2.0"
