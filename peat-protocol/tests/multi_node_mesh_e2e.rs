@@ -16,7 +16,7 @@
 //! 3. **Convergence**: All nodes have identical final state
 //! 4. **Bidirectional Sync**: Documents propagate in all directions
 
-use peat_protocol::sync::{DataSyncBackend, Document, Query, Value};
+use peat_protocol::sync::{ChangeEvent, DataSyncBackend, Document, Query, Value};
 use peat_protocol::testing::E2EHarness;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -25,6 +25,10 @@ use tokio::time::sleep;
 
 /// Polling interval for sync checks (200ms for faster test execution)
 const SYNC_POLL_INTERVAL: Duration = Duration::from_millis(200);
+
+/// Maximum time to wait for a document to sync to a single node via observe().
+/// Generous for CI environments with resource contention.
+const SYNC_OBSERVE_TIMEOUT: Duration = Duration::from_secs(30);
 
 // ============================================================================
 // Ditto Backend Tests
@@ -234,6 +238,112 @@ async fn test_automerge_three_node_mesh() {
 // Shared Test Logic
 // ============================================================================
 
+/// Wait for a specific document to appear on a node using observe() for event-driven
+/// detection, confirmed by get() to ensure it's queryable through the standard API.
+///
+/// Uses the `observe()` API to get notified when the document arrives via sync,
+/// then confirms with `get()` to ensure the document is fully queryable (observe()
+/// and get() use different deserialization paths internally).
+async fn wait_for_doc_on_node<B: DataSyncBackend>(
+    backend: &Arc<B>,
+    collection: &str,
+    doc_id: &str,
+    node_name: &str,
+) -> bool {
+    let doc_id_owned = doc_id.to_string();
+
+    // Check if document already exists via get()
+    if let Ok(Some(_)) = backend
+        .document_store()
+        .get(collection, &doc_id_owned)
+        .await
+    {
+        println!("    {}: document '{}' already present", node_name, doc_id);
+        return true;
+    }
+
+    // Set up observer for the collection to get notified on sync
+    let stream = match backend.document_store().observe(collection, &Query::All) {
+        Ok(stream) => Some(stream),
+        Err(e) => {
+            println!("    {}: observe() failed: {}, will poll only", node_name, e);
+            None
+        }
+    };
+
+    // Combined strategy: use observe() as the primary signal, with periodic get()
+    // polling as confirmation. This handles both the fast path (observe fires when
+    // doc arrives) and edge cases where observe() and get() have different views.
+    let result = tokio::time::timeout(SYNC_OBSERVE_TIMEOUT, async {
+        if let Some(mut stream) = stream {
+            // Use select! to race observe events against periodic get() checks.
+            // observe() gives us instant notification, get() confirms queryability.
+            loop {
+                tokio::select! {
+                    event = stream.receiver.recv() => {
+                        match event {
+                            Some(ChangeEvent::Updated { document, .. }) => {
+                                if document.id.as_deref() == Some(doc_id) {
+                                    // Observer saw it — confirm via get() with brief retry
+                                    for _ in 0..10 {
+                                        if let Ok(Some(_)) = backend.document_store().get(collection, &doc_id_owned).await {
+                                            return true;
+                                        }
+                                        sleep(Duration::from_millis(50)).await;
+                                    }
+                                }
+                            }
+                            Some(ChangeEvent::Initial { documents }) => {
+                                if documents.iter().any(|d| d.id.as_deref() == Some(doc_id)) {
+                                    if let Ok(Some(_)) = backend.document_store().get(collection, &doc_id_owned).await {
+                                        return true;
+                                    }
+                                }
+                            }
+                            Some(_) => continue,
+                            None => break, // Channel closed, fall through to polling
+                        }
+                    }
+                    _ = sleep(Duration::from_secs(1)) => {
+                        // Periodic get() check in case observe missed the event
+                        if let Ok(Some(_)) = backend.document_store().get(collection, &doc_id_owned).await {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fallback: pure polling (if observe failed or channel closed)
+        loop {
+            sleep(SYNC_POLL_INTERVAL).await;
+            if let Ok(Some(_)) = backend.document_store().get(collection, &doc_id_owned).await {
+                return true;
+            }
+        }
+    })
+    .await;
+
+    match result {
+        Ok(true) => {
+            println!(
+                "    {}: document '{}' synced and confirmed",
+                node_name, doc_id
+            );
+            true
+        }
+        _ => {
+            println!(
+                "    {}: document '{}' NOT found after {}s timeout",
+                node_name,
+                doc_id,
+                SYNC_OBSERVE_TIMEOUT.as_secs()
+            );
+            false
+        }
+    }
+}
+
 /// Shared test logic for 3-node mesh
 ///
 /// Tests:
@@ -311,48 +421,27 @@ async fn run_three_node_mesh_test<B: DataSyncBackend>(
         .expect("Should create document on node1");
     println!("  ✓ Document created on Node 1");
 
-    // Wait for sync propagation with retry
+    // Wait for sync propagation using observe()-based event-driven detection
     println!("  3. Waiting for sync to propagate...");
     let doc_id1 = "mesh-test-doc-1".to_string();
 
-    // Increase retries for CI environments with resource contention
-    // First document: 30 retries @ 200ms = 6 second timeout
-    // Second document (bidirectional): uses extended timeout below
-    let retries = 30;
-    let mut all_synced = false;
-
-    for i in 0..retries {
-        sleep(SYNC_POLL_INTERVAL).await;
-
-        let doc_on_node1 = backend1
-            .document_store()
-            .get("mesh_test", &doc_id1)
-            .await
-            .expect("Should query node1");
-
-        let doc_on_node2 = backend2
-            .document_store()
-            .get("mesh_test", &doc_id1)
-            .await
-            .expect("Should query node2");
-
-        let doc_on_node3 = backend3
-            .document_store()
-            .get("mesh_test", &doc_id1)
-            .await
-            .expect("Should query node3");
-
-        if doc_on_node1.is_some() && doc_on_node2.is_some() && doc_on_node3.is_some() {
-            println!("  ✓ Document synced to all nodes (attempt {})", i + 1);
-            all_synced = true;
-            break;
-        }
-    }
+    // Wait for document on all nodes concurrently using observe() streams.
+    // This is event-driven rather than blind polling, so it detects sync
+    // as soon as it happens rather than racing against poll intervals.
+    let (synced1, synced2, synced3) = tokio::join!(
+        wait_for_doc_on_node(&backend1, "mesh_test", &doc_id1, "Node1"),
+        wait_for_doc_on_node(&backend2, "mesh_test", &doc_id1, "Node2"),
+        wait_for_doc_on_node(&backend3, "mesh_test", &doc_id1, "Node3"),
+    );
 
     assert!(
-        all_synced,
-        "Document failed to sync to all nodes within timeout"
+        synced1 && synced2 && synced3,
+        "Document failed to sync to all nodes within timeout. Node1={}, Node2={}, Node3={}",
+        synced1,
+        synced2,
+        synced3
     );
+    println!("  ✓ Document synced to all nodes");
 
     // Get documents for verification
     println!("  4. Verifying document synced to all nodes...");
@@ -408,56 +497,24 @@ async fn run_three_node_mesh_test<B: DataSyncBackend>(
         .expect("Should create document on node2");
     println!("  ✓ Document created on Node 2");
 
-    // Wait for sync with retry - use extended timeout for bidirectional sync
-    // Bidirectional sync may take longer as connections were initiated from Node 1
-    // 60 retries @ 200ms = 12 second timeout (doubled for CI reliability)
+    // Wait for bidirectional sync using observe()-based event-driven detection.
+    // This was previously the flaky section — blind polling with 200ms intervals
+    // could miss sync events or time out under CI resource contention.
+    // Using observe() streams we wait for the actual sync event deterministically.
     let doc_id2 = "mesh-test-doc-2".to_string();
-    let mut all_synced2 = false;
-    let extended_retries = 60;
 
-    let mut last_node1_has = false;
-    let mut last_node2_has = false;
-    let mut last_node3_has = false;
-
-    for i in 0..extended_retries {
-        sleep(SYNC_POLL_INTERVAL).await;
-
-        let doc2_on_node1 = backend1
-            .document_store()
-            .get("mesh_test", &doc_id2)
-            .await
-            .expect("Should query node1");
-
-        let doc2_on_node2 = backend2
-            .document_store()
-            .get("mesh_test", &doc_id2)
-            .await
-            .expect("Should query node2");
-
-        let doc2_on_node3 = backend3
-            .document_store()
-            .get("mesh_test", &doc_id2)
-            .await
-            .expect("Should query node3");
-
-        last_node1_has = doc2_on_node1.is_some();
-        last_node2_has = doc2_on_node2.is_some();
-        last_node3_has = doc2_on_node3.is_some();
-
-        if last_node1_has && last_node2_has && last_node3_has {
-            println!(
-                "  ✓ Second document synced to all nodes (attempt {})",
-                i + 1
-            );
-            all_synced2 = true;
-            break;
-        }
-    }
+    let (synced2_1, synced2_2, synced2_3) = tokio::join!(
+        wait_for_doc_on_node(&backend1, "mesh_test", &doc_id2, "Node1"),
+        wait_for_doc_on_node(&backend2, "mesh_test", &doc_id2, "Node2"),
+        wait_for_doc_on_node(&backend3, "mesh_test", &doc_id2, "Node3"),
+    );
 
     assert!(
-        all_synced2,
+        synced2_1 && synced2_2 && synced2_3,
         "Second document failed to sync to all nodes within timeout. Node1={}, Node2={}, Node3={}",
-        last_node1_has, last_node2_has, last_node3_has
+        synced2_1,
+        synced2_2,
+        synced2_3
     );
     println!("  ✓ Second document synced to all nodes");
 
