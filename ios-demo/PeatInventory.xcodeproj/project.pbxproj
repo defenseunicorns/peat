@@ -1,0 +1,609 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		151EFD6CF66AF18E89E3D32A /* DemoViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA96780DB71C0F9DD17C8153 /* DemoViewModel.swift */; };
+		19F1081CD24BBB7F17D6527E /* FilterChipsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87B8A2F7F67016B4DA3E74C6 /* FilterChipsView.swift */; };
+		1DE425935D80D8D8F4F80436 /* ItemEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2774147FC2F616893E6006EF /* ItemEditView.swift */; };
+		2A0E31387D92B753276124AF /* PeatInventoryApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA228AE2B270FCF2E3CFB339 /* PeatInventoryApp.swift */; };
+		2CB06786E170AF3F455D5BD1 /* DemoDataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D72A9C48AB1F59ACC2296908 /* DemoDataService.swift */; };
+		2D847AFA1660B157CE1DBF60 /* PersistenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEEA16477E90FC1FAF27D803 /* PersistenceService.swift */; };
+		459B6FE02CF6EBDA4805023D /* ConditionBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = D253CE2E5DFDE225A6A77A72 /* ConditionBadge.swift */; };
+		48C5C1B6F6FEC1E0135E3DBD /* InventoryItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 991FC24EF2E6DD53994BE81E /* InventoryItem.swift */; };
+		551FF185E8F0DC22981ED22D /* PeatServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 380ACE4B0CFD78F803446465 /* PeatServiceProtocol.swift */; };
+		6E6F7E5D84449E4D2FF9A39F /* InventoryItemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 337D64A920800EC7D687CC1E /* InventoryItemTests.swift */; };
+		6E85425ED3F2FD1CF80AB12C /* ItemDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF9EA10D7A9BB70BE96F6F46 /* ItemDetailView.swift */; };
+		7637EB2C888D7CE87D3868F5 /* InventoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 320046E232EC7399E4AC4210 /* InventoryViewModel.swift */; };
+		7EAA924F63B3CE51E28C4AA4 /* AggregationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 970C4D68D09EDBE142AA8D7A /* AggregationView.swift */; };
+		8A8B83EBB8A6AC959E52719A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F26451547030B95534345DDD /* ContentView.swift */; };
+		95C286BD2A98F549CA33CF6F /* MeshStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 314D80F0E1B73D222522D9BD /* MeshStatusView.swift */; };
+		9F1F4EA3563E08D8EF34A8B6 /* MeshViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D66D1C63433110BC936820D /* MeshViewModel.swift */; };
+		A667AC12CB9BD3C5A274A54C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 21125E48B95DE7121B3AAD82 /* Assets.xcassets */; };
+		B708AF721FFF1D8C2818D719 /* MilitaryTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A975FE7B471F4090C3D56CCC /* MilitaryTheme.swift */; };
+		C276A6D96DBCAE4910BB298F /* PeatServiceMock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 254D7852DB4467E15134E7A7 /* PeatServiceMock.swift */; };
+		D031BF869EAF76A1576EE3F4 /* MeshModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05276D78A2CCDE105430F210 /* MeshModels.swift */; };
+		DD4B50B4C4DE214D8A427A64 /* TransportBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49E57B7BF208203FFA332B23 /* TransportBadge.swift */; };
+		E844A839F1E56BE2ADBD6BAA /* DemoSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A08DA74F948150BD1DBD2CF /* DemoSettingsView.swift */; };
+		F13C0D41555E47B9B80630D5 /* MeshModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02E54C257DA0C14C9CCBCDF8 /* MeshModelTests.swift */; };
+		F62975343B7D36D7A73207AD /* InventoryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 197E2303AE70E33594CA56DF /* InventoryListView.swift */; };
+		F82F80FE8EC71473375845C5 /* PeatServiceLive.swift in Sources */ = {isa = PBXBuildFile; fileRef = 961829AB6D00B8E6724A05C9 /* PeatServiceLive.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		BAA31636D1A90EB83C9E162E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0B04C864CDB0257D106E55D5 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C2CDCF95C56E08BE526D059D;
+			remoteInfo = PeatInventory;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		02E54C257DA0C14C9CCBCDF8 /* MeshModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshModelTests.swift; sourceTree = "<group>"; };
+		05276D78A2CCDE105430F210 /* MeshModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshModels.swift; sourceTree = "<group>"; };
+		197E2303AE70E33594CA56DF /* InventoryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InventoryListView.swift; sourceTree = "<group>"; };
+		21125E48B95DE7121B3AAD82 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		254D7852DB4467E15134E7A7 /* PeatServiceMock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeatServiceMock.swift; sourceTree = "<group>"; };
+		2774147FC2F616893E6006EF /* ItemEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemEditView.swift; sourceTree = "<group>"; };
+		314D80F0E1B73D222522D9BD /* MeshStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshStatusView.swift; sourceTree = "<group>"; };
+		320046E232EC7399E4AC4210 /* InventoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InventoryViewModel.swift; sourceTree = "<group>"; };
+		337D64A920800EC7D687CC1E /* InventoryItemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InventoryItemTests.swift; sourceTree = "<group>"; };
+		380ACE4B0CFD78F803446465 /* PeatServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeatServiceProtocol.swift; sourceTree = "<group>"; };
+		382CBD040D44E1A41A6ACA2B /* Peat Inventory.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Peat Inventory.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		49E57B7BF208203FFA332B23 /* TransportBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransportBadge.swift; sourceTree = "<group>"; };
+		5D66D1C63433110BC936820D /* MeshViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshViewModel.swift; sourceTree = "<group>"; };
+		87B8A2F7F67016B4DA3E74C6 /* FilterChipsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterChipsView.swift; sourceTree = "<group>"; };
+		8A08DA74F948150BD1DBD2CF /* DemoSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoSettingsView.swift; sourceTree = "<group>"; };
+		8F67169BFA4A6FC573E9C6FB /* PeatInventory.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PeatInventory.entitlements; sourceTree = "<group>"; };
+		961829AB6D00B8E6724A05C9 /* PeatServiceLive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeatServiceLive.swift; sourceTree = "<group>"; };
+		970C4D68D09EDBE142AA8D7A /* AggregationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AggregationView.swift; sourceTree = "<group>"; };
+		991FC24EF2E6DD53994BE81E /* InventoryItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InventoryItem.swift; sourceTree = "<group>"; };
+		A975FE7B471F4090C3D56CCC /* MilitaryTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MilitaryTheme.swift; sourceTree = "<group>"; };
+		AA228AE2B270FCF2E3CFB339 /* PeatInventoryApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeatInventoryApp.swift; sourceTree = "<group>"; };
+		BF9EA10D7A9BB70BE96F6F46 /* ItemDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemDetailView.swift; sourceTree = "<group>"; };
+		C2127077CBE30C7A411EB009 /* PeatInventoryTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = PeatInventoryTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D253CE2E5DFDE225A6A77A72 /* ConditionBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConditionBadge.swift; sourceTree = "<group>"; };
+		D72A9C48AB1F59ACC2296908 /* DemoDataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoDataService.swift; sourceTree = "<group>"; };
+		DDD0E54F3CB2C123BA1C94CD /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		EA96780DB71C0F9DD17C8153 /* DemoViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoViewModel.swift; sourceTree = "<group>"; };
+		EEEA16477E90FC1FAF27D803 /* PersistenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceService.swift; sourceTree = "<group>"; };
+		F26451547030B95534345DDD /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		1969C6566F11D7C0C70808A4 = {
+			isa = PBXGroup;
+			children = (
+				7B5D14445B9BBD5C88210093 /* PeatInventory */,
+				C337FEE827F5F283ABFA2C8F /* PeatInventoryTests */,
+				6C68BEB2CEA008B1254521EC /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		3BDB57B3442026D7E7F2C841 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				21125E48B95DE7121B3AAD82 /* Assets.xcassets */,
+				DDD0E54F3CB2C123BA1C94CD /* Info.plist */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		3D8A35ED6ACDFC80FCB0693A /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				D253CE2E5DFDE225A6A77A72 /* ConditionBadge.swift */,
+				87B8A2F7F67016B4DA3E74C6 /* FilterChipsView.swift */,
+				49E57B7BF208203FFA332B23 /* TransportBadge.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		558B083AAA3DB21E42A994CD /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				D72A9C48AB1F59ACC2296908 /* DemoDataService.swift */,
+				961829AB6D00B8E6724A05C9 /* PeatServiceLive.swift */,
+				254D7852DB4467E15134E7A7 /* PeatServiceMock.swift */,
+				380ACE4B0CFD78F803446465 /* PeatServiceProtocol.swift */,
+				EEEA16477E90FC1FAF27D803 /* PersistenceService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		5A08018E2C84B2CC277CC6C5 /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				A975FE7B471F4090C3D56CCC /* MilitaryTheme.swift */,
+			);
+			path = Theme;
+			sourceTree = "<group>";
+		};
+		6C68BEB2CEA008B1254521EC /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				382CBD040D44E1A41A6ACA2B /* Peat Inventory.app */,
+				C2127077CBE30C7A411EB009 /* PeatInventoryTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		7B5D14445B9BBD5C88210093 /* PeatInventory */ = {
+			isa = PBXGroup;
+			children = (
+				8F67169BFA4A6FC573E9C6FB /* PeatInventory.entitlements */,
+				99B2297AF49965422B36291F /* App */,
+				EACE1AAEB864BF8CEC3A292A /* Models */,
+				3BDB57B3442026D7E7F2C841 /* Resources */,
+				558B083AAA3DB21E42A994CD /* Services */,
+				5A08018E2C84B2CC277CC6C5 /* Theme */,
+				CC1D580C499D1475EFBF3546 /* ViewModels */,
+				9A97CE86FAC10BC574E03FA4 /* Views */,
+			);
+			path = PeatInventory;
+			sourceTree = "<group>";
+		};
+		89D60F2F05DC169370934688 /* Mesh */ = {
+			isa = PBXGroup;
+			children = (
+				314D80F0E1B73D222522D9BD /* MeshStatusView.swift */,
+			);
+			path = Mesh;
+			sourceTree = "<group>";
+		};
+		89DE428C81EE3F378D460248 /* Demo */ = {
+			isa = PBXGroup;
+			children = (
+				8A08DA74F948150BD1DBD2CF /* DemoSettingsView.swift */,
+			);
+			path = Demo;
+			sourceTree = "<group>";
+		};
+		99B2297AF49965422B36291F /* App */ = {
+			isa = PBXGroup;
+			children = (
+				F26451547030B95534345DDD /* ContentView.swift */,
+				AA228AE2B270FCF2E3CFB339 /* PeatInventoryApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		9A97CE86FAC10BC574E03FA4 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				FD59FFC356DC70C7A2DA0B76 /* Aggregation */,
+				3D8A35ED6ACDFC80FCB0693A /* Components */,
+				89DE428C81EE3F378D460248 /* Demo */,
+				DFD4A607CB0ADE3A7B907C01 /* Inventory */,
+				89D60F2F05DC169370934688 /* Mesh */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		C337FEE827F5F283ABFA2C8F /* PeatInventoryTests */ = {
+			isa = PBXGroup;
+			children = (
+				337D64A920800EC7D687CC1E /* InventoryItemTests.swift */,
+				02E54C257DA0C14C9CCBCDF8 /* MeshModelTests.swift */,
+			);
+			path = PeatInventoryTests;
+			sourceTree = "<group>";
+		};
+		CC1D580C499D1475EFBF3546 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				EA96780DB71C0F9DD17C8153 /* DemoViewModel.swift */,
+				320046E232EC7399E4AC4210 /* InventoryViewModel.swift */,
+				5D66D1C63433110BC936820D /* MeshViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		DFD4A607CB0ADE3A7B907C01 /* Inventory */ = {
+			isa = PBXGroup;
+			children = (
+				197E2303AE70E33594CA56DF /* InventoryListView.swift */,
+				BF9EA10D7A9BB70BE96F6F46 /* ItemDetailView.swift */,
+				2774147FC2F616893E6006EF /* ItemEditView.swift */,
+			);
+			path = Inventory;
+			sourceTree = "<group>";
+		};
+		EACE1AAEB864BF8CEC3A292A /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				991FC24EF2E6DD53994BE81E /* InventoryItem.swift */,
+				05276D78A2CCDE105430F210 /* MeshModels.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		FD59FFC356DC70C7A2DA0B76 /* Aggregation */ = {
+			isa = PBXGroup;
+			children = (
+				970C4D68D09EDBE142AA8D7A /* AggregationView.swift */,
+			);
+			path = Aggregation;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		70ABC68A5F862B97769B6574 /* PeatInventoryTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2E3B40BA8D8E01F2EB8512CD /* Build configuration list for PBXNativeTarget "PeatInventoryTests" */;
+			buildPhases = (
+				080F97E865D3BD9D4D3BF04D /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5E8CD5BEC2DBB0DFD4000D47 /* PBXTargetDependency */,
+			);
+			name = PeatInventoryTests;
+			packageProductDependencies = (
+			);
+			productName = PeatInventoryTests;
+			productReference = C2127077CBE30C7A411EB009 /* PeatInventoryTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		C2CDCF95C56E08BE526D059D /* PeatInventory */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0F348EA71551780598F7D4CA /* Build configuration list for PBXNativeTarget "PeatInventory" */;
+			buildPhases = (
+				5E9E007E76C872B2094C637A /* Sources */,
+				C992397E3A655B3A7780F3FC /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PeatInventory;
+			packageProductDependencies = (
+			);
+			productName = PeatInventory;
+			productReference = 382CBD040D44E1A41A6ACA2B /* Peat Inventory.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		0B04C864CDB0257D106E55D5 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					C2CDCF95C56E08BE526D059D = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 288BF7A1A204B0BDA1FC98F9 /* Build configuration list for PBXProject "PeatInventory" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 1969C6566F11D7C0C70808A4;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 6C68BEB2CEA008B1254521EC /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				C2CDCF95C56E08BE526D059D /* PeatInventory */,
+				70ABC68A5F862B97769B6574 /* PeatInventoryTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C992397E3A655B3A7780F3FC /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A667AC12CB9BD3C5A274A54C /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		080F97E865D3BD9D4D3BF04D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6E6F7E5D84449E4D2FF9A39F /* InventoryItemTests.swift in Sources */,
+				F13C0D41555E47B9B80630D5 /* MeshModelTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5E9E007E76C872B2094C637A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7EAA924F63B3CE51E28C4AA4 /* AggregationView.swift in Sources */,
+				459B6FE02CF6EBDA4805023D /* ConditionBadge.swift in Sources */,
+				8A8B83EBB8A6AC959E52719A /* ContentView.swift in Sources */,
+				2CB06786E170AF3F455D5BD1 /* DemoDataService.swift in Sources */,
+				E844A839F1E56BE2ADBD6BAA /* DemoSettingsView.swift in Sources */,
+				151EFD6CF66AF18E89E3D32A /* DemoViewModel.swift in Sources */,
+				19F1081CD24BBB7F17D6527E /* FilterChipsView.swift in Sources */,
+				48C5C1B6F6FEC1E0135E3DBD /* InventoryItem.swift in Sources */,
+				F62975343B7D36D7A73207AD /* InventoryListView.swift in Sources */,
+				7637EB2C888D7CE87D3868F5 /* InventoryViewModel.swift in Sources */,
+				6E85425ED3F2FD1CF80AB12C /* ItemDetailView.swift in Sources */,
+				1DE425935D80D8D8F4F80436 /* ItemEditView.swift in Sources */,
+				D031BF869EAF76A1576EE3F4 /* MeshModels.swift in Sources */,
+				95C286BD2A98F549CA33CF6F /* MeshStatusView.swift in Sources */,
+				9F1F4EA3563E08D8EF34A8B6 /* MeshViewModel.swift in Sources */,
+				B708AF721FFF1D8C2818D719 /* MilitaryTheme.swift in Sources */,
+				2A0E31387D92B753276124AF /* PeatInventoryApp.swift in Sources */,
+				F82F80FE8EC71473375845C5 /* PeatServiceLive.swift in Sources */,
+				C276A6D96DBCAE4910BB298F /* PeatServiceMock.swift in Sources */,
+				551FF185E8F0DC22981ED22D /* PeatServiceProtocol.swift in Sources */,
+				2D847AFA1660B157CE1DBF60 /* PersistenceService.swift in Sources */,
+				DD4B50B4C4DE214D8A427A64 /* TransportBadge.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		5E8CD5BEC2DBB0DFD4000D47 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C2CDCF95C56E08BE526D059D /* PeatInventory */;
+			targetProxy = BAA31636D1A90EB83C9E162E /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		2B35F577BC9F5BA0F9F1BB00 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 44Q9MQQPG3;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PeatInventory/Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.peat.inventory;
+				PRODUCT_NAME = "Peat Inventory";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		2C9B2255D8755899BA4D95AA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		945D861B6D90F0306756D90D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 44Q9MQQPG3;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PeatInventory/Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.peat.inventory;
+				PRODUCT_NAME = "Peat Inventory";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		AA352241F11B6EEEBFAD47A8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.defenseunicorns.peat.inventory.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Peat Inventory.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Peat Inventory";
+			};
+			name = Debug;
+		};
+		D4C6399E2C50A8F672FD7743 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		E73D52C2AE9B9E886D12C51E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.defenseunicorns.peat.inventory.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Peat Inventory.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Peat Inventory";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0F348EA71551780598F7D4CA /* Build configuration list for PBXNativeTarget "PeatInventory" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2B35F577BC9F5BA0F9F1BB00 /* Debug */,
+				945D861B6D90F0306756D90D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		288BF7A1A204B0BDA1FC98F9 /* Build configuration list for PBXProject "PeatInventory" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D4C6399E2C50A8F672FD7743 /* Debug */,
+				2C9B2255D8755899BA4D95AA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		2E3B40BA8D8E01F2EB8512CD /* Build configuration list for PBXNativeTarget "PeatInventoryTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA352241F11B6EEEBFAD47A8 /* Debug */,
+				E73D52C2AE9B9E886D12C51E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 0B04C864CDB0257D106E55D5 /* Project object */;
+}
