@@ -99,6 +99,15 @@ data class PeatPlatform(
         /** Fixed sensor */
         SENSOR,
 
+        /** Squad leader */
+        SQUAD_LEADER,
+
+        /** Platoon leader */
+        PLATOON_LEADER,
+
+        /** Company commander */
+        COMPANY_COMMANDER,
+
         /** Unknown type */
         UNKNOWN
     }
@@ -138,14 +147,17 @@ data class PeatPlatform(
      * Generate a CoT type string based on platform type
      */
     fun toCotType(): String = when (platformType) {
-        PlatformType.UAV -> "a-f-A-M-F-Q"      // Friendly Air - Military Fixed Wing - UAV
-        PlatformType.UGV -> "a-f-G-U-C"        // Friendly Ground Unit - Combat
-        PlatformType.USV -> "a-f-S-X"          // Friendly Surface - Other
-        PlatformType.UUV -> "a-f-U-X"          // Friendly Subsurface - Other
-        PlatformType.OPERATOR -> "a-f-G-U-C-I" // Friendly Ground Unit - Infantry
-        PlatformType.SOLDIER -> "a-f-G-U-C-I"  // Friendly Ground Unit - Infantry (PLI)
-        PlatformType.SENSOR -> "a-f-G-E-S"     // Friendly Ground Equipment - Sensor
-        PlatformType.UNKNOWN -> "a-u-G"        // Unknown Ground
+        PlatformType.UAV -> "a-f-A-M-F-Q"                // Friendly Air - Military Fixed Wing - UAV
+        PlatformType.UGV -> "a-f-G-E-V-A-T-H"            // Friendly Ground Equipment - Vehicle - Armor - Tank - Heavy (robot)
+        PlatformType.USV -> "a-f-S-X"                     // Friendly Surface - Other
+        PlatformType.UUV -> "a-f-U-X"                     // Friendly Subsurface - Other
+        PlatformType.OPERATOR -> "a-f-G-U-C-I"            // Friendly Ground Unit - Infantry
+        PlatformType.SOLDIER -> "a-f-G-U-C-I"             // Friendly Ground Unit - Infantry (PLI)
+        PlatformType.SENSOR -> "a-f-G-E-S"                // Friendly Ground Equipment - Sensor
+        PlatformType.SQUAD_LEADER -> "a-f-G-U-C-I"        // Friendly Ground Unit - Infantry
+        PlatformType.PLATOON_LEADER -> "a-f-G-U-C-V-M"    // Friendly Ground Unit - HQ Element
+        PlatformType.COMPANY_COMMANDER -> "a-f-G-U-C-V-M" // Friendly Ground Unit - HQ Element
+        PlatformType.UNKNOWN -> "a-u-G"                    // Unknown Ground
     }
 
     /**

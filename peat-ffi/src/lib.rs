@@ -491,6 +491,25 @@ impl PeatNode {
         })
     }
 
+    /// Request a full document sync with all connected peers.
+    /// This pushes all local documents to each peer and pulls any documents they have.
+    /// Useful for ensuring newly created documents propagate after the initial connection.
+    pub fn request_sync(&self) -> Result<(), PeatError> {
+        if let Some(coordinator) = self.storage_backend.sync_coordinator() {
+            let peers = self.iroh_transport.connected_peers();
+            let coord = Arc::clone(coordinator);
+            self.runtime.block_on(async {
+                for peer_id in peers {
+                    if let Err(e) = coord.sync_all_documents_with_peer(peer_id).await {
+                        #[cfg(target_os = "android")]
+                        android_log(&format!("request_sync failed for peer: {}", e));
+                    }
+                }
+            });
+        }
+        Ok(())
+    }
+
     /// Connect to a peer node with formation handshake
     ///
     /// Establishes a QUIC connection, performs formation-key authentication,
@@ -522,6 +541,30 @@ impl PeatNode {
                         Ok(()) => {
                             // Emit Connected to trigger immediate sync handler spawning
                             self.iroh_transport.emit_peer_connected(peer_id);
+
+                            // Explicitly trigger document sync with the new peer.
+                            // The event-based sync handler spawner should handle this,
+                            // but we also trigger sync directly to ensure documents flow.
+                            if let Some(coordinator) = self.storage_backend.sync_coordinator() {
+                                let coord = Arc::clone(coordinator);
+                                let sync_peer = peer_id;
+                                tokio::spawn(async move {
+                                    // Brief delay for connection to stabilize
+                                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                                    #[cfg(target_os = "android")]
+                                    android_log(&format!("Triggering sync_all_documents_with_peer for {:?}", sync_peer));
+                                    match coord.sync_all_documents_with_peer(sync_peer).await {
+                                        Ok(()) => {
+                                            #[cfg(target_os = "android")]
+                                            android_log("sync_all_documents_with_peer: SUCCESS");
+                                        }
+                                        Err(e) => {
+                                            #[cfg(target_os = "android")]
+                                            android_log(&format!("sync_all_documents_with_peer: FAILED - {}", e));
+                                        }
+                                    }
+                                });
+                            }
                         }
                         Err(e) => {
                             conn.close(1u32.into(), b"authentication failed");
@@ -2226,6 +2269,25 @@ pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_peerCountJni(
     count
 }
 
+/// JNI: Request full document sync with all connected peers
+///
+/// Kotlin signature: external fun requestSyncJni(handle: Long): Boolean
+#[cfg(feature = "sync")]
+#[no_mangle]
+pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_requestSyncJni(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: i64,
+) -> jboolean {
+    if handle == 0 {
+        return 0;
+    }
+    let node = unsafe { Arc::from_raw(handle as *const PeatNode) };
+    let result = node.request_sync().is_ok();
+    std::mem::forget(node);
+    result as jboolean
+}
+
 /// JNI: Get connected peer IDs as a JSON array
 ///
 /// Kotlin signature: external fun connectedPeersJni(handle: Long): String
@@ -2953,6 +3015,12 @@ pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_nativeInit(
         },
         #[cfg(feature = "sync")]
         NativeMethod {
+            name: "requestSyncJni".into(),
+            sig: "(J)Z".into(),
+            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_requestSyncJni as *mut c_void,
+        },
+        #[cfg(feature = "sync")]
+        NativeMethod {
             name: "startSyncJni".into(),
             sig: "(J)Z".into(),
             fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_startSyncJni as *mut c_void,
@@ -3174,6 +3242,12 @@ pub extern "C" fn JNI_OnLoad(vm: *mut JavaVM, _reserved: *mut c_void) -> jint {
                     name: "connectedPeersJni".into(),
                     sig: "(J)Ljava/lang/String;".into(),
                     fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_connectedPeersJni as *mut c_void,
+                },
+                #[cfg(feature = "sync")]
+                NativeMethod {
+                    name: "requestSyncJni".into(),
+                    sig: "(J)Z".into(),
+                    fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_requestSyncJni as *mut c_void,
                 },
                 #[cfg(feature = "sync")]
                 NativeMethod {

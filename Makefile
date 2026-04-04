@@ -424,15 +424,17 @@ build-android:
 	@ls -la atak-plugin/app/libs/arm64-v8a/libpeat_ffi.so atak-plugin/app/libs/armeabi-v7a/libpeat_ffi.so
 
 # Build ATAK plugin with native libs
+# Kotlin 2.1.x can't parse Java 25 version strings, so pin to JDK 21
+ATAK_JAVA_HOME ?= /usr/lib/jvm/java-21-openjdk
 build-atak-plugin: build-android
-	@echo "Building ATAK plugin..."
-	@cd atak-plugin && ./gradlew assembleCivDebug
+	@echo "Building ATAK plugin (JDK 21)..."
+	@cd atak-plugin && JAVA_HOME=$(ATAK_JAVA_HOME) ./gradlew assembleCivDebug
 	@echo "✓ ATAK plugin built"
 
 # Deploy ATAK plugin to connected device
 deploy-atak-plugin:
 	@echo "Deploying ATAK plugin..."
-	@adb install -r atak-plugin/app/build/outputs/apk/civ/debug/ATAK-Plugin-PEAT-*.apk
+	@adb install -r atak-plugin/app/build/outputs/apk/civ/debug/ATAK-Plugin-Peat-*.apk
 	@echo "✓ Deployed to device"
 
 # Full Android build and deploy
@@ -446,6 +448,103 @@ clean-android:
 	@rm -rf atak-plugin/app/libs/armeabi-v7a/libpeat_ffi.so
 	@rm -rf atak-plugin/app/build
 	@echo "✓ Android artifacts cleaned"
+
+# ============================================
+# Demo Automation (ATAK + Sim Mesh)
+# ============================================
+# Full build→deploy→configure→launch loop for development iteration.
+#
+# Quick reference:
+#   make demo-atak          # Build + deploy + configure + launch ATAK plugin
+#   make demo-restart-atak  # Stop + clear + relaunch (no rebuild)
+#   make demo-sim           # Build docker + deploy containerlab + warmup
+#   make demo               # Full loop: sim + ATAK
+#   make demo-verify        # Check ATAK logs for cell sync status
+#   make demo-stop          # Tear down sim + stop ATAK
+
+TOPOLOGY ?= peat-sim/topologies/lab4-48n-1gbps.yaml
+CLAB_PREFIX ?= clab-lab4-48n
+COMMANDER_CONTAINER ?= $(CLAB_PREFIX)-company-ALPHA-commander
+ATAK_PACKAGE ?= com.atakmap.app.civ
+PEAT_PLUGIN_ID ?= com.defenseunicorns.atak.peat
+
+# Full ATAK plugin build → deploy → configure → launch
+demo-atak: build-atak-plugin deploy-atak-plugin configure-atak
+	@sleep 2
+	@$(MAKE) start-atak
+	@echo "✓ ATAK plugin built, deployed, configured, and launched"
+
+# Enable plugin + clear stale store (adb install always disables the plugin)
+# Must stop ATAK first so SharedPreferences aren't held open
+configure-atak:
+	@echo "Stopping ATAK for configuration..."
+	@adb shell am force-stop $(ATAK_PACKAGE) 2>/dev/null || true
+	@sleep 1
+	@echo "Enabling Peat plugin..."
+	@adb shell "run-as $(ATAK_PACKAGE) sed -i 's/shouldLoad-$(PEAT_PLUGIN_ID)\" value=\"false\"/shouldLoad-$(PEAT_PLUGIN_ID)\" value=\"true\"/' /data/data/$(ATAK_PACKAGE)/shared_prefs/$(ATAK_PACKAGE)_preferences.xml" 2>/dev/null || echo "  (prefs file not found — first install, plugin will auto-enable)"
+	@echo "Clearing stale Peat store..."
+	@adb shell "run-as $(ATAK_PACKAGE) rm -rf /data/user/0/$(ATAK_PACKAGE)/files/peat" 2>/dev/null || true
+	@echo "✓ ATAK configured for Peat plugin"
+
+# Force-stop and relaunch ATAK (no rebuild)
+start-atak:
+	@echo "Starting ATAK..."
+	@adb shell am force-stop $(ATAK_PACKAGE) 2>/dev/null || true
+	@sleep 1
+	@adb shell am start -n $(ATAK_PACKAGE)/com.atakmap.app.ATAKActivity
+	@echo "✓ ATAK started"
+
+# Stop ATAK
+stop-atak:
+	@echo "Stopping ATAK..."
+	@adb shell am force-stop $(ATAK_PACKAGE) 2>/dev/null || true
+	@echo "✓ ATAK stopped"
+
+# Quick restart: stop → clear store → relaunch (skips build)
+demo-restart-atak: stop-atak
+	@echo "Clearing stale Peat store..."
+	@adb shell "run-as $(ATAK_PACKAGE) rm -rf /data/user/0/$(ATAK_PACKAGE)/files/peat" 2>/dev/null || true
+	@sleep 1
+	@$(MAKE) start-atak
+	@echo "✓ ATAK restarted with clean Peat store"
+
+# Build docker image + deploy containerlab + wait for warmup
+demo-sim: build-docker
+	@echo "Deploying sim topology: $(TOPOLOGY)..."
+	@sudo BACKEND=automerge CAP_IN_MEMORY=true containerlab deploy -t $(TOPOLOGY) --reconfigure --timeout 5m
+	@echo "Waiting for sim warmup (both platoons reporting to commander)..."
+	@for i in $$(seq 1 60); do \
+		if docker exec $(COMMANDER_CONTAINER) cat /data/logs/company-ALPHA-commander.metrics.log 2>/dev/null | grep -q 'input_count.:2'; then \
+			echo "✓ Sim warmed up — both platoons reporting"; \
+			exit 0; \
+		fi; \
+		printf "  Waiting... (%d/60)\r" $$i; \
+		sleep 5; \
+	done; \
+	echo "⚠ Warmup timeout — check $(COMMANDER_CONTAINER) logs manually"
+
+# Tear down sim
+demo-sim-destroy:
+	@echo "Destroying sim topology..."
+	@sudo containerlab destroy -t $(TOPOLOGY) --cleanup 2>/dev/null || true
+	@echo "✓ Sim destroyed"
+
+# Full demo loop: sim + ATAK
+demo: demo-sim demo-atak
+	@sleep 5
+	@$(MAKE) demo-verify
+
+# Verify ATAK sees the sim mesh
+demo-verify:
+	@echo "=== Recent Peat logs ==="
+	@adb logcat -d -t 200 | grep -iE 'Cell.*updated|PeatNode|sync.*document|PEAT|formation.*handshake' || echo "(no recent Peat logs — ATAK may still be starting)"
+	@echo ""
+	@echo "=== Sim commander metrics ==="
+	@docker exec $(COMMANDER_CONTAINER) tail -5 /data/logs/company-ALPHA-commander.metrics.log 2>/dev/null || echo "(sim not running)"
+
+# Stop everything
+demo-stop: stop-atak demo-sim-destroy
+	@echo "✓ Demo environment torn down"
 
 # ============================================
 # BLE Functional Test (Pi-to-Android)

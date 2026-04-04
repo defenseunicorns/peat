@@ -23,8 +23,8 @@ import com.defenseunicorns.peat.PeatDocument
 import com.defenseunicorns.peat.PeatEventType
 import com.defenseunicorns.peat.PeatMarker
 import com.defenseunicorns.peat.PeatPeer
-import uniffi.peat_lite_android.CannedMessageAckEventData
-import uniffi.peat_lite_android.CannedMessageType
+import com.defenseunicorns.atak.peat.model.CannedMessageAckEventData
+import com.defenseunicorns.atak.peat.model.CannedMessageType
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
@@ -42,7 +42,19 @@ class PeatMapComponent : DropDownMapComponent() {
 
     companion object {
         private const val TAG = "PeatMapComponent"
-        private const val REFRESH_INTERVAL_MS = 2000L // Refresh every 2 seconds
+        private const val REFRESH_INTERVAL_MS = 10000L // Refresh every 10 seconds (reduced to prevent OOM with 49+ platform markers)
+        private const val EARTH_RADIUS_M = 6_371_000.0
+
+        /** Offset a lat/lon point by bearing (degrees) and distance (meters). */
+        fun offsetPosition(start: DoubleArray, bearingDeg: Double, distanceM: Double): DoubleArray {
+            val lat1 = Math.toRadians(start[0])
+            val lon1 = Math.toRadians(start[1])
+            val brng = Math.toRadians(bearingDeg)
+            val d = distanceM / EARTH_RADIUS_M
+            val lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(brng))
+            val lon2 = lon1 + Math.atan2(Math.sin(brng) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2))
+            return doubleArrayOf(Math.toDegrees(lat2), Math.toDegrees(lon2))
+        }
     }
 
     private lateinit var pluginContext: Context
@@ -915,8 +927,10 @@ class PeatMapComponent : DropDownMapComponent() {
         val allPlatforms = platforms
 
         _cells.forEachIndexed { index, cell ->
-            // Get all platforms in this cell
-            val cellPlatforms = allPlatforms.filter { it.cellId == cell.id }
+            // Get all platforms in this cell (match exact ID or child IDs like squad/platoon)
+            val cellPlatforms = allPlatforms.filter {
+                it.cellId == cell.id || it.cellId?.startsWith(cell.id) == true
+            }
 
             // Get ACTIVE platforms in this cell (for capabilities)
             val activePlatforms = cellPlatforms.filter { platform ->
@@ -928,6 +942,7 @@ class PeatMapComponent : DropDownMapComponent() {
             val activeCapabilities = activePlatforms
                 .flatMap { it.capabilities }
                 .distinct()
+                .sorted()
                 .toMutableList()
 
             // Add base capabilities for BLE cells
@@ -936,21 +951,31 @@ class PeatMapComponent : DropDownMapComponent() {
                 if (!activeCapabilities.contains("GATEWAY")) activeCapabilities.add("GATEWAY")
             }
 
-            // Cell status reflects current operational state of active platforms
-            // Not "DEGRADED" just because nodes left - that's just the current composition
+            // Cell status: for BLE cells, derive from local platform count.
+            // For sim/FFI cells (non-BLE), trust the aggregated status from the mesh.
             val activeCount = activePlatforms.size
-            val newStatus = if (activeCount == 0) PeatCell.Status.OFFLINE else PeatCell.Status.ACTIVE
+            val isBleCell = cell.capabilities.contains("BLE_MESH")
+            val newStatus = if (isBleCell) {
+                if (activeCount == 0) PeatCell.Status.OFFLINE else PeatCell.Status.ACTIVE
+            } else {
+                cell.status  // Trust FFI-provided status (from hierarchical aggregation)
+            }
+
+            // For sim cells, use generated platform count if available, else FFI count
+            val displayCount = if (isBleCell) activeCount
+                else if (activePlatforms.isNotEmpty()) activePlatforms.size
+                else cell.platformCount
 
             // Update cell if anything changed
-            if (cell.platformCount != activeCount ||
+            if (cell.platformCount != displayCount ||
                 cell.capabilities != activeCapabilities ||
                 cell.status != newStatus) {
 
-                Log.i(TAG, "Cell ${cell.name} updated: platforms=$activeCount, " +
+                Log.i(TAG, "Cell ${cell.name} updated: platforms=$displayCount, " +
                         "status=$newStatus, capabilities=$activeCapabilities")
 
                 _cells[index] = cell.copy(
-                    platformCount = activeCount,
+                    platformCount = displayCount,
                     capabilities = activeCapabilities,
                     status = newStatus,
                     lastUpdate = System.currentTimeMillis()
@@ -1046,15 +1071,126 @@ class PeatMapComponent : DropDownMapComponent() {
             Log.e(TAG, "Error fetching tracks: ${e.message}", e)
         }
 
-        // Fetch platforms from Peat sync
+        // Generate platform markers from cell hierarchy (avoids CRDT sync overhead)
+        // Uses the same deterministic layout as the sim's PositionSeed
         try {
-            val platformsJson = node.getPlatformsJson()
-            Log.d(TAG, "Platforms JSON: $platformsJson")
             _platforms.clear()
-            _platforms.addAll(parsePlatformsJson(platformsJson))
-            Log.i(TAG, "Loaded ${_platforms.size} platforms from Peat")
+
+            for (cell in _cells) {
+                if (cell.capabilities.contains("BLE_MESH")) continue
+                if (cell.centerLat == 0.0 && cell.centerLon == 0.0) continue
+
+                val center = doubleArrayOf(cell.centerLat, cell.centerLon)
+                val numPlatoons = 2
+                val squadsPerPlatoon = 3
+                val soldiersPerSquad = 7
+
+                // Commander at center
+                _platforms.add(PeatPlatform(
+                    id = "${cell.id}-commander", callsign = "${cell.id}-commander",
+                    platformType = PeatPlatform.PlatformType.COMPANY_COMMANDER,
+                    lat = cell.centerLat, lon = cell.centerLon,
+                    cellId = cell.id, capabilities = listOf("Tactical Radio", "C2 Edge Compute"),
+                    lastUpdate = System.currentTimeMillis()
+                ))
+
+                // Generate full topology from center point
+                for (p in 1..numPlatoons) {
+                    val platoonBearing = if (p == 1) 30.0 else 330.0
+                    val platoonCenter = offsetPosition(center, platoonBearing, 500.0)
+                    val pltId = "${cell.id}-platoon-$p"
+
+                    // Platoon leader
+                    _platforms.add(PeatPlatform(
+                        id = "$pltId-leader", callsign = "$pltId-leader",
+                        platformType = PeatPlatform.PlatformType.PLATOON_LEADER,
+                        lat = platoonCenter[0], lon = platoonCenter[1],
+                        cellId = pltId, capabilities = listOf("Tactical Radio", "C2 Edge Compute"),
+                        lastUpdate = System.currentTimeMillis()
+                    ))
+
+                    for (s in 1..squadsPerPlatoon) {
+                        val squadBearings = doubleArrayOf(300.0, 60.0, 180.0)
+                        val squadCenter = offsetPosition(platoonCenter, squadBearings[s - 1], 200.0)
+                        val squadId = "$pltId-squad-$s"
+
+                        // Squad leader
+                        _platforms.add(PeatPlatform(
+                            id = "$squadId-leader", callsign = "$squadId-leader",
+                            platformType = PeatPlatform.PlatformType.SQUAD_LEADER,
+                            lat = squadCenter[0], lon = squadCenter[1],
+                            cellId = squadId, capabilities = listOf("Squad Radio", "Optical Sensor"),
+                            lastUpdate = System.currentTimeMillis()
+                        ))
+
+                        // Soldiers
+                        for (m in 1..soldiersPerSquad) {
+                            val angle = (m - 1) * (360.0 / 6.0)
+                            val pos = offsetPosition(squadCenter, angle, 30.0)
+                            val memberId = "$squadId-soldier-$m"
+                            val pType = when (m) {
+                                5 -> PeatPlatform.PlatformType.UGV
+                                6 -> PeatPlatform.PlatformType.UAV
+                                else -> PeatPlatform.PlatformType.SOLDIER
+                            }
+                            // Tactical callsigns by platform type
+                            val callsign = when (pType) {
+                                PeatPlatform.PlatformType.UGV -> "MULE-$p$s"
+                                PeatPlatform.PlatformType.UAV -> "RAVEN-$p$s"
+                                else -> memberId
+                            }
+                            val caps = when (pType) {
+                                PeatPlatform.PlatformType.UGV -> listOf("Silvus MIMO Radio", "FLIR Boson 640", "LiDAR 3D (200m)", "EO/IR Gimbal 30x", "CBRN Detector", "Cargo Bay 200kg", "Jetson AGX Orin")
+                                PeatPlatform.PlatformType.UAV -> listOf("C2 Datalink (5km)", "FLIR Vue Pro R 640", "EO 4K Gimbal 20x", "MTI Radar (GMTI)", "Edge AI (YOLOv8)")
+                                else -> when (m) {
+                                    1 -> listOf("PRC-163 Radio", "FLIR ThermoSight", "Laser Rangefinder")
+                                    2 -> listOf("PRC-163 Radio", "LPVO Optic")
+                                    3 -> listOf("PRC-163 Radio", "ATAK EUD", "MANET Relay")
+                                    4 -> listOf("PRC-163 Radio", "CASEVAC Kit")
+                                    else -> listOf("PRC-163 Radio")
+                                }
+                            }
+                            _platforms.add(PeatPlatform(
+                                id = memberId, callsign = callsign,
+                                platformType = pType,
+                                lat = pos[0], lon = pos[1],
+                                cellId = squadId, capabilities = caps,
+                                lastUpdate = System.currentTimeMillis()
+                            ))
+                        }
+                    }
+                }
+            }
+
+            // Override cell name, capabilities, and platform count from generated platforms
+            for (i in _cells.indices) {
+                val cell = _cells[i]
+                if (cell.capabilities.contains("BLE_MESH")) continue
+                val cellPlatforms = _platforms.filter {
+                    it.cellId == cell.id || it.cellId?.startsWith(cell.id) == true
+                }
+                if (cellPlatforms.isNotEmpty()) {
+                    val detailedCaps = cellPlatforms
+                        .flatMap { it.capabilities }
+                        .distinct()
+                        .sorted()
+                    // Derive display name from generated topology (not FFI which may show partial sync)
+                    val displayName = cell.name.substringBefore(" (").ifEmpty { cell.id }
+                    val pltCount = cellPlatforms.count {
+                        it.platformType == PeatPlatform.PlatformType.PLATOON_LEADER
+                    }
+                    val paxCount = cellPlatforms.size
+                    _cells[i] = cell.copy(
+                        name = "$displayName ($pltCount PLT, $paxCount PAX)",
+                        capabilities = detailedCaps,
+                        platformCount = paxCount
+                    )
+                }
+            }
+
+            Log.i(TAG, "Generated ${_platforms.size} platform markers from cell hierarchy")
         } catch (e: Exception) {
-            Log.e(TAG, "Error fetching platforms: ${e.message}", e)
+            Log.e(TAG, "Error generating platforms: ${e.message}", e)
         }
     }
 
@@ -1094,6 +1230,36 @@ class PeatMapComponent : DropDownMapComponent() {
             PeatCell.Status.OFFLINE
         }
 
+        // Parse hierarchy entries (platoon/squad breakdown)
+        val hierarchyArr = obj.optJSONArray("hierarchy")
+        val hierarchy = mutableListOf<PeatCell.HierarchyEntry>()
+        if (hierarchyArr != null) {
+            for (i in 0 until hierarchyArr.length()) {
+                try {
+                    val h = hierarchyArr.getJSONObject(i)
+                    val hCaps = mutableListOf<String>()
+                    val hCapsArr = h.optJSONArray("capabilities")
+                    if (hCapsArr != null) {
+                        for (j in 0 until hCapsArr.length()) {
+                            hCaps.add(hCapsArr.getString(j))
+                        }
+                    }
+                    hierarchy.add(PeatCell.HierarchyEntry(
+                        id = h.getString("id"),
+                        type = h.optString("type", "platoon"),
+                        memberCount = h.optInt("member_count", 0),
+                        squadCount = h.optInt("squad_count", 0),
+                        readiness = h.optString("readiness", null).takeIf { it?.isNotEmpty() == true },
+                        avgFuel = h.optString("avg_fuel", null).takeIf { it?.isNotEmpty() == true },
+                        worstHealth = h.optString("worst_health", null).takeIf { it?.isNotEmpty() == true },
+                        capabilities = hCaps
+                    ))
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error parsing hierarchy entry: ${e.message}")
+                }
+            }
+        }
+
         return PeatCell(
             id = obj.getString("id"),
             name = obj.getString("name"),
@@ -1104,7 +1270,11 @@ class PeatMapComponent : DropDownMapComponent() {
             capabilities = capabilities,
             formationId = obj.optString("formation_id", null).takeIf { it?.isNotEmpty() == true },
             leaderId = obj.optString("leader_id", null).takeIf { it?.isNotEmpty() == true },
-            lastUpdate = obj.optLong("last_update", System.currentTimeMillis())
+            lastUpdate = obj.optLong("last_update", System.currentTimeMillis()),
+            readiness = obj.optString("readiness", null).takeIf { it?.isNotEmpty() == true },
+            avgFuel = obj.optString("avg_fuel", null).takeIf { it?.isNotEmpty() == true },
+            worstHealth = obj.optString("worst_health", null).takeIf { it?.isNotEmpty() == true },
+            hierarchy = hierarchy
         )
     }
 
@@ -1224,9 +1394,9 @@ class PeatMapComponent : DropDownMapComponent() {
             platformType = platformType,
             lat = obj.getDouble("lat"),
             lon = obj.getDouble("lon"),
-            hae = if (obj.has("hae")) obj.getDouble("hae") else null,
-            heading = if (obj.has("heading")) obj.getDouble("heading") else null,
-            speed = if (obj.has("speed")) obj.getDouble("speed") else null,
+            hae = if (obj.has("hae") && !obj.isNull("hae")) obj.getDouble("hae") else null,
+            heading = if (obj.has("heading") && !obj.isNull("heading")) obj.getDouble("heading") else null,
+            speed = if (obj.has("speed") && !obj.isNull("speed")) obj.getDouble("speed") else null,
             cellId = obj.optString("cell_id", null).takeIf { it?.isNotEmpty() == true },
             capabilities = capabilities,
             status = status,
