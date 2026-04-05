@@ -554,6 +554,37 @@ demo-disco-destroy:
 	@sudo containerlab destroy -t $(DISCO_TOPOLOGY) --cleanup 2>/dev/null || true
 	@echo "✓ DiSCO flotilla destroyed"
 
+# ---- Demo Flow Control ----
+# Phase 1: ATAK only (BRAVO cell = tablet + watch)
+demo-phase1: configure-atak start-atak
+	@echo "✓ Phase 1: ATAK running (BRAVO cell)"
+
+# Phase 2: Bring up ALPHA company (48-node ground force)
+demo-phase2: build-docker
+	@cp peat-sim/topologies/lab4-48n-1gbps.yaml /tmp/lab4-48n.yaml
+	@echo "Deploying ALPHA company..."
+	@sudo BACKEND=automerge CAP_IN_MEMORY=true containerlab deploy -t $(TOPOLOGY) --reconfigure --timeout 5m
+	@echo "✓ Phase 2: ALPHA company deployed"
+
+# Phase 3: Bring up CHARLIE (DiSCO USV swarm)
+demo-phase3:
+	@echo "Deploying CHARLIE (DiSCO LightFish swarm)..."
+	@sudo BACKEND=automerge CAP_IN_MEMORY=true containerlab deploy -t $(DISCO_TOPOLOGY) --reconfigure --timeout 5m
+	@echo "✓ Phase 3: CHARLIE USV swarm deployed"
+
+# Phase 4: Start red track scenario (hostile vessel approaches USV box)
+demo-phase4:
+	@echo "Starting red track scenario..."
+	@adb logcat -c 2>/dev/null
+	@adb shell am broadcast -a com.defenseunicorns.atak.peat.SCENARIO_START -p com.atakmap.app.civ 2>/dev/null || true
+	@echo "✓ Phase 4: Red track scenario active — tap SKUNK-1 in Peat panel"
+
+# Stop red track scenario
+demo-phase4-stop:
+	@echo "Stopping red track scenario..."
+	@adb shell am broadcast -a com.defenseunicorns.atak.peat.SCENARIO_STOP -p com.atakmap.app.civ 2>/dev/null || true
+	@echo "✓ Red track scenario stopped"
+
 # Stop everything
 demo-stop: stop-atak demo-sim-destroy demo-disco-destroy
 	@echo "✓ Demo environment torn down"

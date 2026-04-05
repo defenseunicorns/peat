@@ -83,6 +83,74 @@ class PeatMapComponent : DropDownMapComponent() {
     private val _tracks = mutableListOf<PeatTrack>()
     val tracks: List<PeatTrack> get() = _tracks.toList()
 
+    // Red track scenario state
+    private var _scenarioStartTime: Long? = null
+    val scenarioActive: Boolean get() = _scenarioStartTime != null
+
+    fun startRedTrackScenario() {
+        _scenarioStartTime = System.currentTimeMillis()
+        Log.i(TAG, "Red track scenario started")
+    }
+
+    fun stopRedTrackScenario() {
+        _scenarioStartTime = null
+        _tracks.removeAll { it.id == "red-track-1" }
+        Log.i(TAG, "Red track scenario stopped")
+    }
+
+    /** Distance in meters between two lat/lon points */
+    fun haversineDistanceM(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2)
+        return EARTH_RADIUS_M * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    }
+
+    /** Generate an animated hostile surface track approaching through the USV patrol box */
+    private fun generateRedTrack(): PeatTrack? {
+        val startTime = _scenarioStartTime ?: return null
+
+        // Need a CHARLIE cell to know the patrol box location
+        val charlieCell = _cells.find {
+            it.id.contains("CHARLIE") || it.name.contains("DiSCO")
+        } ?: return null
+
+        val center = doubleArrayOf(charlieCell.centerLat, charlieCell.centerLon)
+        val boxCenter = offsetPosition(center, 200.0, 800.0) // USV patrol box center
+
+        // Approach path: from 2km SE to 2km NW through the box
+        val startPos = offsetPosition(boxCenter, 135.0, 2000.0) // SE
+        val endPos = offsetPosition(boxCenter, 315.0, 2000.0)   // NW toward shore
+
+        // 8 knots = ~4.1 m/s, 4km path = ~16 min
+        val elapsedSec = (System.currentTimeMillis() - startTime) / 1000.0
+        val totalPathM = 4000.0
+        val speedMps = 4.1
+        val totalTimeSec = totalPathM / speedMps
+        val progress = (elapsedSec / totalTimeSec).coerceIn(0.0, 1.0)
+
+        val lat = startPos[0] + (endPos[0] - startPos[0]) * progress
+        val lon = startPos[1] + (endPos[1] - startPos[1]) * progress
+
+        return PeatTrack(
+            id = "red-track-1",
+            sourcePlatform = "LightFish-CDR",
+            cellId = charlieCell.id,
+            lat = lat,
+            lon = lon,
+            heading = 315.0,
+            speed = speedMps,
+            classification = "a-h-S",
+            confidence = 0.82,
+            category = PeatTrack.Category.VESSEL,
+            attributes = mapOf("callsign" to "SKUNK-1", "speed_kts" to "8.0"),
+            createdAt = startTime,
+            lastUpdate = System.currentTimeMillis()
+        )
+    }
+
     /** Get the self callsign from ATAK's self marker */
     val selfCallsign: String
         get() = if (::mapView.isInitialized) {
@@ -264,6 +332,25 @@ class PeatMapComponent : DropDownMapComponent() {
         val ddFilter = DocumentedIntentFilter()
         ddFilter.addAction(PeatDropDownReceiver.SHOW_PLUGIN)
         registerDropDownReceiver(dropDownReceiver, ddFilter)
+
+        // Register scenario control broadcast receiver
+        val scenarioFilter = DocumentedIntentFilter()
+        scenarioFilter.addAction("com.defenseunicorns.atak.peat.SCENARIO_START")
+        scenarioFilter.addAction("com.defenseunicorns.atak.peat.SCENARIO_STOP")
+        val scenarioReceiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+                when (intent?.action) {
+                    "com.defenseunicorns.atak.peat.SCENARIO_START" -> {
+                        startRedTrackScenario()
+                    }
+                    "com.defenseunicorns.atak.peat.SCENARIO_STOP" -> {
+                        stopRedTrackScenario()
+                    }
+                }
+            }
+        }
+        com.atakmap.android.ipc.AtakBroadcast.getInstance().registerReceiver(scenarioReceiver, scenarioFilter)
+        Log.d(TAG, "Scenario broadcast receiver registered")
 
         // Register BLE document sync callback to display peer locations on map
         registerBleDocumentCallback()
@@ -1066,6 +1153,8 @@ class PeatMapComponent : DropDownMapComponent() {
             Log.d(TAG, "Tracks JSON: $tracksJson")
             _tracks.clear()
             _tracks.addAll(parseTracksJson(tracksJson))
+            // Inject red track scenario if active
+            generateRedTrack()?.let { _tracks.add(it) }
             Log.i(TAG, "Loaded ${_tracks.size} tracks from Peat")
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching tracks: ${e.message}", e)

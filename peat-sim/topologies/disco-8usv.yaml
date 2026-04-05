@@ -1,7 +1,7 @@
-# DiSCO USV Flotilla: 8 autonomous surface vehicles
-# 1 leader + 7 patrol boats in box perimeter pattern
-# Joins the same Peat mesh as company-ALPHA via shared credentials
-# Publishes as cell company-CHARLIE in ATAK
+# DiSCO LightFish Flotilla: 8 autonomous surface vehicles
+# 1 leader + 7 patrol boats — flat cell, no platoon/squad hierarchy
+# Joins the same Peat mesh as ALPHA via shared formation credentials
+# Leader aggregates USV states and publishes cell CHARLIE directly
 
 name: disco-8usv
 
@@ -12,91 +12,50 @@ mgmt:
 topology:
   nodes:
 
-    # ===== DiSCO FLOTILLA (CHARLIE) =====
+    # ===== DiSCO FLOTILLA =====
 
-    company-CHARLIE-disco-leader:
+    # Leader node: aggregates USV states → publishes cell CHARLIE
+    disco-leader:
       kind: linux
       image: peat-sim-node:latest
       ports:
         - 12500:12500/udp
       env:
-        NODE_ID: company-CHARLIE-disco-leader
-        ROLE: company_commander
-        PLATFORM_TYPE: usv
-        NODE_TYPE: usv
-        MODE: hierarchical
-        BACKEND: ${BACKEND}
-        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-false}"
-        COMPANY_ID: company-CHARLIE
-        COMPANY_DISPLAY_NAME: "CHARLIE (DiSCO)"
-        PLATOONS_PER_COMPANY: "1"
-        UPDATE_RATE_MS: "5000"
-        TCP_LISTEN: "12500"
-        TCP_CONNECT: "company-CHARLIE-platoon-1-leader|company-CHARLIE-platoon-1-leader:12502"
-        PEAT_APP_ID: default-formation
-        PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        DEMO_CENTER_LAT: "32.6723"
-        DEMO_CENTER_LON: "-117.2425"
-
-    company-CHARLIE-platoon-1-leader:
-      kind: linux
-      image: peat-sim-node:latest
-      env:
-        NODE_ID: company-CHARLIE-platoon-1-leader
-        ROLE: platoon_leader
-        PLATFORM_TYPE: usv
-        NODE_TYPE: usv
-        MODE: hierarchical
-        BACKEND: ${BACKEND}
-        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-false}"
-        PLATOON_ID: company-CHARLIE-platoon-1
-        SQUAD_IDS: "company-CHARLIE-platoon-1-disco-squad"
-        UPDATE_RATE_MS: "5000"
-        TCP_LISTEN: "12502"
-        TCP_CONNECT: "company-CHARLIE-disco-leader|company-CHARLIE-disco-leader:12500,company-CHARLIE-disco-squad-leader|company-CHARLIE-disco-squad-leader:12501"
-        PEAT_APP_ID: default-formation
-        PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        DEMO_CENTER_LAT: "32.6723"
-        DEMO_CENTER_LON: "-117.2425"
-
-    company-CHARLIE-disco-squad-leader:
-      kind: linux
-      image: peat-sim-node:latest
-      env:
-        NODE_ID: company-CHARLIE-disco-squad-leader
+        NODE_ID: disco-leader
         ROLE: squad_leader
         PLATFORM_TYPE: usv
         NODE_TYPE: usv
         MODE: hierarchical
         BACKEND: ${BACKEND}
         CAP_IN_MEMORY: "${CAP_IN_MEMORY:-false}"
-        SQUAD_ID: company-CHARLIE-platoon-1-disco-squad
-        SQUAD_MEMBERS: "company-CHARLIE-disco-1,company-CHARLIE-disco-2,company-CHARLIE-disco-3,company-CHARLIE-disco-4,company-CHARLIE-disco-5,company-CHARLIE-disco-6,company-CHARLIE-disco-7"
+        SQUAD_ID: disco-swarm
+        SQUAD_MEMBERS: "disco-1,disco-2,disco-3,disco-4,disco-5,disco-6,disco-7"
+        COMPANY_ID: company-CHARLIE
         UPDATE_RATE_MS: "5000"
-        TCP_LISTEN: "12501"
-        TCP_CONNECT: "company-CHARLIE-platoon-1-leader|company-CHARLIE-platoon-1-leader:12502,company-CHARLIE-disco-1|company-CHARLIE-disco-1:12510,company-CHARLIE-disco-2|company-CHARLIE-disco-2:12511,company-CHARLIE-disco-3|company-CHARLIE-disco-3:12512,company-CHARLIE-disco-4|company-CHARLIE-disco-4:12513,company-CHARLIE-disco-5|company-CHARLIE-disco-5:12514,company-CHARLIE-disco-6|company-CHARLIE-disco-6:12515,company-CHARLIE-disco-7|company-CHARLIE-disco-7:12516"
+        TCP_LISTEN: "12500"
+        TCP_CONNECT: "disco-1|disco-1:12510,disco-2|disco-2:12511,disco-3|disco-3:12512,disco-4|disco-4:12513,disco-5|disco-5:12514,disco-6|disco-6:12515,disco-7|disco-7:12516"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
         DEMO_CENTER_LAT: "32.6723"
         DEMO_CENTER_LON: "-117.2425"
 
-    # ----- DiSCO Patrol Boats -----
+    # ----- LightFish Patrol Boats -----
 
-    company-CHARLIE-disco-1:
+    disco-1:
       kind: linux
       image: peat-sim-node:latest
       env:
-        NODE_ID: company-CHARLIE-disco-1
+        NODE_ID: disco-1
         ROLE: soldier
         PLATFORM_TYPE: usv
         NODE_TYPE: usv
         MODE: hierarchical
         BACKEND: ${BACKEND}
         CAP_IN_MEMORY: "${CAP_IN_MEMORY:-false}"
-        SQUAD_ID: company-CHARLIE-platoon-1-disco-squad
+        SQUAD_ID: disco-swarm
         UPDATE_RATE_MS: "3000"
         TCP_LISTEN: "12510"
-        TCP_CONNECT: "company-CHARLIE-disco-squad-leader|company-CHARLIE-disco-squad-leader:12501"
+        TCP_CONNECT: "disco-leader|disco-leader:12500"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
         USV_INDEX: "0"
@@ -104,21 +63,21 @@ topology:
         DEMO_CENTER_LAT: "32.6723"
         DEMO_CENTER_LON: "-117.2425"
 
-    company-CHARLIE-disco-2:
+    disco-2:
       kind: linux
       image: peat-sim-node:latest
       env:
-        NODE_ID: company-CHARLIE-disco-2
+        NODE_ID: disco-2
         ROLE: soldier
         PLATFORM_TYPE: usv
         NODE_TYPE: usv
         MODE: hierarchical
         BACKEND: ${BACKEND}
         CAP_IN_MEMORY: "${CAP_IN_MEMORY:-false}"
-        SQUAD_ID: company-CHARLIE-platoon-1-disco-squad
+        SQUAD_ID: disco-swarm
         UPDATE_RATE_MS: "3000"
         TCP_LISTEN: "12511"
-        TCP_CONNECT: "company-CHARLIE-disco-squad-leader|company-CHARLIE-disco-squad-leader:12501"
+        TCP_CONNECT: "disco-leader|disco-leader:12500"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
         USV_INDEX: "1"
@@ -126,21 +85,21 @@ topology:
         DEMO_CENTER_LAT: "32.6723"
         DEMO_CENTER_LON: "-117.2425"
 
-    company-CHARLIE-disco-3:
+    disco-3:
       kind: linux
       image: peat-sim-node:latest
       env:
-        NODE_ID: company-CHARLIE-disco-3
+        NODE_ID: disco-3
         ROLE: soldier
         PLATFORM_TYPE: usv
         NODE_TYPE: usv
         MODE: hierarchical
         BACKEND: ${BACKEND}
         CAP_IN_MEMORY: "${CAP_IN_MEMORY:-false}"
-        SQUAD_ID: company-CHARLIE-platoon-1-disco-squad
+        SQUAD_ID: disco-swarm
         UPDATE_RATE_MS: "3000"
         TCP_LISTEN: "12512"
-        TCP_CONNECT: "company-CHARLIE-disco-squad-leader|company-CHARLIE-disco-squad-leader:12501"
+        TCP_CONNECT: "disco-leader|disco-leader:12500"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
         USV_INDEX: "2"
@@ -148,21 +107,21 @@ topology:
         DEMO_CENTER_LAT: "32.6723"
         DEMO_CENTER_LON: "-117.2425"
 
-    company-CHARLIE-disco-4:
+    disco-4:
       kind: linux
       image: peat-sim-node:latest
       env:
-        NODE_ID: company-CHARLIE-disco-4
+        NODE_ID: disco-4
         ROLE: soldier
         PLATFORM_TYPE: usv
         NODE_TYPE: usv
         MODE: hierarchical
         BACKEND: ${BACKEND}
         CAP_IN_MEMORY: "${CAP_IN_MEMORY:-false}"
-        SQUAD_ID: company-CHARLIE-platoon-1-disco-squad
+        SQUAD_ID: disco-swarm
         UPDATE_RATE_MS: "3000"
         TCP_LISTEN: "12513"
-        TCP_CONNECT: "company-CHARLIE-disco-squad-leader|company-CHARLIE-disco-squad-leader:12501"
+        TCP_CONNECT: "disco-leader|disco-leader:12500"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
         USV_INDEX: "3"
@@ -170,21 +129,21 @@ topology:
         DEMO_CENTER_LAT: "32.6723"
         DEMO_CENTER_LON: "-117.2425"
 
-    company-CHARLIE-disco-5:
+    disco-5:
       kind: linux
       image: peat-sim-node:latest
       env:
-        NODE_ID: company-CHARLIE-disco-5
+        NODE_ID: disco-5
         ROLE: soldier
         PLATFORM_TYPE: usv
         NODE_TYPE: usv
         MODE: hierarchical
         BACKEND: ${BACKEND}
         CAP_IN_MEMORY: "${CAP_IN_MEMORY:-false}"
-        SQUAD_ID: company-CHARLIE-platoon-1-disco-squad
+        SQUAD_ID: disco-swarm
         UPDATE_RATE_MS: "3000"
         TCP_LISTEN: "12514"
-        TCP_CONNECT: "company-CHARLIE-disco-squad-leader|company-CHARLIE-disco-squad-leader:12501"
+        TCP_CONNECT: "disco-leader|disco-leader:12500"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
         USV_INDEX: "4"
@@ -192,21 +151,21 @@ topology:
         DEMO_CENTER_LAT: "32.6723"
         DEMO_CENTER_LON: "-117.2425"
 
-    company-CHARLIE-disco-6:
+    disco-6:
       kind: linux
       image: peat-sim-node:latest
       env:
-        NODE_ID: company-CHARLIE-disco-6
+        NODE_ID: disco-6
         ROLE: soldier
         PLATFORM_TYPE: usv
         NODE_TYPE: usv
         MODE: hierarchical
         BACKEND: ${BACKEND}
         CAP_IN_MEMORY: "${CAP_IN_MEMORY:-false}"
-        SQUAD_ID: company-CHARLIE-platoon-1-disco-squad
+        SQUAD_ID: disco-swarm
         UPDATE_RATE_MS: "3000"
         TCP_LISTEN: "12515"
-        TCP_CONNECT: "company-CHARLIE-disco-squad-leader|company-CHARLIE-disco-squad-leader:12501"
+        TCP_CONNECT: "disco-leader|disco-leader:12500"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
         USV_INDEX: "5"
@@ -214,21 +173,21 @@ topology:
         DEMO_CENTER_LAT: "32.6723"
         DEMO_CENTER_LON: "-117.2425"
 
-    company-CHARLIE-disco-7:
+    disco-7:
       kind: linux
       image: peat-sim-node:latest
       env:
-        NODE_ID: company-CHARLIE-disco-7
+        NODE_ID: disco-7
         ROLE: soldier
         PLATFORM_TYPE: usv
         NODE_TYPE: usv
         MODE: hierarchical
         BACKEND: ${BACKEND}
         CAP_IN_MEMORY: "${CAP_IN_MEMORY:-false}"
-        SQUAD_ID: company-CHARLIE-platoon-1-disco-squad
+        SQUAD_ID: disco-swarm
         UPDATE_RATE_MS: "3000"
         TCP_LISTEN: "12516"
-        TCP_CONNECT: "company-CHARLIE-disco-squad-leader|company-CHARLIE-disco-squad-leader:12501"
+        TCP_CONNECT: "disco-leader|disco-leader:12500"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
         USV_INDEX: "6"

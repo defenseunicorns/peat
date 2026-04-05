@@ -2170,6 +2170,69 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 }
                             });
 
+                            // Flat cell publishing: if this squad leader has COMPANY_ID set,
+                            // it publishes a cell directly (no platoon/company hierarchy needed).
+                            // This supports flat cells like the DiSCO USV swarm.
+                            if let Ok(company_id) = std::env::var("COMPANY_ID") {
+                                let cells_coll =
+                                    automerge_backend.storage_backend().collection("cells");
+                                let cell_coordinator = automerge_backend.summary_storage();
+                                let cell_coordinator =
+                                    Arc::new(HierarchicalAggregator::new(cell_coordinator));
+                                let cell_squad_id = std::env::var("SQUAD_ID").unwrap_or_default();
+                                let cell_node_id = node_id.clone();
+                                let cell_company_id = company_id.clone();
+                                let display_name = std::env::var("COMPANY_DISPLAY_NAME")
+                                    .unwrap_or_else(|_| {
+                                        company_id
+                                            .strip_prefix("company-")
+                                            .unwrap_or(&company_id)
+                                            .to_uppercase()
+                                    });
+                                tokio::spawn(async move {
+                                    // Wait for first aggregation
+                                    sleep(Duration::from_secs(10)).await;
+                                    loop {
+                                        if let Ok(Some(summary)) =
+                                            cell_coordinator.get_squad_summary(&cell_squad_id).await
+                                        {
+                                            let centroid = summary.position_centroid.as_ref();
+                                            let status = if summary.operational_count > 0 {
+                                                "ACTIVE"
+                                            } else {
+                                                "OFFLINE"
+                                            };
+                                            let cap_names: Vec<String> = summary
+                                                .aggregated_capabilities
+                                                .iter()
+                                                .map(|c| c.name.clone())
+                                                .filter(|n| !n.is_empty())
+                                                .collect();
+                                            let cell_json = serde_json::json!({
+                                                "name": format!("{} ({} USV Swarm)", display_name, summary.member_count),
+                                                "status": status,
+                                                "platform_count": summary.member_count,
+                                                "center_lat": centroid.map(|p| p.latitude).unwrap_or(0.0),
+                                                "center_lon": centroid.map(|p| p.longitude).unwrap_or(0.0),
+                                                "capabilities": if cap_names.is_empty() { serde_json::json!(["USV_SWARM"]) } else { serde_json::json!(cap_names) },
+                                                "formation_id": serde_json::Value::Null,
+                                                "leader_id": &cell_node_id,
+                                                "last_update": now_micros() / 1000,
+                                            });
+                                            let _ = cells_coll.upsert(
+                                                &cell_company_id,
+                                                cell_json.to_string().into_bytes(),
+                                            );
+                                        }
+                                        sleep(Duration::from_secs(5)).await;
+                                    }
+                                });
+                                println!(
+                                    "[{}] ✓ Flat cell publisher spawned for {}",
+                                    node_id, company_id
+                                );
+                            }
+
                             // Phase 3: Spawn command demo task
                             let cmd_node_id = node_id.clone();
                             tokio::spawn(async move {

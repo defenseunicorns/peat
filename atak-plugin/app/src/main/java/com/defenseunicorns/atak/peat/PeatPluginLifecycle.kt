@@ -54,7 +54,7 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
         // CHARLIE (DiSCO): 8-node USV flotilla on port 12500
         // EndpointId will be set after first deploy — leave blank to skip
         const val DISCO_SIM_PEER_ADDRESS = "192.168.1.96:12500"
-        const val DISCO_SIM_PEER_NODE_ID = "4a6d13352927862711ae99e2ca75a178454b99b04f6c6a2f71acc5cf9cfcbb23"
+        const val DISCO_SIM_PEER_NODE_ID = "3070b732574d40d4cc6822fe1f7966498aec7368e9e279e62171b33351803368"
 
         @Volatile
         private var instance: PeatPluginLifecycle? = null

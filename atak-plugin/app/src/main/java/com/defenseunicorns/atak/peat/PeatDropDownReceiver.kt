@@ -63,6 +63,10 @@ class PeatDropDownReceiver(
     // Marker detail view state - store UID to allow refresh with updated data
     private var selectedMarkerUid: String? = null
 
+    // Track detail view state
+    private var selectedTrackId: String? = null
+    private var coaResponse: String? = null
+
     // User's role in the hierarchy (for PoC, using default role)
     private var userRole: PeatRole = PeatRole.defaultRole()
 
@@ -194,6 +198,17 @@ class PeatDropDownReceiver(
             } else {
                 // Marker no longer exists, clear selection
                 selectedMarkerUid = null
+            }
+        }
+
+        // If a track is selected, show track detail view with COA prompt
+        selectedTrackId?.let { trackId ->
+            val track = mapComponent.tracks.find { it.id == trackId }
+            if (track != null) {
+                return buildTrackDetailView(track)
+            } else {
+                selectedTrackId = null
+                coaResponse = null
             }
         }
 
@@ -346,7 +361,28 @@ class PeatDropDownReceiver(
                 setTextColor(Color.WHITE)
             }
             container.addView(tracksTitle)
-            container.addView(createSpacer(12))
+            container.addView(createSpacer(8))
+
+            // Scenario trigger button (when CHARLIE/DiSCO cell exists)
+            val hasCharlie = mapComponent.cells.any {
+                it.id.contains("CHARLIE") || it.name.contains("DiSCO")
+            }
+            if (hasCharlie) {
+                val scenarioBtn = Button(pluginContext).apply {
+                    text = if (mapComponent.scenarioActive) "Stop Scenario" else "Start Scenario"
+                    textSize = 12f
+                    setBackgroundColor(Color.parseColor(if (mapComponent.scenarioActive) "#F44336" else "#FF9800"))
+                    setTextColor(Color.WHITE)
+                    setPadding(24, 8, 24, 8)
+                    setOnClickListener {
+                        if (mapComponent.scenarioActive) mapComponent.stopRedTrackScenario()
+                        else mapComponent.startRedTrackScenario()
+                        refreshContent()
+                    }
+                }
+                container.addView(scenarioBtn)
+                container.addView(createSpacer(8))
+            }
 
             if (mapComponent.tracks.isEmpty()) {
                 val noTracks = TextView(pluginContext).apply {
@@ -1185,6 +1221,13 @@ class PeatDropDownReceiver(
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#2d2d2d"))
             setPadding(24, 16, 24, 16)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                selectedTrackId = track.id
+                coaResponse = null
+                refreshContent()
+            }
         }
 
         val headerRow = LinearLayout(pluginContext).apply {
@@ -1192,8 +1235,9 @@ class PeatDropDownReceiver(
             gravity = Gravity.CENTER_VERTICAL
         }
 
+        val callsign = track.attributes["callsign"] ?: track.id.takeLast(8)
         val id = TextView(pluginContext).apply {
-            text = "Track: ${track.id.takeLast(8)}"
+            text = callsign
             textSize = 14f
             setTextColor(Color.WHITE)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
@@ -1229,6 +1273,250 @@ class PeatDropDownReceiver(
         card.addView(confidence)
 
         return card
+    }
+
+    // =========================================================================
+    // Track Detail View + COA Prompt
+    // =========================================================================
+
+    private fun buildTrackDetailView(track: PeatTrack): LinearLayout {
+        val container = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(32, 32, 32, 32)
+        }
+
+        // Back button
+        val backBtn = Button(pluginContext).apply {
+            text = "< Back"
+            textSize = 12f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#333333"))
+            setPadding(16, 8, 16, 8)
+            gravity = Gravity.START
+            setOnClickListener {
+                selectedTrackId = null
+                coaResponse = null
+                refreshContent()
+            }
+        }
+        container.addView(backBtn)
+        container.addView(createSpacer(12))
+
+        // Track header
+        val callsign = track.attributes["callsign"] ?: track.id
+        val isHostile = track.classification.contains("-h-")
+        val headerRow = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val titleText = TextView(pluginContext).apply {
+            text = callsign
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        headerRow.addView(titleText)
+        if (isHostile) {
+            val hostileBadge = TextView(pluginContext).apply {
+                text = "HOSTILE"
+                textSize = 12f
+                setTextColor(Color.parseColor("#F44336"))
+                setTypeface(null, android.graphics.Typeface.BOLD)
+            }
+            headerRow.addView(hostileBadge)
+        }
+        container.addView(headerRow)
+        container.addView(createSpacer(12))
+
+        // Track info card
+        val infoCard = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#2d2d2d"))
+            setPadding(24, 16, 24, 16)
+        }
+        val speedKts = track.attributes["speed_kts"] ?: track.speed?.let { "%.1f".format(it * 1.944) } ?: "?"
+        val infoLines = listOf(
+            "Classification: ${track.classification} (${track.category.name})",
+            "Position: %.5f, %.5f".format(track.lat, track.lon),
+            "Heading: ${track.heading?.toInt() ?: "?"}°",
+            "Speed: $speedKts kts",
+            "Confidence: ${(track.confidence * 100).toInt()}%",
+            "Source: ${track.sourcePlatform}"
+        )
+        infoLines.forEach { line ->
+            val tv = TextView(pluginContext).apply {
+                text = line
+                textSize = 12f
+                setTextColor(Color.parseColor("#CCCCCC"))
+                setPadding(0, 2, 0, 2)
+            }
+            infoCard.addView(tv)
+        }
+        container.addView(infoCard)
+        container.addView(createSpacer(16))
+
+        // === AI Analysis Section ===
+        val aiTitle = TextView(pluginContext).apply {
+            text = "AI Analysis"
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        }
+        container.addView(aiTitle)
+        container.addView(createSpacer(8))
+
+        // Quick action button
+        val coaBtn = Button(pluginContext).apply {
+            text = "COA Analysis"
+            textSize = 13f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#1565C0"))
+            setPadding(24, 12, 24, 12)
+            setOnClickListener {
+                coaResponse = generateCoaResponse(track)
+                refreshContent()
+            }
+        }
+        container.addView(coaBtn)
+        container.addView(createSpacer(8))
+
+        // Free-form prompt input
+        val promptRow = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val promptInput = EditText(pluginContext).apply {
+            hint = "Ask about this contact..."
+            textSize = 12f
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.parseColor("#666666"))
+            setBackgroundColor(Color.parseColor("#3d3d3d"))
+            setPadding(16, 12, 16, 12)
+            setSingleLine(false)
+            maxLines = 3
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        promptRow.addView(promptInput)
+        promptRow.addView(createHorizontalSpacer(8))
+        val sendBtn = Button(pluginContext).apply {
+            text = "Send"
+            textSize = 11f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#1565C0"))
+            setPadding(16, 12, 16, 12)
+            setOnClickListener {
+                val query = promptInput.text.toString().trim()
+                if (query.isNotEmpty()) {
+                    coaResponse = generateCoaResponse(track)
+                    refreshContent()
+                }
+            }
+        }
+        promptRow.addView(sendBtn)
+        container.addView(promptRow)
+        container.addView(createSpacer(12))
+
+        // COA Response display
+        if (coaResponse != null) {
+            val responseCard = LinearLayout(pluginContext).apply {
+                orientation = LinearLayout.VERTICAL
+                setBackgroundColor(Color.parseColor("#1a1a2e"))
+                setPadding(24, 16, 24, 16)
+            }
+            val aiLabel = TextView(pluginContext).apply {
+                text = "Peat AI"
+                textSize = 11f
+                setTextColor(Color.parseColor("#00BCD4"))
+                setTypeface(null, android.graphics.Typeface.BOLD)
+            }
+            responseCard.addView(aiLabel)
+            responseCard.addView(createSpacer(8))
+            val responseText = TextView(pluginContext).apply {
+                text = coaResponse
+                textSize = 11f
+                setTextColor(Color.parseColor("#DDDDDD"))
+                setTypeface(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.NORMAL)
+            }
+            responseCard.addView(responseText)
+            container.addView(responseCard)
+        }
+
+        return container
+    }
+
+    private fun generateCoaResponse(track: PeatTrack): String {
+        val callsign = track.attributes["callsign"] ?: "CONTACT-1"
+        val speedKts = track.attributes["speed_kts"] ?: "8.0"
+
+        // Get LightFish USV platforms
+        val usvPlatforms = mapComponent.platforms.filter {
+            it.platformType == PeatPlatform.PlatformType.USV
+        }.sortedBy { it.callsign }
+
+        if (usvPlatforms.isEmpty()) {
+            return "No USV assets available for tasking."
+        }
+
+        // Calculate distances from each USV to hostile track
+        data class UsvProximity(val platform: PeatPlatform, val distanceM: Double)
+        val proximities = usvPlatforms.map { usv ->
+            UsvProximity(usv, mapComponent.haversineDistanceM(usv.lat, usv.lon, track.lat, track.lon))
+        }.sortedBy { it.distanceM }
+
+        val closest = proximities.first()
+        val closestDistNm = "%.1f".format(closest.distanceM / 1852.0)
+
+        val operational = usvPlatforms.filter { (it.batteryPercent ?: 0) > 30 }
+        val lowBattery = usvPlatforms.filter { (it.batteryPercent ?: 0) <= 30 }
+        val bestIntercept = proximities.filter { (it.platform.batteryPercent ?: 0) > 30 }.take(2)
+        val bestTrail = proximities.filter { (it.platform.batteryPercent ?: 0) > 50 }.take(3)
+
+        val sb = StringBuilder()
+        sb.appendLine("SITUATION: $callsign classified hostile surface vessel, HDG ${track.heading?.toInt() ?: 315}, speed $speedKts kts. Nearest asset: ${closest.platform.callsign} at ${closestDistNm}nm.")
+        sb.appendLine()
+        sb.appendLine("ASSETS: ${operational.size}/${usvPlatforms.size} LightFish operational")
+        operational.forEach { usv ->
+            val dist = proximities.find { it.platform.id == usv.id }?.distanceM ?: 0.0
+            sb.appendLine("  ${usv.callsign}: ${"%.1f".format(dist / 1852.0)}nm, ${usv.batteryPercent}% batt")
+        }
+        if (lowBattery.isNotEmpty()) {
+            sb.appendLine("  ${lowBattery.size} USV(s) below 30% — limited capability")
+        }
+        sb.appendLine()
+
+        // COA 1
+        sb.appendLine("COA 1 — INTERCEPT & IDENTIFY")
+        if (bestIntercept.size >= 2) {
+            sb.appendLine("  Task ${bestIntercept[0].platform.callsign} + ${bestIntercept[1].platform.callsign} to converge")
+            sb.appendLine("  Bow/stern approach, EO cameras for visual ID at 200m")
+            sb.appendLine("  Side-scan sonar for hull classification")
+            sb.appendLine("  Risk: Moderate — depletes 2 USVs from patrol")
+        }
+        sb.appendLine()
+
+        // COA 2
+        sb.appendLine("COA 2 — SHADOW & TRACK")
+        if (bestTrail.isNotEmpty()) {
+            sb.appendLine("  Task ${bestTrail.first().platform.callsign} to maintain 500m trail")
+            sb.appendLine("  Continuous track via GNSS RTK + sonar")
+            sb.appendLine("  ${operational.size - 1} USVs maintain patrol coverage")
+            sb.appendLine("  Risk: Low — single asset, patrol maintained")
+        }
+        sb.appendLine()
+
+        // COA 3
+        sb.appendLine("COA 3 — REPOSITION SWARM")
+        sb.appendLine("  Shift patrol box to envelop $callsign")
+        sb.appendLine("  All ${operational.size} USVs maintain formation around contact")
+        sb.appendLine("  Full sensor coverage: sonar, EO, magnetometer")
+        sb.appendLine("  Risk: High — abandons patrol sector, 10-15 min reposition")
+        sb.appendLine()
+
+        val recAsset = bestTrail.firstOrNull()?.platform
+        sb.append("RECOMMENDATION: COA 2. ${recAsset?.callsign ?: "LightFish-1"} (${recAsset?.batteryPercent ?: 70}% batt) has endurance for 2+ hr trail. Maintains patrol posture while tracking $callsign.")
+
+        return sb.toString()
     }
 
     private fun createMarkerCard(cachedMarker: PeatMapComponent.CachedMarker): View {
