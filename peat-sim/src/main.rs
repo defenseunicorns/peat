@@ -63,6 +63,7 @@
 //! 1: Failure (timeout, error, or document not received)
 
 mod metrics;
+mod simulation;
 mod utils;
 
 use metrics::{init_metrics_file, log_metrics, MetricsEvent};
@@ -94,7 +95,7 @@ use peat_protocol::storage::DittoCommandStorage;
 #[cfg(feature = "automerge-backend")]
 use peat_protocol::network::IrohTransport;
 #[cfg(feature = "automerge-backend")]
-use peat_protocol::storage::AutomergeStore;
+use peat_protocol::storage::{AutomergeStore, StorageBackend};
 use peat_schema::command::v1::{
     command_target::Scope, AckStatus, CommandAcknowledgment, CommandTarget, HierarchicalCommand,
 };
@@ -469,36 +470,62 @@ async fn squad_leader_aggregation_loop(
         }
     });
 
-    // Helper closure for aggregation
+    // Helper closure for aggregation — reads real soldier data from CRDT store
     let do_aggregation = |coordinator: Arc<HierarchicalAggregator>,
                           squad_id: String,
                           node_id: String,
-                          member_ids: Vec<String>| async move {
-        // Collect member states using synthetic NodeConfig/NodeState
-        // In production, this would query actual NodeState documents from storage
+                          member_ids: Vec<String>,
+                          backend: Arc<Box<dyn DataSyncBackend>>| async move {
+        let seed = simulation::PositionSeed::from_env();
         let mut member_states = Vec::new();
 
         for member_id in &member_ids {
-            // Create minimal NodeConfig for aggregation
+            let doc_id = format!("sim_doc_{}", member_id);
+            let platform_type = simulation::assign_platform_type(member_id);
+            let capabilities =
+                simulation::generate_capabilities(member_id, platform_type, "soldier");
+
+            // Try to read the actual soldier document from CRDT store
+            let (lat, lon, fuel, health) =
+                match backend.document_store().get("sim_poc", &doc_id).await {
+                    Ok(Some(doc)) => {
+                        let lat = doc.get("lat").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                        let lon = doc.get("lon").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                        let fuel = doc
+                            .get("fuel_minutes")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(100) as u32;
+                        let health = doc.get("health").and_then(|v| v.as_i64()).unwrap_or(1) as i32;
+                        (lat, lon, fuel, health)
+                    }
+                    _ => {
+                        // Startup race: soldier hasn't published yet — use seeded defaults
+                        let pos = seed.initial_position(member_id);
+                        (pos.0, pos.1, 100u32, 1i32)
+                    }
+                };
+
+            // NOTE: Platform markers are generated client-side in ATAK from cell hierarchy.
+            // No CRDT platform doc publishing needed (causes OOM from revision accumulation).
+
             let config = NodeConfig {
                 id: member_id.clone(),
-                platform_type: "Simulated".to_string(),
-                capabilities: vec![],
+                platform_type: platform_type.as_str().to_string(),
+                capabilities,
                 comm_range_m: 1000.0,
-                max_speed_mps: 10.0,
+                max_speed_mps: platform_type.speed_mps() as f32,
                 operator_binding: None,
                 created_at: None,
             };
 
-            // Create minimal operational NodeState
             let state = NodeState {
                 position: Some(peat_schema::common::v1::Position {
-                    latitude: 0.0,
-                    longitude: 0.0,
-                    altitude: 0.0,
+                    latitude: lat,
+                    longitude: lon,
+                    altitude: platform_type.default_altitude(),
                 }),
-                fuel_minutes: 100,
-                health: peat_schema::node::v1::HealthStatus::Nominal.into(),
+                fuel_minutes: fuel,
+                health,
                 phase: peat_schema::node::v1::Phase::Hierarchy.into(),
                 cell_id: Some(squad_id.clone()),
                 zone_id: None,
@@ -633,6 +660,7 @@ async fn squad_leader_aggregation_loop(
         squad_id.clone(),
         node_id.clone(),
         member_ids.clone(),
+        Arc::clone(&backend),
     )
     .await;
     let mut last_aggregation = Instant::now();
@@ -660,6 +688,7 @@ async fn squad_leader_aggregation_loop(
                         squad_id.clone(),
                         node_id.clone(),
                         member_ids.clone(),
+                        Arc::clone(&backend),
                     )
                     .await;
                     last_aggregation = Instant::now();
@@ -685,6 +714,7 @@ async fn squad_leader_aggregation_loop(
                         squad_id.clone(),
                         node_id.clone(),
                         member_ids.clone(),
+                        Arc::clone(&backend),
                     )
                     .await;
                     last_aggregation = Instant::now();
@@ -932,7 +962,7 @@ async fn platoon_leader_aggregation_loop(
                             if let Some(doc_id) = &doc.id {
                                 // Match squad summaries from both backends:
                                 // - Ditto: "squad-summary-{squad_id}" (starts with "squad-")
-                                // - Automerge: "{squad_id}" after prefix strip (e.g., "company-1-platoon-1-squad-1")
+                                // - Automerge: "{squad_id}" after prefix strip (e.g., "company-ALPHA-platoon-1-squad-1")
                                 if doc_id.starts_with("squad-") || doc_id.contains("-squad-") {
                                     // Extract timestamps with proper delta sync semantics
                                     // Fallback to doc.updated_at for Automerge (which doesn't store timestamps in fields)
@@ -1036,7 +1066,7 @@ async fn platoon_leader_aggregation_loop(
                         if let Some(doc_id) = &document.id {
                             // Match squad summaries from both backends:
                             // - Ditto: "squad-summary-{squad_id}" (starts with "squad-")
-                            // - Automerge: "{squad_id}" after prefix strip (e.g., "company-1-platoon-1-squad-1")
+                            // - Automerge: "{squad_id}" after prefix strip (e.g., "company-ALPHA-platoon-1-squad-1")
                             let matches =
                                 doc_id.starts_with("squad-") || doc_id.contains("-squad-");
                             if matches {
@@ -1163,6 +1193,7 @@ async fn company_commander_aggregation_loop(
     coordinator: Arc<HierarchicalAggregator>,
     company_id: String,
     node_id: String,
+    cells_collection: Option<Arc<dyn peat_protocol::storage::Collection>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!(
         "[{}] Started company commander aggregation for {}",
@@ -1203,169 +1234,345 @@ async fn company_commander_aggregation_loop(
     let mut seen_doc_updates: HashSet<(String, u128)> = HashSet::new();
 
     // Helper function to perform aggregation (called when platoon summaries change)
-    let do_aggregation = |coordinator: Arc<HierarchicalAggregator>,
-                          company_id: String,
-                          node_id: String,
-                          platoon_ids: Vec<String>| async move {
-        // Collect latest platoon summaries
-        let mut platoon_summaries = Vec::new();
-        let mut missing_platoons = Vec::new();
+    let do_aggregation =
+        |coordinator: Arc<HierarchicalAggregator>,
+         company_id: String,
+         node_id: String,
+         platoon_ids: Vec<String>,
+         cells_coll: Option<Arc<dyn peat_protocol::storage::Collection>>| async move {
+            // Collect latest platoon summaries
+            let mut platoon_summaries = Vec::new();
+            let mut missing_platoons = Vec::new();
 
-        for platoon_id in &platoon_ids {
-            match coordinator.get_platoon_summary(platoon_id).await {
-                Ok(Some(summary)) => {
-                    platoon_summaries.push(summary);
-                }
-                Ok(None) => {
-                    missing_platoons.push(platoon_id.clone());
-                }
-                Err(e) => {
-                    eprintln!("[{}] Error fetching platoon {}: {}", node_id, platoon_id, e);
-                    missing_platoons.push(platoon_id.clone());
+            for platoon_id in &platoon_ids {
+                match coordinator.get_platoon_summary(platoon_id).await {
+                    Ok(Some(summary)) => {
+                        platoon_summaries.push(summary);
+                    }
+                    Ok(None) => {
+                        missing_platoons.push(platoon_id.clone());
+                    }
+                    Err(e) => {
+                        eprintln!("[{}] Error fetching platoon {}: {}", node_id, platoon_id, e);
+                        missing_platoons.push(platoon_id.clone());
+                    }
                 }
             }
-        }
 
-        // Log aggregation readiness
-        if !missing_platoons.is_empty() {
-            // Only log occasionally to avoid spam (every 10 seconds based on timestamp)
-            let ts_secs = now_micros() / 1_000_000;
-            if ts_secs % 10 == 0 {
-                println!(
-                    "[{}] Company aggregation: {}/{} platoons ready, missing: {:?}",
-                    node_id,
-                    platoon_summaries.len(),
-                    platoon_ids.len(),
-                    missing_platoons
-                );
+            // Log aggregation readiness
+            if !missing_platoons.is_empty() {
+                // Only log occasionally to avoid spam (every 10 seconds based on timestamp)
+                let ts_secs = now_micros() / 1_000_000;
+                if ts_secs % 10 == 0 {
+                    println!(
+                        "[{}] Company aggregation: {}/{} platoons ready, missing: {:?}",
+                        node_id,
+                        platoon_summaries.len(),
+                        platoon_ids.len(),
+                        missing_platoons
+                    );
+                }
             }
-        }
 
-        // Aggregate when we have at least one platoon summary
-        // Note: In distributed P2P systems, we may not always have all platoons synced
-        // Relaxed from: platoon_summaries.len() == platoon_ids.len()
-        if !platoon_summaries.is_empty() {
-            // Log aggregation start
-            log_metrics(&MetricsEvent::AggregationStarted {
-                node_id: node_id.to_string(),
-                tier: "company".to_string(),
-                input_doc_type: "PlatoonSummary".to_string(),
-                input_count: platoon_summaries.len(),
-                timestamp_us: now_micros(),
-            });
+            // Aggregate when we have at least one platoon summary
+            // Note: In distributed P2P systems, we may not always have all platoons synced
+            // Relaxed from: platoon_summaries.len() == platoon_ids.len()
+            if !platoon_summaries.is_empty() {
+                // Build hierarchy breakdown for ATAK cell detail (before aggregation consumes summaries)
+                let seed = simulation::PositionSeed::from_env();
+                let squads_per_platoon: usize = 3;
+                let soldiers_per_squad: usize = 7;
+                let hierarchy_json: Vec<serde_json::Value> = platoon_summaries
+                    .iter()
+                    .map(|ps| {
+                        let plt_caps: Vec<String> = ps
+                            .aggregated_capabilities
+                            .iter()
+                            .map(|c| c.name.clone())
+                            .filter(|n| !n.is_empty())
+                            .collect();
+                        let plt_centroid = ps.position_centroid.as_ref();
+                        serde_json::json!({
+                            "id": ps.platoon_id,
+                            "type": "platoon",
+                            "squad_count": ps.squad_count,
+                            "member_count": ps.total_member_count,
+                            "readiness": format!("{:.0}%", ps.readiness_score * 100.0),
+                            "avg_fuel": format!("{:.0} min", ps.avg_fuel_minutes),
+                            "worst_health": match ps.worst_health {
+                                1 => "Nominal",
+                                2 => "Degraded",
+                                3 => "Critical",
+                                _ => "Unknown",
+                            },
+                            "capabilities": plt_caps,
+                            "center_lat": plt_centroid.map(|p| p.latitude).unwrap_or(0.0),
+                            "center_lon": plt_centroid.map(|p| p.longitude).unwrap_or(0.0),
+                        })
+                    })
+                    .collect();
+                // Build individual platform list embedded in the cell JSON.
+                // This avoids the multi-hop sync issue with the platforms collection.
+                // Positions are generated from the deterministic layout.
+                let mut embedded_platforms: Vec<serde_json::Value> = Vec::new();
+                let timestamp_ms = now_micros() / 1000;
+                for ps in &platoon_summaries {
+                    // Platoon leader
+                    let plt_leader = format!("{}-leader", ps.platoon_id);
+                    let (lat, lon) = seed.initial_position(&plt_leader);
+                    embedded_platforms.push(serde_json::json!({
+                        "id": &plt_leader, "platform_type": "platoon_leader", "name": &plt_leader,
+                        "status": "ACTIVE", "lat": lat, "lon": lon, "readiness": 1.0,
+                        "capabilities": ["Tactical Radio", "C2 Edge Compute"],
+                        "cell_id": &ps.platoon_id, "last_heartbeat": timestamp_ms,
+                    }));
+                    for s in 1..=squads_per_platoon {
+                        let squad_id = format!("{}-squad-{}", ps.platoon_id, s);
+                        // Squad leader
+                        let sq_leader = format!("{}-leader", squad_id);
+                        let (lat, lon) = seed.initial_position(&sq_leader);
+                        embedded_platforms.push(serde_json::json!({
+                            "id": &sq_leader, "platform_type": "squad_leader", "name": &sq_leader,
+                            "status": "ACTIVE", "lat": lat, "lon": lon, "readiness": 1.0,
+                            "capabilities": ["Tactical Radio"],
+                            "cell_id": &squad_id, "last_heartbeat": timestamp_ms,
+                        }));
+                        for m in 1..=soldiers_per_squad {
+                            let member_id = format!("{}-soldier-{}", squad_id, m);
+                            let platform_type = simulation::assign_platform_type(&member_id);
+                            let (lat, lon) = seed.initial_position(&member_id);
+                            let capabilities = simulation::generate_capabilities(
+                                &member_id,
+                                platform_type,
+                                "soldier",
+                            );
+                            let cap_names = simulation::capability_names(&capabilities);
+                            embedded_platforms.push(serde_json::json!({
+                                "id": &member_id, "platform_type": platform_type.as_str(),
+                                "name": &member_id, "status": "ACTIVE",
+                                "lat": lat, "lon": lon, "readiness": 1.0,
+                                "capabilities": cap_names,
+                                "cell_id": &squad_id, "last_heartbeat": timestamp_ms,
+                            }));
+                        }
+                    }
+                }
+                // Log aggregation start
+                log_metrics(&MetricsEvent::AggregationStarted {
+                    node_id: node_id.to_string(),
+                    tier: "company".to_string(),
+                    input_doc_type: "PlatoonSummary".to_string(),
+                    input_count: platoon_summaries.len(),
+                    timestamp_us: now_micros(),
+                });
 
-            let aggregation_start_time = now_micros();
-            let timestamp_us = aggregation_start_time;
+                let aggregation_start_time = now_micros();
+                let timestamp_us = aggregation_start_time;
 
-            // Aggregate into CompanySummary
-            match StateAggregator::aggregate_company(&company_id, &node_id, platoon_summaries) {
-                Ok(company_summary) => {
-                    let processing_time_us = now_micros() - aggregation_start_time;
-                    // Check if company summary document exists (create-once pattern)
-                    match coordinator.get_company_summary(&company_id).await {
-                        Ok(None) => {
-                            // First time - create document with latency tracking
-                            let crdt_start = Instant::now();
-                            if let Err(e) = coordinator
-                                .create_company_summary(&company_id, &company_summary)
-                                .await
-                            {
-                                eprintln!("[{}] Failed to create company summary: {}", node_id, e);
-                            } else {
-                                let crdt_latency_ms = crdt_start.elapsed().as_secs_f64() * 1000.0;
-                                println!(
-                                    "[{}] ✓ Created company {} ({} platoons, {} total members)",
-                                    node_id,
-                                    company_id,
-                                    company_summary.platoon_count,
-                                    company_summary.total_member_count
-                                );
-                                // Log CRDT create latency for Lab 4 analysis
-                                println!(
+                // Aggregate into CompanySummary
+                match StateAggregator::aggregate_company(&company_id, &node_id, platoon_summaries) {
+                    Ok(company_summary) => {
+                        let processing_time_us = now_micros() - aggregation_start_time;
+                        // Check if company summary document exists (create-once pattern)
+                        match coordinator.get_company_summary(&company_id).await {
+                            Ok(None) => {
+                                // First time - create document with latency tracking
+                                let crdt_start = Instant::now();
+                                if let Err(e) = coordinator
+                                    .create_company_summary(&company_id, &company_summary)
+                                    .await
+                                {
+                                    eprintln!(
+                                        "[{}] Failed to create company summary: {}",
+                                        node_id, e
+                                    );
+                                } else {
+                                    let crdt_latency_ms =
+                                        crdt_start.elapsed().as_secs_f64() * 1000.0;
+                                    println!(
+                                        "[{}] ✓ Created company {} ({} platoons, {} total members)",
+                                        node_id,
+                                        company_id,
+                                        company_summary.platoon_count,
+                                        company_summary.total_member_count
+                                    );
+                                    // Log CRDT create latency for Lab 4 analysis
+                                    println!(
                                     "METRICS: {{\"event_type\":\"CRDTUpsert\",\"node_id\":\"{}\",\"tier\":\"company_commander\",\"company_id\":\"{}\",\"operation\":\"create\",\"platoons_aggregated\":{},\"total_members\":{},\"latency_ms\":{:.3},\"timestamp_us\":{}}}",
                                     node_id, company_id, company_summary.platoon_count, company_summary.total_member_count, crdt_latency_ms, timestamp_us
                                 );
 
-                                // Log CompanySummaryCreated event for metrics tracking
-                                log_metrics(&MetricsEvent::CompanySummaryCreated {
-                                    node_id: node_id.to_string(),
-                                    company_id: company_id.clone(),
-                                    platoon_count: company_summary.platoon_count,
-                                    total_member_count: company_summary.total_member_count,
-                                    timestamp_us,
-                                });
+                                    // Log CompanySummaryCreated event for metrics tracking
+                                    log_metrics(&MetricsEvent::CompanySummaryCreated {
+                                        node_id: node_id.to_string(),
+                                        company_id: company_id.clone(),
+                                        platoon_count: company_summary.platoon_count,
+                                        total_member_count: company_summary.total_member_count,
+                                        timestamp_us,
+                                    });
+                                }
                             }
-                        }
-                        Ok(Some(_existing)) => {
-                            // Document exists - send delta update with latency tracking
-                            use peat_protocol::hierarchy::deltas::CompanyDelta;
-                            let delta =
-                                CompanyDelta::from_summary(&company_summary, timestamp_us as u64);
-
-                            let crdt_start = Instant::now();
-                            if let Err(e) =
-                                coordinator.update_company_summary(&company_id, delta).await
-                            {
-                                eprintln!("[{}] Failed to update company summary: {}", node_id, e);
-                            } else {
-                                let crdt_latency_ms = crdt_start.elapsed().as_secs_f64() * 1000.0;
-                                println!(
-                                    "[{}] ↑ Updated company {} ({} platoons, {} total members)",
-                                    node_id,
-                                    company_id,
-                                    company_summary.platoon_count,
-                                    company_summary.total_member_count
+                            Ok(Some(_existing)) => {
+                                // Document exists - send delta update with latency tracking
+                                use peat_protocol::hierarchy::deltas::CompanyDelta;
+                                let delta = CompanyDelta::from_summary(
+                                    &company_summary,
+                                    timestamp_us as u64,
                                 );
-                                // Log CRDT update latency for Lab 4 analysis
-                                println!(
+
+                                let crdt_start = Instant::now();
+                                if let Err(e) =
+                                    coordinator.update_company_summary(&company_id, delta).await
+                                {
+                                    eprintln!(
+                                        "[{}] Failed to update company summary: {}",
+                                        node_id, e
+                                    );
+                                } else {
+                                    let crdt_latency_ms =
+                                        crdt_start.elapsed().as_secs_f64() * 1000.0;
+                                    println!(
+                                        "[{}] ↑ Updated company {} ({} platoons, {} total members)",
+                                        node_id,
+                                        company_id,
+                                        company_summary.platoon_count,
+                                        company_summary.total_member_count
+                                    );
+                                    // Log CRDT update latency for Lab 4 analysis
+                                    println!(
                                     "METRICS: {{\"event_type\":\"CRDTUpsert\",\"node_id\":\"{}\",\"tier\":\"company_commander\",\"company_id\":\"{}\",\"operation\":\"delta_update\",\"platoons_aggregated\":{},\"total_members\":{},\"latency_ms\":{:.3},\"timestamp_us\":{}}}",
                                     node_id, company_id, company_summary.platoon_count, company_summary.total_member_count, crdt_latency_ms, timestamp_us
                                 );
 
-                                // Log CompanySummaryCreated event for metrics tracking
-                                log_metrics(&MetricsEvent::CompanySummaryCreated {
-                                    node_id: node_id.to_string(),
-                                    company_id: company_id.clone(),
-                                    platoon_count: company_summary.platoon_count,
-                                    total_member_count: company_summary.total_member_count,
-                                    timestamp_us,
-                                });
+                                    // Log CompanySummaryCreated event for metrics tracking
+                                    log_metrics(&MetricsEvent::CompanySummaryCreated {
+                                        node_id: node_id.to_string(),
+                                        company_id: company_id.clone(),
+                                        platoon_count: company_summary.platoon_count,
+                                        total_member_count: company_summary.total_member_count,
+                                        timestamp_us,
+                                    });
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("[{}] Failed to check company summary: {}", node_id, e);
                             }
                         }
-                        Err(e) => {
-                            eprintln!("[{}] Failed to check company summary: {}", node_id, e);
-                        }
-                    }
 
-                    // Log aggregation completed
-                    log_metrics(&MetricsEvent::AggregationCompleted {
-                        node_id: node_id.to_string(),
-                        tier: "company".to_string(),
-                        input_doc_type: "PlatoonSummary".to_string(),
-                        output_doc_type: "CompanySummary".to_string(),
-                        output_doc_id: format!("company-summary-{}", company_id),
-                        input_count: company_summary.platoon_count as usize,
-                        processing_time_us,
-                        timestamp_us: now_micros(),
-                        input_bytes: None,
-                        output_bytes: None,
-                        bytes_saved: None,
-                        reduction_ratio: Some(company_summary.platoon_count as f64),
-                    });
+                        // Log aggregation completed
+                        log_metrics(&MetricsEvent::AggregationCompleted {
+                            node_id: node_id.to_string(),
+                            tier: "company".to_string(),
+                            input_doc_type: "PlatoonSummary".to_string(),
+                            output_doc_type: "CompanySummary".to_string(),
+                            output_doc_id: format!("company-summary-{}", company_id),
+                            input_count: company_summary.platoon_count as usize,
+                            processing_time_us,
+                            timestamp_us: now_micros(),
+                            input_bytes: None,
+                            output_bytes: None,
+                            bytes_saved: None,
+                            reduction_ratio: Some(company_summary.platoon_count as f64),
+                        });
 
-                    // Log aggregation efficiency for Lab 4 analysis
-                    let reduction_ratio = company_summary.platoon_count as f64;
-                    println!(
+                        // Log aggregation efficiency for Lab 4 analysis
+                        let reduction_ratio = company_summary.platoon_count as f64;
+                        println!(
                         "METRICS: {{\"event_type\":\"AggregationEfficiency\",\"node_id\":\"{}\",\"tier\":\"company\",\"input_docs\":{},\"output_docs\":1,\"reduction_ratio\":{:.1},\"total_members\":{},\"timestamp_us\":{}}}",
                         node_id, company_summary.platoon_count, reduction_ratio, company_summary.total_member_count, now_micros()
                     );
-                }
-                Err(e) => {
-                    eprintln!("[{}] Failed to aggregate company: {}", node_id, e);
+
+                        // Publish company as a single rolled-up CellInfo for ATAK
+                        // The company is the unit visible at this level — platoons are sub-units
+                        // aggregated into the company's readiness, position, and member count.
+                        if let Some(ref cells) = cells_coll {
+                            let centroid = company_summary.position_centroid.as_ref();
+                            // Status based on member count — sim soldiers are always operational
+                            let status = if company_summary.total_member_count > 0 {
+                                "ACTIVE"
+                            } else {
+                                "OFFLINE"
+                            };
+                            // Map internal company ID to NATO display name
+                            let display_name = std::env::var("COMPANY_DISPLAY_NAME")
+                                .unwrap_or_else(|_| {
+                                    // Map company ID to NATO display name
+                                    match company_id.as_str() {
+                                        "company-ALPHA" => "ALPHA".to_string(),
+                                        "company-BRAVO" => "BRAVO".to_string(),
+                                        "company-CHARLIE" => "CHARLIE".to_string(),
+                                        "company-DELTA" => "DELTA".to_string(),
+                                        _ => company_id
+                                            .strip_prefix("company-")
+                                            .unwrap_or(&company_id)
+                                            .to_uppercase(),
+                                    }
+                                });
+
+                            // Extract real aggregated capability names from the CompanySummary
+                            // Collect detailed capability names from embedded platforms
+                            let mut detailed_caps: Vec<String> = embedded_platforms
+                                .iter()
+                                .filter_map(|p| p.get("capabilities"))
+                                .filter_map(|c| c.as_array())
+                                .flat_map(|arr| arr.iter())
+                                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                                .collect::<std::collections::HashSet<_>>()
+                                .into_iter()
+                                .collect();
+                            detailed_caps.sort();
+                            if detailed_caps.is_empty() {
+                                // Fallback to aggregated type names
+                                detailed_caps = company_summary
+                                    .aggregated_capabilities
+                                    .iter()
+                                    .map(|c| c.name.clone())
+                                    .filter(|n| !n.is_empty())
+                                    .collect();
+                            }
+
+                            let cell_json = serde_json::json!({
+                                "name": format!("{} ({} PLT, {} PAX)",
+                                    display_name,
+                                    company_summary.platoon_count,
+                                    company_summary.total_member_count),
+                                "status": status,
+                                "platform_count": company_summary.total_member_count,
+                                "center_lat": centroid.map(|p| p.latitude).unwrap_or(0.0),
+                                "center_lon": centroid.map(|p| p.longitude).unwrap_or(0.0),
+                                "capabilities": &detailed_caps,
+                                "formation_id": serde_json::Value::Null,
+                                "leader_id": company_summary.leader_id,
+                                "last_update": now_micros() / 1000,
+                                "readiness": format!("{:.0}%", company_summary.readiness_score * 100.0),
+                                "avg_fuel": format!("{:.0} min", company_summary.avg_fuel_minutes),
+                                "worst_health": match company_summary.worst_health {
+                                    1 => "Nominal",
+                                    2 => "Degraded",
+                                    3 => "Critical",
+                                    _ => "Unknown",
+                                },
+                                "hierarchy": hierarchy_json,
+                                "embedded_platforms": embedded_platforms,
+                            });
+                            if let Err(e) =
+                                cells.upsert(&company_id, cell_json.to_string().into_bytes())
+                            {
+                                eprintln!("[{}] Failed to publish company cell: {}", node_id, e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("[{}] Failed to aggregate company: {}", node_id, e);
+                    }
                 }
             }
-        }
-    };
+        };
+
+    // NOTE: Platform markers are generated client-side in the ATAK plugin from
+    // the cell hierarchy data. No need to publish individual platform docs to the
+    // CRDT store — doing so causes unbounded memory growth from Automerge revision
+    // history accumulation.
 
     // Track last aggregation time for periodic fallback (Issue #493 - recovery time fix)
     let mut last_aggregation = Instant::now();
@@ -1451,6 +1658,7 @@ async fn company_commander_aggregation_loop(
                                             company_id.clone(),
                                             node_id.clone(),
                                             platoon_ids.clone(),
+                                            cells_collection.clone(),
                                         )
                                         .await;
                                     }
@@ -1524,6 +1732,7 @@ async fn company_commander_aggregation_loop(
                                         company_id.clone(),
                                         node_id.clone(),
                                         platoon_ids.clone(),
+                                        cells_collection.clone(),
                                     )
                                     .await;
                                 }
@@ -1546,6 +1755,7 @@ async fn company_commander_aggregation_loop(
                         company_id.clone(),
                         node_id.clone(),
                         platoon_ids.clone(),
+                        cells_collection.clone(),
                     )
                     .await;
                     last_aggregation = Instant::now();
@@ -2159,7 +2369,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 );
 
                 let company_id =
-                    std::env::var("COMPANY_ID").unwrap_or_else(|_| "company-1".to_string());
+                    std::env::var("COMPANY_ID").unwrap_or_else(|_| "company-ALPHA".to_string());
 
                 // Create observer for platoon summaries arriving via P2P mesh
                 let change_stream_result = backend.document_store().observe(
@@ -2199,6 +2409,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     coordinator,
                                     company_id,
                                     node_id_clone.clone(),
+                                    None, // Ditto backend — no cells collection
                                 )
                                 .await
                                 {
@@ -2250,8 +2461,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                                     let node_id_clone = node_id.clone();
 
+                                    // Get cells + platforms collections for ATAK publishing
+                                    let cells_coll: Option<
+                                        Arc<dyn peat_protocol::storage::Collection>,
+                                    > = Some(
+                                        automerge_backend.storage_backend().collection("cells"),
+                                    );
                                     println!(
-                                        "[{}] → Company: {} (AutomergeIroh)",
+                                        "[{}] → Company: {} (AutomergeIroh, cells publishing enabled)",
                                         node_id, company_id
                                     );
 
@@ -2261,6 +2478,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                             coordinator,
                                             company_id,
                                             node_id_clone.clone(),
+                                            cells_coll,
                                         )
                                         .await
                                         {
@@ -2333,10 +2551,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let result = match mode.as_str() {
         "writer" => writer_mode(&*backend, &node_id, &node_type, update_rate_ms).await,
         "reader" => reader_mode(&*backend, &node_id).await,
-        "hierarchical" => {
-            // In hierarchical mode, nodes run aggregation simulation without ack test
-            hierarchical_mode(&*backend, &node_id, &node_type, update_rate_ms).await
-        }
+        "hierarchical" => hierarchical_mode(&*backend, &node_id, &node_type, update_rate_ms).await,
         "flat_mesh" => {
             // Lab 3b: Flat P2P mesh with Peat CRDT (all nodes at same tier)
             flat_mesh_mode(&*backend, &node_id, &node_type, update_rate_ms).await
@@ -2961,107 +3176,107 @@ async fn hierarchical_mode(
     }
 }
 
-/// Soldier capability mode: Send N updates with capabilities, wait for squad summary
+/// Soldier capability mode: Send periodic updates with dynamic position, fuel, health, and capabilities.
 async fn soldier_capability_mode(
     backend: &dyn DataSyncBackend,
     node_id: &str,
-    node_type: &str,
+    _node_type: &str,
     update_rate_ms: u64,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    println!("[{}] Running as SOLDIER with capability reporting", node_id);
+    // Determine platform type and initialize simulation state
+    let platform_type = simulation::assign_platform_type(node_id);
+    let seed = simulation::PositionSeed::from_env();
+    let mut sim_state = simulation::NodeSimState::new(node_id, platform_type, &seed);
+    let capabilities = simulation::generate_capabilities(node_id, platform_type, "soldier");
+    let cap_names = simulation::capability_names(&capabilities);
+
+    println!(
+        "[{}] Running as {} with {} capabilities (center: {:.4}, {:.4})",
+        node_id,
+        platform_type.as_str(),
+        capabilities.len(),
+        seed.center_lat,
+        seed.center_lon,
+    );
+    for cap in &cap_names {
+        println!("[{}]   - {}", node_id, cap);
+    }
 
     // Mission parameters - run indefinitely unless MAX_UPDATES is set
     let max_updates: u64 = std::env::var("MAX_UPDATES")
         .ok()
         .and_then(|s| s.parse().ok())
-        .unwrap_or(u64::MAX); // Default: run forever
+        .unwrap_or(u64::MAX);
 
     let update_interval = Duration::from_millis(update_rate_ms);
+    let dt_secs = update_rate_ms as f64 / 1000.0;
     let mut message_number: u64 = 0;
     let doc_id = format!("sim_doc_{}", node_id);
-    let _start_time = Instant::now();
 
-    // Generate soldier capabilities (simple test data for now)
-    let capabilities = generate_soldier_capabilities(node_id);
-    println!(
-        "[{}] Generated {} capabilities:",
-        node_id,
-        capabilities.len()
-    );
-    for cap in &capabilities {
-        println!("[{}]   - {} (confidence: {:.2})", node_id, cap, 0.85);
-    }
-
-    // Send status updates with capabilities (runs until MAX_UPDATES or forever)
     while message_number < max_updates {
         message_number += 1;
+        sim_state.tick(dt_secs);
         let timestamp_us = now_micros();
+        let (lat, lon) = sim_state.position;
 
-        // Create update message with capabilities
-        let message_content = format!(
-            "Status update #{} from {} - Capabilities: {}",
-            message_number,
-            node_id,
-            capabilities.join(", ")
-        );
-
-        // Create document fields including capabilities
+        // Create document fields with dynamic state
         let mut fields = HashMap::new();
-        fields.insert(
-            "message".to_string(),
-            Value::String(message_content.clone()),
-        );
         fields.insert("timestamp_us".to_string(), serde_json::json!(timestamp_us));
         fields.insert("created_by".to_string(), Value::String(node_id.to_string()));
         fields.insert(
             "node_type".to_string(),
-            Value::String(node_type.to_string()),
+            Value::String(platform_type.as_str().to_string()),
         );
         fields.insert(
             "message_number".to_string(),
             serde_json::json!(message_number),
         );
+        fields.insert("lat".to_string(), serde_json::json!(lat));
+        fields.insert("lon".to_string(), serde_json::json!(lon));
+        fields.insert(
+            "fuel_minutes".to_string(),
+            serde_json::json!(sim_state.fuel_minutes_u32()),
+        );
+        fields.insert("health".to_string(), serde_json::json!(sim_state.health));
         fields.insert(
             "capabilities".to_string(),
-            Value::Array(
-                capabilities
-                    .iter()
-                    .map(|c| Value::String(c.clone()))
-                    .collect(),
-            ),
+            Value::Array(cap_names.iter().map(|c| Value::String(c.clone())).collect()),
         );
         fields.insert("public".to_string(), Value::Bool(true));
 
         let document = Document::with_id(doc_id.clone(), fields.clone());
 
-        // Insert/update document with latency tracking
         let crdt_start = Instant::now();
         backend.document_store().upsert("sim_poc", document).await?;
         let crdt_latency_ms = crdt_start.elapsed().as_secs_f64() * 1000.0;
 
+        // NOTE: Platform markers are generated client-side in ATAK.
+        // No CRDT platform publishing — causes OOM from revision accumulation.
+
         let message_json = serde_json::to_string(&fields)?;
         let message_size_bytes = message_json.len();
 
-        // Log CRDT upsert latency for Lab 4 analysis
         println!(
-            "METRICS: {{\"event_type\":\"CRDTUpsert\",\"node_id\":\"{}\",\"tier\":\"soldier\",\"message_number\":{},\"latency_ms\":{:.3},\"timestamp_us\":{}}}",
-            node_id, message_number, crdt_latency_ms, timestamp_us
+            "METRICS: {{\"event_type\":\"CRDTUpsert\",\"node_id\":\"{}\",\"tier\":\"soldier\",\"platform_type\":\"{}\",\"message_number\":{},\"lat\":{:.6},\"lon\":{:.6},\"fuel\":{},\"health\":{},\"latency_ms\":{:.3},\"timestamp_us\":{}}}",
+            node_id, platform_type.as_str(), message_number, lat, lon, sim_state.fuel_minutes_u32(), sim_state.health, crdt_latency_ms, timestamp_us
         );
 
-        // Log progress every 10 updates or if running limited test
         if max_updates < 100 || message_number % 10 == 0 {
             println!(
-                "[{}] ✓ Status update #{} sent ({} bytes, {} capabilities)",
+                "[{}] ✓ {} update #{} — pos=({:.5},{:.5}) fuel={} health={}",
                 node_id,
+                platform_type.as_str(),
                 message_number,
-                message_size_bytes,
-                capabilities.len()
+                lat,
+                lon,
+                sim_state.fuel_minutes_u32(),
+                sim_state.health
             );
         }
 
         log_metrics(&MetricsEvent::MessageSent {
             node_id: node_id.to_string(),
-            node_type: node_type.to_string(),
+            node_type: platform_type.as_str().to_string(),
             message_number,
             message_size_bytes,
             timestamp_us,
@@ -3216,91 +3431,64 @@ async fn soldier_capability_mode(
 async fn leader_status_mode(
     backend: &dyn DataSyncBackend,
     node_id: &str,
-    node_type: &str,
+    _node_type: &str,
     update_rate_ms: u64,
     role: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let seed = simulation::PositionSeed::from_env();
+    let (lat, lon) = seed.initial_position(node_id);
+    let capabilities =
+        simulation::generate_capabilities(node_id, simulation::PlatformType::Soldier, role);
+    let cap_names = simulation::capability_names(&capabilities);
+
     println!(
-        "[{}] Running as {} with status heartbeat",
+        "[{}] Running as {} at ({:.5}, {:.5}) with {} capabilities",
         node_id,
-        role.to_uppercase()
+        role.to_uppercase(),
+        lat,
+        lon,
+        cap_names.len()
     );
 
-    // Leaders run indefinitely until lab is destroyed
     let update_interval = Duration::from_millis(update_rate_ms);
     let mut message_number: u64 = 0;
     let doc_id = format!("sim_doc_{}", node_id);
-    let _start_time = Instant::now();
 
     loop {
         message_number += 1;
         let timestamp_us = now_micros();
 
-        let message_content = format!(
-            "Leader heartbeat #{} from {} ({})",
-            message_number, node_id, role
-        );
-
         let mut fields = HashMap::new();
-        fields.insert("message".to_string(), Value::String(message_content));
         fields.insert("timestamp_us".to_string(), serde_json::json!(timestamp_us));
         fields.insert("created_by".to_string(), Value::String(node_id.to_string()));
-        fields.insert(
-            "node_type".to_string(),
-            Value::String(node_type.to_string()),
-        );
+        fields.insert("node_type".to_string(), Value::String(role.to_string()));
         fields.insert("role".to_string(), Value::String(role.to_string()));
         fields.insert(
             "message_number".to_string(),
             serde_json::json!(message_number),
+        );
+        fields.insert("lat".to_string(), serde_json::json!(lat));
+        fields.insert("lon".to_string(), serde_json::json!(lon));
+        fields.insert("fuel_minutes".to_string(), serde_json::json!(100u32));
+        fields.insert("health".to_string(), serde_json::json!(1i32));
+        fields.insert(
+            "capabilities".to_string(),
+            Value::Array(cap_names.iter().map(|c| Value::String(c.clone())).collect()),
         );
         fields.insert("public".to_string(), Value::Bool(true));
 
         let document = Document::with_id(doc_id.clone(), fields);
         backend.document_store().upsert("sim_poc", document).await?;
 
+        // NOTE: Platform markers are generated client-side in ATAK.
+        // No CRDT platform publishing — causes OOM from revision accumulation.
+
         if message_number % 10 == 0 {
-            println!("[{}] ✓ Leader heartbeat #{}", node_id, message_number);
+            println!("[{}] ✓ {} heartbeat #{}", node_id, role, message_number);
         }
 
         sleep(update_interval).await;
     }
-}
-
-/// Generate simple test capabilities for a soldier node
-fn generate_soldier_capabilities(node_id: &str) -> Vec<String> {
-    // Simple capability generation based on node ID hash
-    // In production, this would be based on actual platform specs
-    let hash = node_id
-        .chars()
-        .fold(0u32, |acc, c| acc.wrapping_add(c as u32));
-
-    let mut caps = vec![];
-
-    // Every soldier has basic capabilities
-    caps.push("communications:radio".to_string());
-    caps.push("mobility:ground".to_string());
-
-    // Add varied capabilities based on hash
-    if hash % 3 == 0 {
-        caps.push("sensor:thermal".to_string());
-    }
-    if hash % 3 == 1 {
-        caps.push("sensor:optical".to_string());
-    }
-    if hash % 3 == 2 {
-        caps.push("sensor:acoustic".to_string());
-    }
-
-    if hash % 4 == 0 {
-        caps.push("compute:edge".to_string());
-    }
-
-    if hash % 5 == 0 {
-        caps.push("payload:supply".to_string());
-    }
-
-    caps
 }
 
 /// Lab 3b: Flat P2P mesh mode with Peat CRDT

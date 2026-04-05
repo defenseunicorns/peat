@@ -30,7 +30,7 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
     companion object {
         private const val TAG = "PeatPluginLifecycle"
         const val DEFAULT_MESH_ID = "WEARTAK"
-        const val DEFAULT_CELL_ID = "ALPHA"
+        const val DEFAULT_CELL_ID = "BRAVO"
 
         /**
          * NATO phonetic alphabet for cell naming.
@@ -46,6 +46,10 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
 
         // Configuration defaults
         const val DEFAULT_CANNED_MESSAGE_TTL_SECONDS = 300  // 5 minutes
+
+        // Sim mesh peer defaults (lab4-48n company-ALPHA-commander on demo machine)
+        const val DEFAULT_SIM_PEER_ADDRESS = "192.168.1.96:12345"
+        const val DEFAULT_SIM_PEER_NODE_ID = "a2f09263cd8c639c2f0898aaf068f6ae67c0a475623e5122fa51ed0700f10dc7"
 
         @Volatile
         private var instance: PeatPluginLifecycle? = null
@@ -112,7 +116,7 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
         // If the peat-ffi node was created with enableBle=true, we don't need
         // the deprecated PeatBleManager. However, during the transition period,
         // we keep PeatBleManager as a fallback for Android BLE adapter integration.
-        val prefs = context.getSharedPreferences("peat_prefs", Context.MODE_PRIVATE)
+        val prefs = (context.applicationContext ?: context).getSharedPreferences("peat_prefs", Context.MODE_PRIVATE)
         val unifiedBleEnabled = prefs.getBoolean("enable_ble", true)
 
         // M5 Migration: PeatBleManager is deprecated. Features will migrate to
@@ -165,17 +169,8 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
 
     private fun createPeatNodeJni(context: Context) {
         try {
-            // IMPORTANT: Clean up any existing node before creating a new one.
-            // This prevents database lock issues when plugin reloads without ATAK restart.
-            if (peatNodeJni != null) {
-                Log.i(TAG, "Destroying existing Peat node before creating new one")
-                try {
-                    peatNodeJni?.close()
-                } catch (e: Exception) {
-                    Log.w(TAG, "Error closing previous node: ${e.message}")
-                }
-                peatNodeJni = null
-            }
+            // Clear Kotlin reference — we'll try to recover the native handle via getInstance()
+            peatNodeJni = null
 
             // Create storage directory for Peat data
             // CRITICAL: redb uses mmap which DOES NOT work on Android's FUSE-mounted
@@ -192,37 +187,46 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
             Log.d(TAG, "Peat dir: ${peatDir.absolutePath}")
             Log.d(TAG, "Peat dir exists: ${peatDir.exists()}, writable: ${peatDir.canWrite()}, readable: ${peatDir.canRead()}")
 
-            // Get Peat formation credentials from system properties or defaults
+            // Get Peat formation credentials from system properties, env, SharedPreferences, or build defaults
+            val credPrefs = context.getSharedPreferences("peat_creds", Context.MODE_PRIVATE)
             val appId = System.getProperty("peat.app_id")
                 ?: System.getenv("PEAT_APP_ID")
-                ?: "default-atak-formation"
+                ?: credPrefs.getString("peat_app_id", null)
+                ?: "default-formation"
 
             val sharedKey = System.getProperty("peat.shared_key")
                 ?: System.getenv("PEAT_SHARED_KEY")
-                ?: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" // 32 zero bytes base64
+                ?: credPrefs.getString("peat_shared_key", null)
+                ?: "2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU="
 
             // Get BLE configuration from preferences
-            val prefs = context.getSharedPreferences("peat_prefs", Context.MODE_PRIVATE)
+            val prefs = (context.applicationContext ?: context).getSharedPreferences("peat_prefs", Context.MODE_PRIVATE)
             val enableBle = prefs.getBoolean("enable_ble", true) // Enable BLE by default (ADR-039)
             val blePowerProfile = prefs.getString("ble_power_profile", "balanced")
 
             Log.d(TAG, "Using Peat formation: $appId")
             Log.d(TAG, "Creating Peat node with storage: ${peatDir.absolutePath}, BLE: $enableBle")
 
-            // Use unified transport with BLE enabled (ADR-039, #558)
-            // This integrates BLE as a transport within peat-ffi rather than running
-            // parallel BLE and Iroh meshes.
-            peatNodeJni = PeatNodeJni.createWithConfig(
-                appId,
-                sharedKey,
-                peatDir.absolutePath,
-                enableBle = enableBle,
-                blePowerProfile = blePowerProfile
-            )
+            // Try to recover existing node first (survives plugin reload within same ATAK process)
+            peatNodeJni = PeatNodeJni.getInstance()
+            if (peatNodeJni != null) {
+                Log.i(TAG, "Recovered existing Peat node from global handle")
+            }
+
+            // Create new node only if no existing one found
+            if (peatNodeJni == null) {
+                peatNodeJni = PeatNodeJni.createWithConfig(
+                    appId,
+                    sharedKey,
+                    peatDir.absolutePath,
+                    enableBle = enableBle,
+                    blePowerProfile = blePowerProfile
+                )
+            }
 
             if (peatNodeJni != null) {
                 val nodeId = peatNodeJni?.nodeId() ?: "unknown"
-                Log.i(TAG, "Peat node created - ID: ${nodeId.take(16)}... (unified transport, BLE: $enableBle)")
+                Log.i(TAG, "Peat node ready - ID: ${nodeId.take(16)}... (unified transport, BLE: $enableBle)")
 
                 // Signal BLE transport as started if BLE is enabled (ADR-047)
                 if (enableBle) {
@@ -237,6 +241,14 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
                 // Start sync
                 val syncStarted = peatNodeJni?.startSync() ?: false
                 Log.i(TAG, "Peat sync started: $syncStarted, peer count: ${peatNodeJni?.peerCount() ?: 0}")
+
+                // Auto-connect to sim peer if configured
+                Log.i(TAG, "Checking sim peer config...")
+                try {
+                    connectSimPeerIfConfigured(context)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Sim peer auto-connect failed: ${e.message}", e)
+                }
             } else {
                 Log.e(TAG, "Failed to create Peat node (returned null)")
             }
@@ -338,7 +350,7 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
         currentCellId = cellId
 
         // Persist to preferences
-        val prefs = context.getSharedPreferences("peat_prefs", Context.MODE_PRIVATE)
+        val prefs = (context.applicationContext ?: context).getSharedPreferences("peat_prefs", Context.MODE_PRIVATE)
         prefs.edit().putString("cell_id", cellId).apply()
     }
 
@@ -349,7 +361,7 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
 
     fun setMeshId(context: Context, meshId: String) {
         // Save to preferences
-        val prefs = context.getSharedPreferences("peat_prefs", Context.MODE_PRIVATE)
+        val prefs = (context.applicationContext ?: context).getSharedPreferences("peat_prefs", Context.MODE_PRIVATE)
         prefs.edit().putString("mesh_id", meshId).apply()
 
         // Fully destroy old BLE mesh before creating new one
@@ -375,7 +387,7 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
      * Controls how long ACK-tracked messages are kept in memory.
      */
     fun getCannedMessageTtlSeconds(context: Context): Int {
-        val prefs = context.getSharedPreferences("peat_prefs", Context.MODE_PRIVATE)
+        val prefs = (context.applicationContext ?: context).getSharedPreferences("peat_prefs", Context.MODE_PRIVATE)
         return prefs.getInt("canned_message_ttl_seconds", DEFAULT_CANNED_MESSAGE_TTL_SECONDS)
     }
 
@@ -384,7 +396,7 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
      * Changes take effect immediately without restart.
      */
     fun setCannedMessageTtlSeconds(context: Context, ttlSeconds: Int) {
-        val prefs = context.getSharedPreferences("peat_prefs", Context.MODE_PRIVATE)
+        val prefs = (context.applicationContext ?: context).getSharedPreferences("peat_prefs", Context.MODE_PRIVATE)
         prefs.edit().putInt("canned_message_ttl_seconds", ttlSeconds).apply()
         Log.i(TAG, "[CONFIG] Canned message TTL set to ${ttlSeconds}s")
 
@@ -394,4 +406,107 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
 
     // Callback for config changes (optional - components can register to receive updates)
     var onConfigChanged: ((key: String, value: Any) -> Unit)? = null
+
+    // ==================== Sim Mesh Peer Connection ====================
+
+    /**
+     * Get the saved sim peer address (IP:port for QUIC connection to sim mesh).
+     */
+    fun getSimPeerAddress(context: Context): String {
+        val prefs = (context.applicationContext ?: context).getSharedPreferences("peat_prefs", Context.MODE_PRIVATE)
+        return prefs.getString("sim_peer_address", null)
+            ?: System.getProperty("peat.sim_peer_address")
+            ?: DEFAULT_SIM_PEER_ADDRESS
+    }
+
+    /**
+     * Save the sim peer address.
+     */
+    fun setSimPeerAddress(context: Context, address: String) {
+        val prefs = (context.applicationContext ?: context).getSharedPreferences("peat_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putString("sim_peer_address", address).apply()
+        Log.i(TAG, "[CONFIG] Sim peer address set to: $address")
+    }
+
+    /**
+     * Get the saved sim peer node ID (hex-encoded Iroh endpoint ID).
+     */
+    fun getSimPeerNodeId(context: Context): String {
+        val prefs = (context.applicationContext ?: context).getSharedPreferences("peat_prefs", Context.MODE_PRIVATE)
+        return prefs.getString("sim_peer_node_id", null)
+            ?: System.getProperty("peat.sim_peer_node_id")
+            ?: DEFAULT_SIM_PEER_NODE_ID
+    }
+
+    /**
+     * Save the sim peer node ID.
+     */
+    fun setSimPeerNodeId(context: Context, nodeId: String) {
+        val prefs = (context.applicationContext ?: context).getSharedPreferences("peat_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putString("sim_peer_node_id", nodeId).apply()
+        Log.i(TAG, "[CONFIG] Sim peer node ID set to: ${nodeId.take(16)}...")
+    }
+
+    /**
+     * Auto-connect to sim peer on startup if address and node ID are configured.
+     */
+    private fun connectSimPeerIfConfigured(context: Context) {
+        val address = getSimPeerAddress(context)
+        val nodeId = getSimPeerNodeId(context)
+        Log.i(TAG, "Sim peer config: address='$address', nodeId='${nodeId.take(16)}...'")
+        if (address.isNotBlank() && nodeId.isNotBlank()) {
+            Log.i(TAG, "Sim peer configured, auto-connecting to $address...")
+            // Connect and maintain connection in background
+            // Reconnects if QUIC drops (idle timeout ~60s)
+            // Publishes heartbeat to generate sync traffic and keep connection alive
+            Thread {
+                while (true) {
+                    try {
+                        val peerCount = getPeatNodeJni()?.peerCount() ?: 0
+                        if (peerCount == 0) {
+                            val result = connectSimPeer(context)
+                            Log.i(TAG, "Sim peer connect attempt: $result")
+                        }
+                        // No heartbeat publishing — platform markers are generated
+                        // client-side from cell hierarchy data. Writing to the CRDT
+                        // store causes unbounded memory growth (Automerge revision history).
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Sim peer maintenance error: ${e.message}")
+                    }
+                    Thread.sleep(30_000)
+                }
+            }.start()
+        } else {
+            Log.i(TAG, "Sim peer not configured (address blank=${address.isBlank()}, nodeId blank=${nodeId.isBlank()})")
+        }
+    }
+
+    /**
+     * Connect to the configured sim mesh peer over QUIC.
+     * @return true if connection was initiated, false if config is missing or connection failed
+     */
+    fun connectSimPeer(context: Context): Boolean {
+        val address = getSimPeerAddress(context)
+        val nodeId = getSimPeerNodeId(context)
+
+        if (address.isBlank() || nodeId.isBlank()) {
+            Log.w(TAG, "Cannot connect to sim peer: address or node ID not configured")
+            return false
+        }
+
+        val node = getPeatNodeJni()
+        if (node == null) {
+            Log.e(TAG, "Cannot connect to sim peer: Peat node not initialized")
+            return false
+        }
+
+        return try {
+            val result = node.connectPeer(nodeId, address)
+            Log.i(TAG, "Sim peer connection initiated: $result (addr=$address, id=${nodeId.take(16)}...)")
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to connect to sim peer: ${e.message}", e)
+            false
+        }
+    }
 }

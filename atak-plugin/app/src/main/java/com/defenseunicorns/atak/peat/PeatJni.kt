@@ -130,6 +130,15 @@ object PeatJni {
     external fun connectedPeersJni(handle: Long): String
 
     /**
+     * Request a full document sync with all connected peers.
+     * Pushes all local documents and pulls any new documents from peers.
+     * @param handle Node handle from createNodeJni
+     * @return true if sync was triggered successfully
+     */
+    @JvmStatic
+    external fun requestSyncJni(handle: Long): Boolean
+
+    /**
      * Start sync for a node.
      * @param handle Node handle from createNodeJni
      * @return true if sync started successfully
@@ -415,6 +424,12 @@ class PeatNodeJni private constructor(private val handle: Long) : AutoCloseable 
     fun startSync(): Boolean = PeatJni.startSyncJni(handle)
 
     /**
+     * Request full document sync with all connected peers.
+     * @return true if sync was triggered
+     */
+    fun requestSync(): Boolean = PeatJni.requestSyncJni(handle)
+
+    /**
      * Get all cells as JSON array string.
      * @return JSON array of cell objects
      */
@@ -438,6 +453,16 @@ class PeatNodeJni private constructor(private val handle: Long) : AutoCloseable 
      * @return true if published successfully
      */
     fun publishPlatform(platformJson: String): Boolean = PeatJni.publishPlatformJni(handle, platformJson)
+
+    /**
+     * Connect to a known peer by node ID and address (bypasses mDNS discovery).
+     * Used for connecting to sim mesh nodes over WiFi/QUIC.
+     * @param nodeId Hex-encoded endpoint ID of the peer
+     * @param address Address string (e.g. "192.168.1.100:12345")
+     * @return true if connection initiated successfully
+     */
+    fun connectPeer(nodeId: String, address: String): Boolean =
+        PeatJni.connectPeerJni(handle, nodeId, address)
 
     // ========================================================================
     // BLE Transport Methods (ADR-047 Android Bootstrap)
