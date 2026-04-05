@@ -45,8 +45,7 @@ pub fn offset_position(start: (f64, f64), bearing_deg: f64, distance_m: f64) -> 
     let d = distance_m / EARTH_RADIUS_M;
 
     let lat2 = (lat1.sin() * d.cos() + lat1.cos() * d.sin() * brng.cos()).asin();
-    let lon2 =
-        lon1 + (brng.sin() * d.sin() * lat1.cos()).atan2(d.cos() - lat1.sin() * lat2.sin());
+    let lon2 = lon1 + (brng.sin() * d.sin() * lat1.cos()).atan2(d.cos() - lat1.sin() * lat2.sin());
 
     (lat2.to_degrees(), lon2.to_degrees())
 }
@@ -198,9 +197,9 @@ impl PlatformType {
     /// Soldiers: ~5.5hr patrol endurance. UGV: ~3.3hr battery. UAV: ~2hr flight time.
     pub fn fuel_drain_per_tick(&self) -> f64 {
         match self {
-            PlatformType::Soldier => 0.3,  // ~330 min endurance
-            PlatformType::Ugv => 0.5,      // ~200 min battery
-            PlatformType::Uav => 0.8,      // ~125 min flight time
+            PlatformType::Soldier => 0.3, // ~330 min endurance
+            PlatformType::Ugv => 0.5,     // ~200 min battery
+            PlatformType::Uav => 0.8,     // ~125 min flight time
         }
     }
 
@@ -317,6 +316,7 @@ impl NodeSimState {
     }
 
     /// Readiness score based on fuel and health (0.0 - 1.0).
+    #[allow(dead_code)]
     pub fn readiness(&self) -> f64 {
         let fuel_factor = (self.fuel_minutes / 100.0).min(1.0);
         let health_factor = match self.health {
@@ -334,65 +334,218 @@ impl NodeSimState {
 // ============================================================================
 
 /// Generate role-appropriate capabilities for a node.
-pub fn generate_capabilities(node_id: &str, platform_type: PlatformType, role: &str) -> Vec<Capability> {
+pub fn generate_capabilities(
+    node_id: &str,
+    platform_type: PlatformType,
+    role: &str,
+) -> Vec<Capability> {
     let mut caps = Vec::new();
 
     match role {
         "company_commander" => {
-            caps.push(Capability::new("comm-cmd".into(), "Tactical Radio".into(), CapabilityType::Communication, 0.99));
-            caps.push(Capability::new("compute-cmd".into(), "C2 Edge Compute".into(), CapabilityType::Compute, 0.95));
+            caps.push(Capability::new(
+                "comm-cmd".into(),
+                "Tactical Radio".into(),
+                CapabilityType::Communication,
+                0.99,
+            ));
+            caps.push(Capability::new(
+                "compute-cmd".into(),
+                "C2 Edge Compute".into(),
+                CapabilityType::Compute,
+                0.95,
+            ));
         }
         "platoon_leader" => {
-            caps.push(Capability::new("comm-plt".into(), "Tactical Radio".into(), CapabilityType::Communication, 0.98));
-            caps.push(Capability::new("compute-plt".into(), "Edge Compute".into(), CapabilityType::Compute, 0.9));
+            caps.push(Capability::new(
+                "comm-plt".into(),
+                "Tactical Radio".into(),
+                CapabilityType::Communication,
+                0.98,
+            ));
+            caps.push(Capability::new(
+                "compute-plt".into(),
+                "Edge Compute".into(),
+                CapabilityType::Compute,
+                0.9,
+            ));
         }
         "squad_leader" => {
-            caps.push(Capability::new("comm-sql".into(), "Squad Radio".into(), CapabilityType::Communication, 0.95));
-            caps.push(Capability::new("sensor-sql".into(), "Optical Sensor".into(), CapabilityType::Sensor, 0.9));
-            caps.push(Capability::new("compute-sql".into(), "Edge Compute".into(), CapabilityType::Compute, 0.8));
+            caps.push(Capability::new(
+                "comm-sql".into(),
+                "Squad Radio".into(),
+                CapabilityType::Communication,
+                0.95,
+            ));
+            caps.push(Capability::new(
+                "sensor-sql".into(),
+                "Optical Sensor".into(),
+                CapabilityType::Sensor,
+                0.9,
+            ));
+            caps.push(Capability::new(
+                "compute-sql".into(),
+                "Edge Compute".into(),
+                CapabilityType::Compute,
+                0.8,
+            ));
         }
         _ => {
             // Soldier-tier nodes: capabilities vary by platform type
             match platform_type {
                 PlatformType::Soldier => {
-                    caps.push(Capability::new("comm-sol".into(), "PRC-163 Radio".into(), CapabilityType::Communication, 0.9));
-                    caps.push(Capability::new("mob-sol".into(), "Dismounted".into(), CapabilityType::Mobility, 0.85));
+                    caps.push(Capability::new(
+                        "comm-sol".into(),
+                        "PRC-163 Radio".into(),
+                        CapabilityType::Communication,
+                        0.9,
+                    ));
+                    caps.push(Capability::new(
+                        "mob-sol".into(),
+                        "Dismounted".into(),
+                        CapabilityType::Mobility,
+                        0.85,
+                    ));
 
                     // Specialist by soldier index
-                    let idx = node_id.split('-').last().and_then(|s| s.parse::<usize>().ok()).unwrap_or(1);
+                    let idx = node_id
+                        .split('-')
+                        .next_back()
+                        .and_then(|s| s.parse::<usize>().ok())
+                        .unwrap_or(1);
                     match idx {
                         1 => {
-                            caps.push(Capability::new("sensor-therm".into(), "FLIR ThermoSight".into(), CapabilityType::Sensor, 0.8));
-                            caps.push(Capability::new("sensor-lrf".into(), "Laser Rangefinder".into(), CapabilityType::Sensor, 0.9));
+                            caps.push(Capability::new(
+                                "sensor-therm".into(),
+                                "FLIR ThermoSight".into(),
+                                CapabilityType::Sensor,
+                                0.8,
+                            ));
+                            caps.push(Capability::new(
+                                "sensor-lrf".into(),
+                                "Laser Rangefinder".into(),
+                                CapabilityType::Sensor,
+                                0.9,
+                            ));
                         }
-                        2 => caps.push(Capability::new("sensor-opt".into(), "LPVO Optic".into(), CapabilityType::Sensor, 0.85)),
+                        2 => caps.push(Capability::new(
+                            "sensor-opt".into(),
+                            "LPVO Optic".into(),
+                            CapabilityType::Sensor,
+                            0.85,
+                        )),
                         3 => {
-                            caps.push(Capability::new("compute-edge".into(), "ATAK EUD".into(), CapabilityType::Compute, 0.7));
-                            caps.push(Capability::new("comm-mesh".into(), "MANET Relay".into(), CapabilityType::Communication, 0.8));
+                            caps.push(Capability::new(
+                                "compute-edge".into(),
+                                "ATAK EUD".into(),
+                                CapabilityType::Compute,
+                                0.7,
+                            ));
+                            caps.push(Capability::new(
+                                "comm-mesh".into(),
+                                "MANET Relay".into(),
+                                CapabilityType::Communication,
+                                0.8,
+                            ));
                         }
-                        4 => caps.push(Capability::new("payload-cas".into(), "CASEVAC Kit".into(), CapabilityType::Payload, 0.9)),
+                        4 => caps.push(Capability::new(
+                            "payload-cas".into(),
+                            "CASEVAC Kit".into(),
+                            CapabilityType::Payload,
+                            0.9,
+                        )),
                         _ => {}
                     }
                 }
                 PlatformType::Ugv => {
                     // Tracked UGV — sensor-heavy ISR/logistics platform
-                    caps.push(Capability::new("comm-ugv".into(), "Silvus MIMO Radio".into(), CapabilityType::Communication, 0.92));
-                    caps.push(Capability::new("mob-ugv".into(), "Tracked 6x6".into(), CapabilityType::Mobility, 0.95));
-                    caps.push(Capability::new("sensor-flir-ugv".into(), "FLIR Boson 640".into(), CapabilityType::Sensor, 0.94));
-                    caps.push(Capability::new("sensor-lidar-ugv".into(), "LiDAR 3D (200m)".into(), CapabilityType::Sensor, 0.90));
-                    caps.push(Capability::new("sensor-eo-ugv".into(), "EO/IR Gimbal 30x".into(), CapabilityType::Sensor, 0.93));
-                    caps.push(Capability::new("sensor-cbrn-ugv".into(), "CBRN Detector".into(), CapabilityType::Sensor, 0.85));
-                    caps.push(Capability::new("payload-ugv".into(), "Cargo Bay 200kg".into(), CapabilityType::Payload, 0.95));
-                    caps.push(Capability::new("compute-ugv".into(), "Jetson AGX Orin".into(), CapabilityType::Compute, 0.88));
+                    caps.push(Capability::new(
+                        "comm-ugv".into(),
+                        "Silvus MIMO Radio".into(),
+                        CapabilityType::Communication,
+                        0.92,
+                    ));
+                    caps.push(Capability::new(
+                        "mob-ugv".into(),
+                        "Tracked 6x6".into(),
+                        CapabilityType::Mobility,
+                        0.95,
+                    ));
+                    caps.push(Capability::new(
+                        "sensor-flir-ugv".into(),
+                        "FLIR Boson 640".into(),
+                        CapabilityType::Sensor,
+                        0.94,
+                    ));
+                    caps.push(Capability::new(
+                        "sensor-lidar-ugv".into(),
+                        "LiDAR 3D (200m)".into(),
+                        CapabilityType::Sensor,
+                        0.90,
+                    ));
+                    caps.push(Capability::new(
+                        "sensor-eo-ugv".into(),
+                        "EO/IR Gimbal 30x".into(),
+                        CapabilityType::Sensor,
+                        0.93,
+                    ));
+                    caps.push(Capability::new(
+                        "sensor-cbrn-ugv".into(),
+                        "CBRN Detector".into(),
+                        CapabilityType::Sensor,
+                        0.85,
+                    ));
+                    caps.push(Capability::new(
+                        "payload-ugv".into(),
+                        "Cargo Bay 200kg".into(),
+                        CapabilityType::Payload,
+                        0.95,
+                    ));
+                    caps.push(Capability::new(
+                        "compute-ugv".into(),
+                        "Jetson AGX Orin".into(),
+                        CapabilityType::Compute,
+                        0.88,
+                    ));
                 }
                 PlatformType::Uav => {
                     // Small tactical UAV — ISR overwatch platform
-                    caps.push(Capability::new("comm-uav".into(), "C2 Datalink (5km)".into(), CapabilityType::Communication, 0.85));
-                    caps.push(Capability::new("mob-uav".into(), "Quadrotor VTOL".into(), CapabilityType::Mobility, 0.95));
-                    caps.push(Capability::new("sensor-flir-uav".into(), "FLIR Vue Pro R 640".into(), CapabilityType::Sensor, 0.95));
-                    caps.push(Capability::new("sensor-eo-uav".into(), "EO 4K Gimbal 20x".into(), CapabilityType::Sensor, 0.95));
-                    caps.push(Capability::new("sensor-mti-uav".into(), "MTI Radar (GMTI)".into(), CapabilityType::Sensor, 0.80));
-                    caps.push(Capability::new("compute-uav".into(), "Edge AI (YOLOv8)".into(), CapabilityType::Compute, 0.82));
+                    caps.push(Capability::new(
+                        "comm-uav".into(),
+                        "C2 Datalink (5km)".into(),
+                        CapabilityType::Communication,
+                        0.85,
+                    ));
+                    caps.push(Capability::new(
+                        "mob-uav".into(),
+                        "Quadrotor VTOL".into(),
+                        CapabilityType::Mobility,
+                        0.95,
+                    ));
+                    caps.push(Capability::new(
+                        "sensor-flir-uav".into(),
+                        "FLIR Vue Pro R 640".into(),
+                        CapabilityType::Sensor,
+                        0.95,
+                    ));
+                    caps.push(Capability::new(
+                        "sensor-eo-uav".into(),
+                        "EO 4K Gimbal 20x".into(),
+                        CapabilityType::Sensor,
+                        0.95,
+                    ));
+                    caps.push(Capability::new(
+                        "sensor-mti-uav".into(),
+                        "MTI Radar (GMTI)".into(),
+                        CapabilityType::Sensor,
+                        0.80,
+                    ));
+                    caps.push(Capability::new(
+                        "compute-uav".into(),
+                        "Edge AI (YOLOv8)".into(),
+                        CapabilityType::Compute,
+                        0.82,
+                    ));
                 }
             }
         }
