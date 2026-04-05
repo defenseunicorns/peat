@@ -27,8 +27,8 @@ import com.defenseunicorns.atak.peat.model.PeatTrack
 import com.defenseunicorns.atak.peat.model.CommsQuality
 import com.defenseunicorns.peat.PeatMarker
 import com.defenseunicorns.peat.PeatPeer as BlePeer
-import uniffi.peat_lite_android.CannedMessageType
-import uniffi.peat_lite_android.CannedMessageAckEventData
+import com.defenseunicorns.atak.peat.model.CannedMessageType
+import com.defenseunicorns.atak.peat.model.CannedMessageAckEventData
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -282,7 +282,7 @@ class PeatDropDownReceiver(
 
         // Role indicator (only in main view)
         if (selectedCellId == null) {
-            val currentCell = PeatPluginLifecycle.getInstance()?.getCurrentCellId() ?: "ALPHA"
+            val currentCell = PeatPluginLifecycle.getInstance()?.getCurrentCellId() ?: "BRAVO"
             val roleRow = TextView(pluginContext).apply {
                 text = "Role: ${userRole.toDisplayString()} • Cell $currentCell"
                 textSize = 11f
@@ -299,6 +299,15 @@ class PeatDropDownReceiver(
             val summarySection = createSquadLeaderSummary()
             container.addView(summarySection)
             container.addView(createSpacer(24))
+        }
+
+        // Cell detail summary (when viewing a specific cell)
+        if (selectedCellId != null) {
+            val cell = mapComponent.cells.find { it.id == selectedCellId }
+            if (cell != null) {
+                container.addView(createCellSummarySection(cell))
+                container.addView(createSpacer(24))
+            }
         }
 
         // Cells section (only in main view, not when viewing a specific cell)
@@ -464,6 +473,493 @@ class PeatDropDownReceiver(
         }
     }
 
+    /**
+     * Create a summary section for a selected cell's aggregation data.
+     * Shows hierarchy breakdown, capabilities, and status for sim/mesh cells.
+     */
+    private fun createCellSummarySection(cell: PeatCell): LinearLayout {
+        val section = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        val statusColor = when (cell.status) {
+            PeatCell.Status.ACTIVE -> Color.parseColor("#4CAF50")
+            PeatCell.Status.FORMING -> Color.parseColor("#FFC107")
+            else -> Color.parseColor("#F44336")
+        }
+
+        val isBleCell = cell.capabilities.contains("BLE_MESH")
+
+        // === Company Overview Card ===
+        val overviewCard = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#2d2d2d"))
+            setPadding(24, 16, 24, 16)
+        }
+
+        val statusRow = TextView(pluginContext).apply {
+            text = "Status: ${cell.status.name}"
+            textSize = 14f
+            setTextColor(statusColor)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        }
+        overviewCard.addView(statusRow)
+
+        if (!isBleCell) {
+            val memberInfo = TextView(pluginContext).apply {
+                text = "Members: ${cell.platformCount} (aggregated)"
+                textSize = 13f
+                setTextColor(Color.parseColor("#CCCCCC"))
+                setPadding(0, 8, 0, 0)
+            }
+            overviewCard.addView(memberInfo)
+
+            // Readiness / Fuel / Health row
+            val statsBuilder = StringBuilder()
+            cell.readiness?.let { statsBuilder.append("Readiness: $it") }
+            cell.avgFuel?.let { if (statsBuilder.isNotEmpty()) statsBuilder.append("  |  "); statsBuilder.append("Fuel: $it") }
+            cell.worstHealth?.let { if (statsBuilder.isNotEmpty()) statsBuilder.append("  |  "); statsBuilder.append("Health: $it") }
+            if (statsBuilder.isNotEmpty()) {
+                val healthColor = when (cell.worstHealth) {
+                    "Nominal" -> Color.parseColor("#4CAF50")
+                    "Degraded" -> Color.parseColor("#FFC107")
+                    "Critical" -> Color.parseColor("#F44336")
+                    else -> Color.parseColor("#AAAAAA")
+                }
+                val statsRow = TextView(pluginContext).apply {
+                    text = statsBuilder.toString()
+                    textSize = 12f
+                    setTextColor(healthColor)
+                    setPadding(0, 4, 0, 0)
+                }
+                overviewCard.addView(statsRow)
+            }
+
+            if (cell.leaderId != null) {
+                val leaderRow = TextView(pluginContext).apply {
+                    text = "Leader: ${cell.leaderId}"
+                    textSize = 12f
+                    setTextColor(Color.parseColor("#AAAAAA"))
+                    setPadding(0, 4, 0, 0)
+                }
+                overviewCard.addView(leaderRow)
+            }
+        }
+
+        section.addView(overviewCard)
+        section.addView(createSpacer(8))
+
+        // === Go To Cell Location button ===
+        if (cell.centerLat != 0.0 || cell.centerLon != 0.0) {
+            val gotoBtn = Button(pluginContext).apply {
+                text = "Go To Location"
+                textSize = 13f
+                setTextColor(Color.WHITE)
+                setBackgroundColor(Color.parseColor("#1565C0"))
+                setPadding(24, 12, 24, 12)
+                setOnClickListener {
+                    mapComponent.zoomToCell(cell.centerLat, cell.centerLon, 1500.0)
+                }
+            }
+            section.addView(gotoBtn)
+            section.addView(createSpacer(12))
+        }
+
+        // === Capabilities (compact — detailed per-squad caps shown in echelons below) ===
+        if (cell.capabilities.isNotEmpty()) {
+            val capsCard = LinearLayout(pluginContext).apply {
+                orientation = LinearLayout.VERTICAL
+                setBackgroundColor(Color.parseColor("#2d2d2d"))
+                setPadding(24, 12, 24, 12)
+            }
+            val capsTitle = TextView(pluginContext).apply {
+                text = "Capabilities (${cell.capabilities.size})"
+                textSize = 13f
+                setTextColor(Color.WHITE)
+            }
+            capsCard.addView(capsTitle)
+            val capsText = TextView(pluginContext).apply {
+                text = cell.capabilities.joinToString(" \u2022 ")
+                textSize = 10f
+                setTextColor(Color.parseColor("#AAAAAA"))
+                setPadding(0, 4, 0, 0)
+            }
+            capsCard.addView(capsText)
+            section.addView(capsCard)
+            section.addView(createSpacer(8))
+        }
+
+        // === Hierarchy Breakdown (Platoons → Squads → Platforms) ===
+        // Get all sim platforms for drill-down display
+        val allPlatforms = mapComponent.platforms
+
+        if (cell.hierarchy.isNotEmpty()) {
+            val hierTitle = TextView(pluginContext).apply {
+                text = "Echelons"
+                textSize = 14f
+                setTextColor(Color.WHITE)
+            }
+            section.addView(hierTitle)
+            section.addView(createSpacer(8))
+
+            cell.hierarchy.forEach { entry ->
+                val entryCard = LinearLayout(pluginContext).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setBackgroundColor(Color.parseColor("#2d2d2d"))
+                    setPadding(24, 12, 24, 12)
+                }
+
+                // Platoon header: name + member count
+                val displayName = entry.id.split("-").lastOrNull()?.let { idx ->
+                    "Platoon $idx"
+                } ?: entry.id
+                val headerRow = LinearLayout(pluginContext).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                }
+
+                // Type breakdown from platforms matching this platoon
+                val platoonPlatforms = allPlatforms.filter { it.callsign.contains(entry.id) }
+                val typeBreakdown = if (platoonPlatforms.isNotEmpty()) {
+                    val counts = platoonPlatforms.groupBy { it.platformType }
+                        .mapValues { it.value.size }
+                        .entries
+                        .sortedByDescending { it.value }
+                        .joinToString(", ") { "${it.value} ${it.key.name}" }
+                    counts
+                } else {
+                    "${entry.memberCount} PAX"
+                }
+
+                val nameText = TextView(pluginContext).apply {
+                    text = "$displayName  (${entry.squadCount} SQD, $typeBreakdown)"
+                    textSize = 13f
+                    setTextColor(Color.WHITE)
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                }
+                headerRow.addView(nameText)
+
+                // Health indicator
+                val healthColor = when (entry.worstHealth) {
+                    "Nominal" -> Color.parseColor("#4CAF50")
+                    "Degraded" -> Color.parseColor("#FFC107")
+                    "Critical" -> Color.parseColor("#F44336")
+                    else -> Color.GRAY
+                }
+                val healthDot = TextView(pluginContext).apply {
+                    text = entry.worstHealth ?: "?"
+                    textSize = 11f
+                    setTextColor(healthColor)
+                }
+                headerRow.addView(healthDot)
+                entryCard.addView(headerRow)
+
+                // Stats row: readiness, fuel
+                val entryStats = StringBuilder()
+                entry.readiness?.let { entryStats.append("Readiness: $it") }
+                entry.avgFuel?.let { if (entryStats.isNotEmpty()) entryStats.append("  |  "); entryStats.append("Fuel: $it") }
+                if (entryStats.isNotEmpty()) {
+                    val statsText = TextView(pluginContext).apply {
+                        text = entryStats.toString()
+                        textSize = 11f
+                        setTextColor(Color.parseColor("#888888"))
+                        setPadding(0, 4, 0, 0)
+                    }
+                    entryCard.addView(statsText)
+                }
+
+                // === Squad-level drill-down with individual platforms ===
+                // Group platforms by squad (parsed from node ID structure)
+                val squadGroups = platoonPlatforms
+                    .filter { it.callsign.contains("-squad-") }
+                    .groupBy { callsign ->
+                        // Extract squad ID: everything up to "-soldier-" or "-leader" suffix
+                        val squadMatch = Regex("(.*-squad-\\d+)").find(callsign.callsign)
+                        squadMatch?.groupValues?.get(1) ?: "unknown"
+                    }
+                    .toSortedMap()
+
+                if (squadGroups.isNotEmpty()) {
+                    squadGroups.forEach { (squadId, squadPlatforms) ->
+                        val squadNum = squadId.split("-").lastOrNull() ?: squadId
+
+                        // Squad type composition
+                        val squadTypeCounts = squadPlatforms.groupBy { it.platformType }
+                            .mapValues { it.value.size }
+                            .entries.sortedByDescending { it.value }
+                            .joinToString(", ") { "${it.value} ${it.key.name}" }
+
+                        val squadLabel = TextView(pluginContext).apply {
+                            text = "  Squad $squadNum ($squadTypeCounts)"
+                            textSize = 12f
+                            setTextColor(Color.parseColor("#BBBBBB"))
+                            setPadding(0, 8, 0, 2)
+                            setTypeface(null, android.graphics.Typeface.BOLD)
+                        }
+                        entryCard.addView(squadLabel)
+
+                        // Squad capabilities summary
+                        val squadCaps = squadPlatforms
+                            .flatMap { it.capabilities }
+                            .distinct()
+                            .sorted()
+                        if (squadCaps.isNotEmpty()) {
+                            val capsText = TextView(pluginContext).apply {
+                                text = "    ${squadCaps.joinToString(" \u2022 ")}"
+                                textSize = 10f
+                                setTextColor(Color.parseColor("#666666"))
+                                setPadding(16, 0, 0, 4)
+                            }
+                            entryCard.addView(capsText)
+                        }
+
+                        // Show each platform in this squad
+                        squadPlatforms.sortedBy { it.callsign }.forEach { platform ->
+                            val platRow = LinearLayout(pluginContext).apply {
+                                orientation = LinearLayout.HORIZONTAL
+                                gravity = Gravity.CENTER_VERTICAL
+                                setPadding(16, 2, 0, 2)
+                            }
+
+                            // Type icon
+                            val typeIcon = when (platform.platformType) {
+                                PeatPlatform.PlatformType.UAV -> "^"
+                                PeatPlatform.PlatformType.UGV -> "#"
+                                PeatPlatform.PlatformType.SQUAD_LEADER,
+                                PeatPlatform.PlatformType.PLATOON_LEADER,
+                                PeatPlatform.PlatformType.COMPANY_COMMANDER -> "*"
+                                else -> "-"
+                            }
+                            val typeColor = when (platform.platformType) {
+                                PeatPlatform.PlatformType.UAV -> Color.parseColor("#00BCD4")
+                                PeatPlatform.PlatformType.UGV -> Color.parseColor("#FF9800")
+                                PeatPlatform.PlatformType.SQUAD_LEADER,
+                                PeatPlatform.PlatformType.PLATOON_LEADER,
+                                PeatPlatform.PlatformType.COMPANY_COMMANDER -> Color.parseColor("#FFD700")
+                                else -> Color.parseColor("#4CAF50")
+                            }
+
+                            // Short name (strip the long prefix, show just soldier-N or leader)
+                            val shortName = when (platform.platformType) {
+                                PeatPlatform.PlatformType.UGV,
+                                PeatPlatform.PlatformType.UAV,
+                                PeatPlatform.PlatformType.SQUAD_LEADER,
+                                PeatPlatform.PlatformType.PLATOON_LEADER,
+                                PeatPlatform.PlatformType.COMPANY_COMMANDER -> platform.callsign
+                                else -> platform.callsign
+                                    .substringAfterLast("-squad-$squadNum-", platform.callsign)
+                                    .ifEmpty { platform.callsign.substringAfterLast("-") }
+                            }
+
+                            val nameLabel = TextView(pluginContext).apply {
+                                text = "  $typeIcon $shortName"
+                                textSize = 11f
+                                setTextColor(typeColor)
+                                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                            }
+                            platRow.addView(nameLabel)
+
+                            // Platform type badge
+                            val typeBadge = TextView(pluginContext).apply {
+                                text = platform.platformType.name
+                                textSize = 9f
+                                setTextColor(Color.parseColor("#888888"))
+                            }
+                            platRow.addView(typeBadge)
+
+                            // Status indicator
+                            val statusColor = when (platform.status) {
+                                PeatPlatform.Status.OPERATIONAL -> Color.parseColor("#4CAF50")
+                                PeatPlatform.Status.DEGRADED -> Color.parseColor("#FFC107")
+                                PeatPlatform.Status.EMERGENCY -> Color.parseColor("#FF0000")
+                                else -> Color.GRAY
+                            }
+                            val statusDot = TextView(pluginContext).apply {
+                                text = "  \u25CF"
+                                textSize = 10f
+                                setTextColor(statusColor)
+                            }
+                            platRow.addView(statusDot)
+
+                            entryCard.addView(platRow)
+                        }
+                    }
+                }
+
+                // Show platoon leader if present
+                val platoonLeader = platoonPlatforms.find { it.callsign.endsWith("-leader") && !it.callsign.contains("-squad-") }
+                if (platoonLeader != null) {
+                    val leaderRow = TextView(pluginContext).apply {
+                        text = "  * PLT LDR"
+                        textSize = 11f
+                        setTextColor(Color.parseColor("#FFD700"))
+                        setPadding(16, 4, 0, 0)
+                    }
+                    entryCard.addView(leaderRow)
+                }
+
+                section.addView(entryCard)
+                section.addView(createSpacer(6))
+            }
+        }
+
+        // === Derive Platoon → Squad → Platform hierarchy from callsigns ===
+        // This works regardless of whether cell.hierarchy is populated
+        val cellPlatforms = allPlatforms.filter { p ->
+            p.cellId?.startsWith(cell.id) == true || p.callsign.startsWith(cell.id)
+        }
+        if (cellPlatforms.isNotEmpty()) {
+            // Group by platoon (extract platoon ID from cellId)
+            val platoonGroups = cellPlatforms
+                .filter { it.cellId?.contains("-platoon-") == true }
+                .groupBy { p ->
+                    val match = Regex("(${Regex.escape(cell.id)}-platoon-\\d+)").find(p.cellId ?: "")
+                    match?.groupValues?.get(1) ?: "unknown"
+                }
+                .toSortedMap()
+
+            if (platoonGroups.isNotEmpty()) {
+                val hierTitle = TextView(pluginContext).apply {
+                    text = "Echelons"
+                    textSize = 14f
+                    setTextColor(Color.WHITE)
+                }
+                section.addView(hierTitle)
+                section.addView(createSpacer(8))
+
+                platoonGroups.forEach { (platoonId, platoonPlatforms) ->
+                    val entryCard = LinearLayout(pluginContext).apply {
+                        orientation = LinearLayout.VERTICAL
+                        setBackgroundColor(Color.parseColor("#2d2d2d"))
+                        setPadding(24, 12, 24, 12)
+                    }
+
+                    val platoonNum = platoonId.substringAfterLast("-platoon-")
+                    val typeCounts = platoonPlatforms.groupBy { it.platformType }
+                        .mapValues { it.value.size }
+                        .entries.sortedByDescending { it.value }
+                        .joinToString(", ") { "${it.value} ${it.key.name}" }
+
+                    val nameText = TextView(pluginContext).apply {
+                        text = "Platoon $platoonNum  ($typeCounts)"
+                        textSize = 13f
+                        setTextColor(Color.WHITE)
+                    }
+                    entryCard.addView(nameText)
+
+                    // Group by squad within this platoon (use cellId, not callsign)
+                    val squadGroups = platoonPlatforms
+                        .filter { it.cellId?.contains("-squad-") == true }
+                        .groupBy { it.cellId ?: "unknown" }
+                        .toSortedMap()
+
+                    squadGroups.forEach { (squadId, squadPlatforms) ->
+                        val squadNum = squadId.substringAfterLast("-squad-")
+                        val squadTypeCounts = squadPlatforms.groupBy { it.platformType }
+                            .mapValues { it.value.size }
+                            .entries.sortedByDescending { it.value }
+                            .joinToString(", ") { "${it.value} ${it.key.name}" }
+
+                        val squadLabel = TextView(pluginContext).apply {
+                            text = "  Squad $squadNum ($squadTypeCounts)"
+                            textSize = 12f
+                            setTextColor(Color.parseColor("#BBBBBB"))
+                            setPadding(0, 8, 0, 2)
+                            setTypeface(null, android.graphics.Typeface.BOLD)
+                        }
+                        entryCard.addView(squadLabel)
+
+                        // Squad capabilities
+                        val squadCaps = squadPlatforms
+                            .flatMap { it.capabilities }
+                            .distinct()
+                            .sorted()
+                        if (squadCaps.isNotEmpty()) {
+                            val capsText = TextView(pluginContext).apply {
+                                text = "    ${squadCaps.joinToString(" \u2022 ")}"
+                                textSize = 10f
+                                setTextColor(Color.parseColor("#666666"))
+                                setPadding(16, 0, 0, 4)
+                            }
+                            entryCard.addView(capsText)
+                        }
+
+                        // Individual platforms
+                        squadPlatforms.sortedBy { it.callsign }.forEach { platform ->
+                            val platRow = LinearLayout(pluginContext).apply {
+                                orientation = LinearLayout.HORIZONTAL
+                                gravity = Gravity.CENTER_VERTICAL
+                                setPadding(16, 2, 0, 2)
+                            }
+                            val typeIcon = when (platform.platformType) {
+                                PeatPlatform.PlatformType.UAV -> "^"
+                                PeatPlatform.PlatformType.UGV -> "#"
+                                PeatPlatform.PlatformType.SQUAD_LEADER,
+                                PeatPlatform.PlatformType.PLATOON_LEADER,
+                                PeatPlatform.PlatformType.COMPANY_COMMANDER -> "*"
+                                else -> "-"
+                            }
+                            val typeColor = when (platform.platformType) {
+                                PeatPlatform.PlatformType.UAV -> Color.parseColor("#00BCD4")
+                                PeatPlatform.PlatformType.UGV -> Color.parseColor("#FF9800")
+                                PeatPlatform.PlatformType.SQUAD_LEADER,
+                                PeatPlatform.PlatformType.PLATOON_LEADER,
+                                PeatPlatform.PlatformType.COMPANY_COMMANDER -> Color.parseColor("#FFD700")
+                                else -> Color.parseColor("#4CAF50")
+                            }
+                            val shortName = when (platform.platformType) {
+                                PeatPlatform.PlatformType.UGV,
+                                PeatPlatform.PlatformType.UAV,
+                                PeatPlatform.PlatformType.SQUAD_LEADER,
+                                PeatPlatform.PlatformType.PLATOON_LEADER,
+                                PeatPlatform.PlatformType.COMPANY_COMMANDER -> platform.callsign
+                                else -> platform.callsign
+                                    .substringAfterLast("-squad-$squadNum-", platform.callsign)
+                                    .ifEmpty { platform.callsign.substringAfterLast("-") }
+                            }
+
+                            val nameLabel = TextView(pluginContext).apply {
+                                text = "  $typeIcon $shortName"
+                                textSize = 11f
+                                setTextColor(typeColor)
+                                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                            }
+                            platRow.addView(nameLabel)
+
+                            val typeBadge = TextView(pluginContext).apply {
+                                text = platform.platformType.name
+                                textSize = 9f
+                                setTextColor(Color.parseColor("#888888"))
+                            }
+                            platRow.addView(typeBadge)
+
+                            entryCard.addView(platRow)
+                        }
+                    }
+
+                    // Platoon leader
+                    val pltLeader = platoonPlatforms.find {
+                        it.callsign.endsWith("-leader") && !it.callsign.contains("-squad-")
+                    }
+                    if (pltLeader != null) {
+                        val leaderRow = TextView(pluginContext).apply {
+                            text = "  * PLT LDR"
+                            textSize = 11f
+                            setTextColor(Color.parseColor("#FFD700"))
+                            setPadding(16, 4, 0, 0)
+                        }
+                        entryCard.addView(leaderRow)
+                    }
+
+                    section.addView(entryCard)
+                    section.addView(createSpacer(6))
+                }
+            }
+        }
+
+        return section
+    }
+
     private fun createCellCard(cell: PeatCell): View {
         // Get actual platforms in this cell
         val cellPlatforms = mapComponent.platforms.filter { it.cellId == cell.id }
@@ -537,15 +1033,20 @@ class PeatDropDownReceiver(
         // Get actual platforms in this cell (for display)
         val displayPlatforms = mapComponent.platforms.filter { it.cellId == cell.id }
 
+        // For sim/mesh cells, show aggregated member count from hierarchical aggregation
+        // For BLE cells, show individual platform list
+        val isBleCell = cell.capabilities.contains("BLE_MESH")
+        val memberCount = if (isBleCell) displayPlatforms.size else cell.platformCount
+
         val platformsHeader = TextView(pluginContext).apply {
-            text = "${displayPlatforms.size} platforms"
+            text = if (isBleCell) "${displayPlatforms.size} platforms" else "$memberCount members (aggregated)"
             textSize = 12f
             setTextColor(Color.GRAY)
         }
         card.addView(platformsHeader)
 
-        // List platform names with SOS indicator
-        if (displayPlatforms.isNotEmpty()) {
+        // List individual platforms (BLE cells) or aggregation summary (sim cells)
+        if (isBleCell && displayPlatforms.isNotEmpty()) {
             displayPlatforms.forEach { platform ->
                 val isEmergency = platform.status == PeatPlatform.Status.EMERGENCY
                 val platformRow = TextView(pluginContext).apply {
@@ -560,6 +1061,16 @@ class PeatDropDownReceiver(
                 }
                 card.addView(platformRow)
             }
+        } else if (!isBleCell && memberCount > 0) {
+            // Show aggregation info for sim cells
+            val leaderInfo = if (cell.leaderId != null) "Leader: ${cell.leaderId}" else ""
+            val capsInfo = cell.capabilities.joinToString(", ")
+            val infoRow = TextView(pluginContext).apply {
+                text = "  $leaderInfo\n  Capabilities: $capsInfo"
+                textSize = 11f
+                setTextColor(Color.parseColor("#AAAAAA"))
+            }
+            card.addView(infoRow)
         }
 
         // Tap hint
@@ -1961,6 +2472,112 @@ class PeatDropDownReceiver(
         }
         ttlRow.addView(ttlApplyButton)
         card.addView(ttlRow)
+
+        // ===== Sim Mesh Peer Connection =====
+        card.addView(createSpacer(16))
+        val simTitle = TextView(pluginContext).apply {
+            text = "Sim Mesh (QUIC)"
+            textSize = 13f
+            setTextColor(Color.parseColor("#FF9800"))
+        }
+        card.addView(simTitle)
+        card.addView(createSpacer(8))
+
+        // Sim peer address row
+        val simAddrRow = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val simAddrLabel = TextView(pluginContext).apply {
+            text = "Peer addr: "
+            textSize = 12f
+            setTextColor(Color.WHITE)
+        }
+        simAddrRow.addView(simAddrLabel)
+
+        val currentSimAddr = PeatPluginLifecycle.getInstance()?.getSimPeerAddress(pluginContext) ?: ""
+        val simAddrInput = android.widget.EditText(pluginContext).apply {
+            setText(currentSimAddr)
+            hint = "192.168.1.10:12345"
+            textSize = 12f
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.parseColor("#666666"))
+            setBackgroundColor(Color.parseColor("#3d3d3d"))
+            setPadding(16, 8, 16, 8)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setSingleLine(true)
+        }
+        simAddrRow.addView(simAddrInput)
+        card.addView(simAddrRow)
+
+        // Sim peer node ID row
+        card.addView(createSpacer(4))
+        val simIdRow = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val simIdLabel = TextView(pluginContext).apply {
+            text = "Peer ID:   "
+            textSize = 12f
+            setTextColor(Color.WHITE)
+        }
+        simIdRow.addView(simIdLabel)
+
+        val currentSimId = PeatPluginLifecycle.getInstance()?.getSimPeerNodeId(pluginContext) ?: ""
+        val simIdInput = android.widget.EditText(pluginContext).apply {
+            setText(currentSimId)
+            hint = "hex endpoint ID"
+            textSize = 12f
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.parseColor("#666666"))
+            setBackgroundColor(Color.parseColor("#3d3d3d"))
+            setPadding(16, 8, 16, 8)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setSingleLine(true)
+        }
+        simIdRow.addView(simIdInput)
+        card.addView(simIdRow)
+
+        // Connect button row
+        card.addView(createSpacer(8))
+        val simConnectRow = LinearLayout(pluginContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val simConnectButton = Button(pluginContext).apply {
+            text = "Connect to Sim"
+            textSize = 10f
+            setBackgroundColor(Color.parseColor("#FF9800"))
+            setTextColor(Color.WHITE)
+            setPadding(16, 8, 16, 8)
+
+            setOnClickListener {
+                val addr = simAddrInput.text.toString().trim()
+                val nodeId = simIdInput.text.toString().trim()
+                if (addr.isNotEmpty() && nodeId.isNotEmpty()) {
+                    PeatPluginLifecycle.getInstance()?.setSimPeerAddress(pluginContext, addr)
+                    PeatPluginLifecycle.getInstance()?.setSimPeerNodeId(pluginContext, nodeId)
+                    val result = PeatPluginLifecycle.getInstance()?.connectSimPeer(pluginContext) ?: false
+                    val msg = if (result) "Connecting to $addr..." else "Connection failed"
+                    android.widget.Toast.makeText(pluginContext, msg, android.widget.Toast.LENGTH_SHORT).show()
+                    handler.postDelayed({ refreshContent() }, 1000)
+                } else {
+                    android.widget.Toast.makeText(pluginContext, "Enter peer address and ID", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        simConnectRow.addView(simConnectButton)
+
+        // Show Iroh peer count as connection feedback
+        val irohPeerInfo = TextView(pluginContext).apply {
+            val peerCount = PeatPluginLifecycle.getInstance()?.getPeerCount() ?: 0
+            text = "  Iroh peers: $peerCount"
+            textSize = 11f
+            setTextColor(if (peerCount > 0) Color.parseColor("#4CAF50") else Color.parseColor("#888888"))
+        }
+        simConnectRow.addView(irohPeerInfo)
+        card.addView(simConnectRow)
 
         // Toggle button
         card.addView(createSpacer(12))
