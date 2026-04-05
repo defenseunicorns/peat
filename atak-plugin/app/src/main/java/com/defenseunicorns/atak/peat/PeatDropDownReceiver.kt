@@ -363,27 +363,6 @@ class PeatDropDownReceiver(
             container.addView(tracksTitle)
             container.addView(createSpacer(8))
 
-            // Scenario trigger button (when CHARLIE/DiSCO cell exists)
-            val hasCharlie = mapComponent.cells.any {
-                it.id.contains("CHARLIE") || it.name.contains("DiSCO")
-            }
-            if (hasCharlie) {
-                val scenarioBtn = Button(pluginContext).apply {
-                    text = if (mapComponent.scenarioActive) "Stop Scenario" else "Start Scenario"
-                    textSize = 12f
-                    setBackgroundColor(Color.parseColor(if (mapComponent.scenarioActive) "#F44336" else "#FF9800"))
-                    setTextColor(Color.WHITE)
-                    setPadding(24, 8, 24, 8)
-                    setOnClickListener {
-                        if (mapComponent.scenarioActive) mapComponent.stopRedTrackScenario()
-                        else mapComponent.startRedTrackScenario()
-                        refreshContent()
-                    }
-                }
-                container.addView(scenarioBtn)
-                container.addView(createSpacer(8))
-            }
-
             if (mapComponent.tracks.isEmpty()) {
                 val noTracks = TextView(pluginContext).apply {
                     text = "No tracks"
@@ -1217,9 +1196,10 @@ class PeatDropDownReceiver(
     }
 
     private fun createTrackCard(track: PeatTrack): View {
+        val isHostile = track.classification.contains("-h-")
         val card = LinearLayout(pluginContext).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#2d2d2d"))
+            setBackgroundColor(Color.parseColor(if (isHostile) "#4d1a1a" else "#2d2d2d"))
             setPadding(24, 16, 24, 16)
             isClickable = true
             isFocusable = true

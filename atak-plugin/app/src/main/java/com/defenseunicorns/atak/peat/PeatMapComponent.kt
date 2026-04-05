@@ -118,11 +118,12 @@ class PeatMapComponent : DropDownMapComponent() {
         } ?: return null
 
         val center = doubleArrayOf(charlieCell.centerLat, charlieCell.centerLon)
-        val boxCenter = offsetPosition(center, 200.0, 800.0) // USV patrol box center
+        // Wall formation center: 800m south of Point Loma tip
+        val wallCenter = offsetPosition(doubleArrayOf(32.6672, -117.2424), 200.0, 800.0)
 
-        // Approach path: from 2km SE to 2km NW through the box
-        val startPos = offsetPosition(boxCenter, 135.0, 2000.0) // SE
-        val endPos = offsetPosition(boxCenter, 315.0, 2000.0)   // NW toward shore
+        // Approach path: from 3km south to 1km north through the wall
+        val startPos = offsetPosition(wallCenter, 180.0, 2000.0) // south, open ocean
+        val endPos = offsetPosition(wallCenter, 0.0, 2000.0)     // north, toward shore
 
         // 8 knots = ~4.1 m/s, 4km path = ~16 min
         val elapsedSec = (System.currentTimeMillis() - startTime) / 1000.0
@@ -140,7 +141,7 @@ class PeatMapComponent : DropDownMapComponent() {
             cellId = charlieCell.id,
             lat = lat,
             lon = lon,
-            heading = 315.0,
+            heading = 0.0, // approaching from south, heading north
             speed = speedMps,
             classification = "a-h-S",
             confidence = 0.82,
@@ -349,8 +350,13 @@ class PeatMapComponent : DropDownMapComponent() {
                 }
             }
         }
+        // Register with both ATAK internal AND Android system broadcasts
         com.atakmap.android.ipc.AtakBroadcast.getInstance().registerReceiver(scenarioReceiver, scenarioFilter)
-        Log.d(TAG, "Scenario broadcast receiver registered")
+        val systemFilter = android.content.IntentFilter()
+        systemFilter.addAction("com.defenseunicorns.atak.peat.SCENARIO_START")
+        systemFilter.addAction("com.defenseunicorns.atak.peat.SCENARIO_STOP")
+        context.registerReceiver(scenarioReceiver, systemFilter, android.content.Context.RECEIVER_EXPORTED)
+        Log.d(TAG, "Scenario broadcast receiver registered (ATAK + system)")
 
         // Register BLE document sync callback to display peer locations on map
         registerBleDocumentCallback()
@@ -1171,50 +1177,37 @@ class PeatMapComponent : DropDownMapComponent() {
 
                 val center = doubleArrayOf(cell.centerLat, cell.centerLon)
 
-                // DiSCO USV cell — animated box perimeter patrol
+                // DiSCO USV cell — wall formation around Point Loma tip
+                // Each LightFish holds a 50m patrol circle at its station,
+                // 500m between stations, daisy-chain mesh comms
                 if (cell.id.contains("CHARLIE") || cell.name.contains("DiSCO")) {
-                    val numUsv = 7
-                    // Box perimeter: 600x400m rectangle SSW of center (offshore)
-                    val boxCenter = offsetPosition(center, 200.0, 800.0)
-                    val halfW = 300.0
-                    val halfH = 200.0
-                    val diag = Math.sqrt(halfW * halfW + halfH * halfH)
-                    val nw = offsetPosition(boxCenter, 315.0, diag)
-                    val ne = offsetPosition(boxCenter, 45.0, diag)
-                    val se = offsetPosition(boxCenter, 135.0, diag)
-                    val sw = offsetPosition(boxCenter, 225.0, diag)
+                    val numTotal = 8 // including leader
 
-                    // Build dense perimeter waypoints for smooth animation
-                    val waypoints = mutableListOf<DoubleArray>()
-                    val segments = listOf(nw to ne, ne to se, se to sw, sw to nw)
-                    val pointsPerSide = 20 // More points = smoother movement
-                    for ((start, end) in segments) {
-                        for (i in 0 until pointsPerSide) {
-                            val t = i.toDouble() / pointsPerSide
-                            waypoints.add(doubleArrayOf(
-                                start[0] + (end[0] - start[0]) * t,
-                                start[1] + (end[1] - start[1]) * t
-                            ))
-                        }
-                    }
-                    val totalWaypoints = waypoints.size // 80
+                    // Wall arc: 8 stations along an arc south of Point Loma tip
+                    // Arc center = Point Loma tip, radius ~800m offshore
+                    // Arc spans from ~150° (SSE) to ~250° (WSW) = 100° of coverage
+                    val arcCenter = doubleArrayOf(32.6672, -117.2424) // Point Loma tip
+                    val arcRadius = 800.0 // meters offshore
+                    val arcStartDeg = 150.0 // SSE
+                    val arcEndDeg = 250.0   // WSW
+                    val arcSpan = arcEndDeg - arcStartDeg
 
-                    // All 8 LightFish in the patrol pattern (including leader)
-                    val numTotal = numUsv + 1 // 7 + leader = 8
-
-                    // Animate LightFish USVs around perimeter with draining battery
+                    // Station hold radius and animation
+                    val stationRadius = 50.0 // each USV circles 50m around its station
                     val elapsedTicks = (System.currentTimeMillis() / (REFRESH_INTERVAL_MS)).toInt()
                     val elapsedMinutes = (System.currentTimeMillis() - cell.lastUpdate) / 60_000.0
 
                     for (i in 0 until numTotal) {
-                        val startOffset = i * totalWaypoints / numTotal
-                        val currentIdx = (startOffset + elapsedTicks) % totalWaypoints
-                        val pos = waypoints[currentIdx]
+                        // Station position on the arc
+                        val arcDeg = arcStartDeg + (i.toDouble() / (numTotal - 1)) * arcSpan
+                        val station = offsetPosition(arcCenter, arcDeg, arcRadius)
 
-                        val nextIdx = (currentIdx + 1) % totalWaypoints
-                        val nextPos = waypoints[nextIdx]
-                        val headingRad = Math.atan2(nextPos[1] - pos[1], nextPos[0] - pos[0])
-                        val headingDeg = Math.toDegrees(headingRad)
+                        // Animate: circle around station at 50m radius
+                        val circleAngle = ((elapsedTicks + i * 5) % 36) * 10.0 // 10° per tick
+                        val pos = offsetPosition(station, circleAngle, stationRadius)
+
+                        // Heading tangent to circle
+                        val headingDeg = (circleAngle + 90.0) % 360.0
 
                         // Each USV starts at different battery level and drains at different rate
                         // Simulates fleet deployed at staggered times
@@ -1268,7 +1261,7 @@ class PeatMapComponent : DropDownMapComponent() {
                             heading = headingDeg,
                             batteryPercent = batteryPct,
                             status = platformStatus,
-                            cellId = "${cell.id}-disco-squad", capabilities = caps,
+                            cellId = cell.id, capabilities = caps,
                             lastUpdate = System.currentTimeMillis()
                         ))
                     }
