@@ -550,9 +550,13 @@ impl PeatNode {
                                 let sync_peer = peer_id;
                                 tokio::spawn(async move {
                                     // Brief delay for connection to stabilize
-                                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                                    tokio::time::sleep(tokio::time::Duration::from_millis(500))
+                                        .await;
                                     #[cfg(target_os = "android")]
-                                    android_log(&format!("Triggering sync_all_documents_with_peer for {:?}", sync_peer));
+                                    android_log(&format!(
+                                        "Triggering sync_all_documents_with_peer for {:?}",
+                                        sync_peer
+                                    ));
                                     match coord.sync_all_documents_with_peer(sync_peer).await {
                                         Ok(()) => {
                                             #[cfg(target_os = "android")]
@@ -560,7 +564,10 @@ impl PeatNode {
                                         }
                                         Err(e) => {
                                             #[cfg(target_os = "android")]
-                                            android_log(&format!("sync_all_documents_with_peer: FAILED - {}", e));
+                                            android_log(&format!(
+                                                "sync_all_documents_with_peer: FAILED - {}",
+                                                e
+                                            ));
                                         }
                                     }
                                 });
