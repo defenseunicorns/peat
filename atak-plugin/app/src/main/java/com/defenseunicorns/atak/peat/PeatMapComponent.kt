@@ -1081,6 +1081,111 @@ class PeatMapComponent : DropDownMapComponent() {
                 if (cell.centerLat == 0.0 && cell.centerLon == 0.0) continue
 
                 val center = doubleArrayOf(cell.centerLat, cell.centerLon)
+
+                // DiSCO USV cell — animated box perimeter patrol
+                if (cell.id.contains("CHARLIE") || cell.name.contains("DiSCO")) {
+                    val numUsv = 7
+                    // Box perimeter: 600x400m rectangle SSW of center (offshore)
+                    val boxCenter = offsetPosition(center, 200.0, 800.0)
+                    val halfW = 300.0
+                    val halfH = 200.0
+                    val diag = Math.sqrt(halfW * halfW + halfH * halfH)
+                    val nw = offsetPosition(boxCenter, 315.0, diag)
+                    val ne = offsetPosition(boxCenter, 45.0, diag)
+                    val se = offsetPosition(boxCenter, 135.0, diag)
+                    val sw = offsetPosition(boxCenter, 225.0, diag)
+
+                    // Build dense perimeter waypoints for smooth animation
+                    val waypoints = mutableListOf<DoubleArray>()
+                    val segments = listOf(nw to ne, ne to se, se to sw, sw to nw)
+                    val pointsPerSide = 20 // More points = smoother movement
+                    for ((start, end) in segments) {
+                        for (i in 0 until pointsPerSide) {
+                            val t = i.toDouble() / pointsPerSide
+                            waypoints.add(doubleArrayOf(
+                                start[0] + (end[0] - start[0]) * t,
+                                start[1] + (end[1] - start[1]) * t
+                            ))
+                        }
+                    }
+                    val totalWaypoints = waypoints.size // 80
+
+                    // All 8 LightFish in the patrol pattern (including leader)
+                    val numTotal = numUsv + 1 // 7 + leader = 8
+
+                    // Animate LightFish USVs around perimeter with draining battery
+                    val elapsedTicks = (System.currentTimeMillis() / (REFRESH_INTERVAL_MS)).toInt()
+                    val elapsedMinutes = (System.currentTimeMillis() - cell.lastUpdate) / 60_000.0
+
+                    for (i in 0 until numTotal) {
+                        val startOffset = i * totalWaypoints / numTotal
+                        val currentIdx = (startOffset + elapsedTicks) % totalWaypoints
+                        val pos = waypoints[currentIdx]
+
+                        val nextIdx = (currentIdx + 1) % totalWaypoints
+                        val nextPos = waypoints[nextIdx]
+                        val headingRad = Math.atan2(nextPos[1] - pos[1], nextPos[0] - pos[0])
+                        val headingDeg = Math.toDegrees(headingRad)
+
+                        // Each USV starts at different battery level and drains at different rate
+                        // Simulates fleet deployed at staggered times
+                        val startBattery = listOf(94, 87, 78, 71, 83, 66, 91, 75)[i % 8]
+                        val drainRate = 0.15 + (i * 0.04) // 0.15-0.43%/min
+                        val batteryPct = (startBattery - elapsedMinutes * drainRate).coerceIn(0.0, 100.0).toInt()
+                        val batteryStatus = when {
+                            batteryPct > 60 -> "OK"
+                            batteryPct > 30 -> "LOW"
+                            batteryPct > 10 -> "CRITICAL"
+                            else -> "DEPLETED"
+                        }
+                        val platformStatus = when {
+                            batteryPct > 30 -> PeatPlatform.Status.OPERATIONAL
+                            batteryPct > 10 -> PeatPlatform.Status.DEGRADED
+                            batteryPct > 0 -> PeatPlatform.Status.LOW_POWER
+                            else -> PeatPlatform.Status.OFFLINE
+                        }
+
+                        // LightFish capabilities — degrade with battery
+                        val caps = mutableListOf(
+                            "Silvus MIMO Radio",
+                            "Electric Hull (6kt)",
+                            "Battery: ${batteryPct}% ($batteryStatus)"
+                        )
+                        if (batteryPct > 10) {
+                            caps.addAll(listOf(
+                                "Side-Scan Sonar (100m)",
+                                "Single-Beam Echo Sounder",
+                                "GNSS RTK (2cm)",
+                                "Water Quality (CTD)"
+                            ))
+                        }
+                        if (batteryPct > 30) {
+                            caps.addAll(listOf(
+                                "ADCP Current Profiler",
+                                "EO Camera (4K)"
+                            ))
+                        }
+                        if (batteryPct > 60) {
+                            caps.add("Magnetometer")
+                        }
+
+                        val callsign = if (i == 0) "LightFish-CDR" else "LightFish-$i"
+                        val platId = if (i == 0) "${cell.id}-disco-leader" else "${cell.id}-disco-$i"
+
+                        _platforms.add(PeatPlatform(
+                            id = platId, callsign = callsign,
+                            platformType = PeatPlatform.PlatformType.USV,
+                            lat = pos[0], lon = pos[1],
+                            heading = headingDeg,
+                            batteryPercent = batteryPct,
+                            status = platformStatus,
+                            cellId = "${cell.id}-disco-squad", capabilities = caps,
+                            lastUpdate = System.currentTimeMillis()
+                        ))
+                    }
+                    continue
+                }
+
                 val numPlatoons = 2
                 val squadsPerPlatoon = 3
                 val soldiersPerSquad = 7
@@ -1174,14 +1279,22 @@ class PeatMapComponent : DropDownMapComponent() {
                         .flatMap { it.capabilities }
                         .distinct()
                         .sorted()
-                    // Derive display name from generated topology (not FFI which may show partial sync)
+                    // Derive display name from generated topology
                     val displayName = cell.name.substringBefore(" (").ifEmpty { cell.id }
-                    val pltCount = cellPlatforms.count {
-                        it.platformType == PeatPlatform.PlatformType.PLATOON_LEADER
-                    }
                     val paxCount = cellPlatforms.size
+                    val hasUsv = cellPlatforms.any { it.platformType == PeatPlatform.PlatformType.USV }
+                    val suffix = if (hasUsv) {
+                        // USV swarm — count by type, not platoons
+                        val usvCount = cellPlatforms.count { it.platformType == PeatPlatform.PlatformType.USV }
+                        "$usvCount USV Swarm"
+                    } else {
+                        val pltCount = cellPlatforms.count {
+                            it.platformType == PeatPlatform.PlatformType.PLATOON_LEADER
+                        }.coerceAtLeast(1)
+                        "$pltCount PLT, $paxCount PAX"
+                    }
                     _cells[i] = cell.copy(
-                        name = "$displayName ($pltCount PLT, $paxCount PAX)",
+                        name = "$displayName ($suffix)",
                         capabilities = detailedCaps,
                         platformCount = paxCount
                     )
@@ -1433,7 +1546,9 @@ class PeatMapComponent : DropDownMapComponent() {
     fun getFilteredPlatforms(): List<PeatPlatform> {
         val allPlatforms = platforms  // Uses the getter which includes BLE platforms
         val selectedId = _selectedCellId ?: return allPlatforms
-        return allPlatforms.filter { it.cellId == selectedId }
+        return allPlatforms.filter {
+            it.cellId == selectedId || it.cellId?.startsWith(selectedId) == true
+        }
     }
 
     /**

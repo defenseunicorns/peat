@@ -725,6 +725,7 @@ class PeatDropDownReceiver(
                             val typeIcon = when (platform.platformType) {
                                 PeatPlatform.PlatformType.UAV -> "^"
                                 PeatPlatform.PlatformType.UGV -> "#"
+                                PeatPlatform.PlatformType.USV -> "~"
                                 PeatPlatform.PlatformType.SQUAD_LEADER,
                                 PeatPlatform.PlatformType.PLATOON_LEADER,
                                 PeatPlatform.PlatformType.COMPANY_COMMANDER -> "*"
@@ -733,6 +734,7 @@ class PeatDropDownReceiver(
                             val typeColor = when (platform.platformType) {
                                 PeatPlatform.PlatformType.UAV -> Color.parseColor("#00BCD4")
                                 PeatPlatform.PlatformType.UGV -> Color.parseColor("#FF9800")
+                                PeatPlatform.PlatformType.USV -> Color.parseColor("#2196F3")
                                 PeatPlatform.PlatformType.SQUAD_LEADER,
                                 PeatPlatform.PlatformType.PLATOON_LEADER,
                                 PeatPlatform.PlatformType.COMPANY_COMMANDER -> Color.parseColor("#FFD700")
@@ -894,6 +896,7 @@ class PeatDropDownReceiver(
                             val typeIcon = when (platform.platformType) {
                                 PeatPlatform.PlatformType.UAV -> "^"
                                 PeatPlatform.PlatformType.UGV -> "#"
+                                PeatPlatform.PlatformType.USV -> "~"
                                 PeatPlatform.PlatformType.SQUAD_LEADER,
                                 PeatPlatform.PlatformType.PLATOON_LEADER,
                                 PeatPlatform.PlatformType.COMPANY_COMMANDER -> "*"
@@ -902,6 +905,7 @@ class PeatDropDownReceiver(
                             val typeColor = when (platform.platformType) {
                                 PeatPlatform.PlatformType.UAV -> Color.parseColor("#00BCD4")
                                 PeatPlatform.PlatformType.UGV -> Color.parseColor("#FF9800")
+                                PeatPlatform.PlatformType.USV -> Color.parseColor("#2196F3")
                                 PeatPlatform.PlatformType.SQUAD_LEADER,
                                 PeatPlatform.PlatformType.PLATOON_LEADER,
                                 PeatPlatform.PlatformType.COMPANY_COMMANDER -> Color.parseColor("#FFD700")
@@ -926,14 +930,104 @@ class PeatDropDownReceiver(
                             }
                             platRow.addView(nameLabel)
 
-                            val typeBadge = TextView(pluginContext).apply {
-                                text = platform.platformType.name
-                                textSize = 9f
+                            // Battery + status badge
+                            val badge = StringBuilder(platform.platformType.name)
+                            if (platform.batteryPercent != null) {
+                                val batColor = when {
+                                    platform.batteryPercent > 60 -> "#4CAF50"
+                                    platform.batteryPercent > 30 -> "#FFC107"
+                                    platform.batteryPercent > 10 -> "#FF9800"
+                                    else -> "#F44336"
+                                }
+                                badge.append("  ${platform.batteryPercent}%")
+                                val typeBadge = TextView(pluginContext).apply {
+                                    text = badge.toString()
+                                    textSize = 9f
+                                    setTextColor(Color.parseColor(batColor))
+                                }
+                                platRow.addView(typeBadge)
+                            } else {
+                                val typeBadge = TextView(pluginContext).apply {
+                                    text = badge.toString()
+                                    textSize = 9f
+                                    setTextColor(Color.parseColor("#888888"))
+                                }
+                                platRow.addView(typeBadge)
+                            }
+
+                            // Status dot for degraded/offline
+                            if (platform.status != PeatPlatform.Status.OPERATIONAL) {
+                                val statusColor = when (platform.status) {
+                                    PeatPlatform.Status.DEGRADED -> "#FFC107"
+                                    PeatPlatform.Status.LOW_POWER -> "#FF9800"
+                                    PeatPlatform.Status.OFFLINE -> "#F44336"
+                                    PeatPlatform.Status.EMERGENCY -> "#FF0000"
+                                    else -> "#888888"
+                                }
+                                val statusDot = TextView(pluginContext).apply {
+                                    text = " \u25CF"
+                                    textSize = 9f
+                                    setTextColor(Color.parseColor(statusColor))
+                                }
+                                platRow.addView(statusDot)
+                            }
+
+                            // Expandable detail panel (hidden by default)
+                            val detailPanel = LinearLayout(pluginContext).apply {
+                                orientation = LinearLayout.VERTICAL
+                                setBackgroundColor(Color.parseColor("#1a1a2e"))
+                                setPadding(32, 8, 16, 8)
+                                visibility = View.GONE
+                            }
+
+                            // Status line
+                            val statusLine = TextView(pluginContext).apply {
+                                val statusText = platform.status.name +
+                                    (platform.batteryPercent?.let { " | Battery: $it%" } ?: "") +
+                                    (platform.heading?.let { " | HDG: ${it.toInt()}\u00B0" } ?: "")
+                                text = statusText
+                                textSize = 10f
+                                setTextColor(Color.parseColor("#AAAAAA"))
+                            }
+                            detailPanel.addView(statusLine)
+
+                            // Position
+                            val posLine = TextView(pluginContext).apply {
+                                text = "Pos: %.5f, %.5f".format(platform.lat, platform.lon)
+                                textSize = 10f
                                 setTextColor(Color.parseColor("#888888"))
                             }
-                            platRow.addView(typeBadge)
+                            detailPanel.addView(posLine)
+
+                            // Capabilities list
+                            if (platform.capabilities.isNotEmpty()) {
+                                val capHeader = TextView(pluginContext).apply {
+                                    text = "Capabilities:"
+                                    textSize = 10f
+                                    setTextColor(Color.parseColor("#AAAAAA"))
+                                    setPadding(0, 4, 0, 0)
+                                }
+                                detailPanel.addView(capHeader)
+                                platform.capabilities.forEach { cap ->
+                                    val capLine = TextView(pluginContext).apply {
+                                        text = "  \u2022 $cap"
+                                        textSize = 9f
+                                        setTextColor(Color.parseColor("#777777"))
+                                    }
+                                    detailPanel.addView(capLine)
+                                }
+                            }
+
+                            // Tap to expand/collapse
+                            platRow.isClickable = true
+                            platRow.isFocusable = true
+                            platRow.setOnClickListener {
+                                detailPanel.visibility = if (detailPanel.visibility == View.GONE)
+                                    View.VISIBLE else View.GONE
+                            }
 
                             entryCard.addView(platRow)
+                            entryCard.addView(detailPanel)
                         }
                     }
 

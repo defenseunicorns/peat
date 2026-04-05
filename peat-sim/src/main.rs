@@ -3186,7 +3186,20 @@ async fn soldier_capability_mode(
     // Determine platform type and initialize simulation state
     let platform_type = simulation::assign_platform_type(node_id);
     let seed = simulation::PositionSeed::from_env();
-    let mut sim_state = simulation::NodeSimState::new(node_id, platform_type, &seed);
+    let mut sim_state = if platform_type == simulation::PlatformType::Usv {
+        // USV nodes use waypoint-based perimeter patrol
+        let usv_index: usize = std::env::var("USV_INDEX")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        let usv_total: usize = std::env::var("USV_TOTAL")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(7);
+        simulation::NodeSimState::new_usv_patrol(node_id, &seed, usv_index, usv_total)
+    } else {
+        simulation::NodeSimState::new(node_id, platform_type, &seed)
+    };
     let capabilities = simulation::generate_capabilities(node_id, platform_type, "soldier");
     let cap_names = simulation::capability_names(&capabilities);
 

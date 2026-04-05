@@ -542,8 +542,20 @@ demo-verify:
 	@echo "=== Sim commander metrics ==="
 	@docker exec $(COMMANDER_CONTAINER) tail -5 /data/logs/company-ALPHA-commander.metrics.log 2>/dev/null || echo "(sim not running)"
 
+# DiSCO USV flotilla (runs alongside company-ALPHA)
+DISCO_TOPOLOGY ?= peat-sim/topologies/disco-8usv.yaml
+demo-disco:
+	@echo "Deploying DiSCO USV flotilla..."
+	@sudo BACKEND=automerge CAP_IN_MEMORY=true containerlab deploy -t $(DISCO_TOPOLOGY) --reconfigure --timeout 5m
+	@echo "✓ DiSCO flotilla deployed"
+
+demo-disco-destroy:
+	@echo "Destroying DiSCO flotilla..."
+	@sudo containerlab destroy -t $(DISCO_TOPOLOGY) --cleanup 2>/dev/null || true
+	@echo "✓ DiSCO flotilla destroyed"
+
 # Stop everything
-demo-stop: stop-atak demo-sim-destroy
+demo-stop: stop-atak demo-sim-destroy demo-disco-destroy
 	@echo "✓ Demo environment torn down"
 
 # ============================================

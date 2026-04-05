@@ -47,9 +47,14 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
         // Configuration defaults
         const val DEFAULT_CANNED_MESSAGE_TTL_SECONDS = 300  // 5 minutes
 
-        // Sim mesh peer defaults (lab4-48n company-ALPHA-commander on demo machine)
+        // Sim mesh peer defaults (demo machine)
+        // ALPHA: 48-node ground company on port 12345
         const val DEFAULT_SIM_PEER_ADDRESS = "192.168.1.96:12345"
         const val DEFAULT_SIM_PEER_NODE_ID = "a2f09263cd8c639c2f0898aaf068f6ae67c0a475623e5122fa51ed0700f10dc7"
+        // CHARLIE (DiSCO): 8-node USV flotilla on port 12500
+        // EndpointId will be set after first deploy — leave blank to skip
+        const val DISCO_SIM_PEER_ADDRESS = "192.168.1.96:12500"
+        const val DISCO_SIM_PEER_NODE_ID = "4a6d13352927862711ae99e2ca75a178454b99b04f6c6a2f71acc5cf9cfcbb23"
 
         @Volatile
         private var instance: PeatPluginLifecycle? = null
@@ -463,13 +468,23 @@ class PeatPluginLifecycle(serviceController: IServiceController) : AbstractPlugi
                 while (true) {
                     try {
                         val peerCount = getPeatNodeJni()?.peerCount() ?: 0
-                        if (peerCount == 0) {
+                        // Always try to reconnect if we have fewer peers than expected
+                        if (peerCount < 1) {
                             val result = connectSimPeer(context)
-                            Log.i(TAG, "Sim peer connect attempt: $result")
+                            Log.i(TAG, "ALPHA sim peer connect: $result (peers=$peerCount)")
                         }
-                        // No heartbeat publishing — platform markers are generated
-                        // client-side from cell hierarchy data. Writing to the CRDT
-                        // store causes unbounded memory growth (Automerge revision history).
+                        // Connect to DiSCO USV flotilla
+                        if (DISCO_SIM_PEER_NODE_ID.isNotBlank() && peerCount < 2) {
+                            try {
+                                val node = getPeatNodeJni()
+                                if (node != null) {
+                                    node.connectPeer(DISCO_SIM_PEER_NODE_ID, DISCO_SIM_PEER_ADDRESS)
+                                    Log.i(TAG, "DiSCO sim peer connect attempt (peers=$peerCount)")
+                                }
+                            } catch (e: Exception) {
+                                Log.w(TAG, "DiSCO peer connect failed: ${e.message}")
+                            }
+                        }
                     } catch (e: Exception) {
                         Log.w(TAG, "Sim peer maintenance error: ${e.message}")
                     }
