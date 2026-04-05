@@ -1648,17 +1648,31 @@ class PeatMapComponent : DropDownMapComponent() {
      */
     fun zoomToCell(centerLat: Double, centerLon: Double, radiusMeters: Double) {
         try {
-            val centerPoint = GeoPoint(centerLat, centerLon)
-            // Calculate appropriate zoom scale based on radius
-            // ATAK uses map scale where lower = more zoomed in
-            // Roughly: scale = radiusMeters * 2 / screenWidthPixels * metersPerPixel
-            // For simplicity, use a scale that shows ~2x the radius
-            val zoomScale = (radiusMeters * 4.0).coerceIn(500.0, 100000.0)
+            // Calculate bounding box from platforms near the cell center
+            val cellPlatforms = platforms.filter {
+                haversineDistanceM(it.lat, it.lon, centerLat, centerLon) < 5000.0
+            }
 
-            mapView.mapController.panTo(centerPoint, true)
-            mapView.mapController.zoomTo(zoomScale, true)
+            if (cellPlatforms.size >= 2) {
+                val minLat = cellPlatforms.minOf { it.lat }
+                val maxLat = cellPlatforms.maxOf { it.lat }
+                val minLon = cellPlatforms.minOf { it.lon }
+                val maxLon = cellPlatforms.maxOf { it.lon }
+                // 30% padding
+                val padLat = (maxLat - minLat) * 0.3
+                val padLon = (maxLon - minLon) * 0.3
 
-            Log.i(TAG, "Zoomed to cell at ($centerLat, $centerLon) with radius ${radiusMeters}m")
+                // Use ATAKUtilities.scaleToFit to zoom to bounding box
+                val sw = GeoPoint(minLat - padLat, minLon - padLon)
+                val ne = GeoPoint(maxLat + padLat, maxLon + padLon)
+                com.atakmap.android.util.ATAKUtilities.scaleToFit(
+                    mapView, arrayOf(sw, ne), mapView.width, mapView.height
+                )
+                Log.i(TAG, "Zoomed to fit ${cellPlatforms.size} platforms")
+            } else {
+                mapView.mapController.panTo(GeoPoint(centerLat, centerLon), true)
+                Log.i(TAG, "Panned to cell center")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to zoom to cell: ${e.message}", e)
         }
