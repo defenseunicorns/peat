@@ -5,6 +5,11 @@ struct ItemDetailView: View {
     let item: InventoryItem
     @State private var showingEdit = false
 
+    /// Live version of the item from the view model, so CRDT updates reflect immediately
+    private var currentItem: InventoryItem {
+        viewModel.items.first(where: { $0.id == item.id }) ?? item
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -15,7 +20,7 @@ struct ItemDetailView: View {
                 assignmentSection
                 Divider()
                 statusSection
-                if !item.notes.isEmpty {
+                if !currentItem.notes.isEmpty {
                     Divider()
                     notesSection
                 }
@@ -24,7 +29,7 @@ struct ItemDetailView: View {
             }
             .padding()
         }
-        .navigationTitle(item.nomenclature)
+        .navigationTitle(currentItem.nomenclature)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -37,13 +42,13 @@ struct ItemDetailView: View {
             }
         }
         .sheet(isPresented: $showingEdit) {
-            ItemEditView(viewModel: viewModel, item: item)
+            ItemEditView(viewModel: viewModel, item: currentItem)
         }
     }
 
     private var headerSection: some View {
         HStack(spacing: 16) {
-            Image(systemName: item.category.sfSymbol)
+            Image(systemName: currentItem.category.sfSymbol)
                 .font(.largeTitle)
                 .foregroundStyle(MilitaryTheme.odGreen)
                 .frame(width: 60, height: 60)
@@ -51,14 +56,14 @@ struct ItemDetailView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(item.nomenclature)
+                Text(currentItem.nomenclature)
                     .font(.headline)
-                Text(item.category.rawValue)
+                Text(currentItem.category.rawValue)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 HStack {
-                    ConditionBadge(code: item.conditionCode)
-                    Text("Qty: \(item.quantity)")
+                    ConditionBadge(code: currentItem.conditionCode)
+                    Text("Qty: \(currentItem.quantity)")
                         .font(.subheadline.bold())
                         .foregroundStyle(MilitaryTheme.odGreen)
                 }
@@ -69,18 +74,18 @@ struct ItemDetailView: View {
     private var identificationSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader(title: "Identification", sfSymbol: "number")
-            DetailRow(label: "NSN", value: item.nsn, monospaced: true)
-            DetailRow(label: "Serial Number", value: item.serialNumber, monospaced: true)
-            DetailRow(label: "Category", value: item.category.rawValue)
+            DetailRow(label: "NSN", value: currentItem.nsn, monospaced: true)
+            DetailRow(label: "Serial Number", value: currentItem.serialNumber, monospaced: true)
+            DetailRow(label: "Category", value: currentItem.category.rawValue)
         }
     }
 
     private var assignmentSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader(title: "Assignment", sfSymbol: "person.fill")
-            DetailRow(label: "Responsible Person", value: item.responsiblePerson)
-            DetailRow(label: "Responsible Unit", value: item.responsibleUnit)
-            DetailRow(label: "Location", value: item.location)
+            DetailRow(label: "Responsible Person", value: currentItem.responsiblePerson)
+            DetailRow(label: "Responsible Unit", value: currentItem.responsibleUnit)
+            DetailRow(label: "Location", value: currentItem.location)
         }
     }
 
@@ -93,19 +98,50 @@ struct ItemDetailView: View {
                     .foregroundStyle(.secondary)
                 Spacer()
                 HStack(spacing: 8) {
-                    ConditionBadgeLarge(code: item.conditionCode)
-                    Text(item.conditionCode.rawValue)
+                    ConditionBadgeLarge(code: currentItem.conditionCode)
+                    Text(currentItem.conditionCode.rawValue)
                         .font(.subheadline)
                 }
             }
-            DetailRow(label: "Quantity", value: "\(item.quantity)")
+            quantityAdjuster
+        }
+    }
+
+    private var quantityAdjuster: some View {
+        HStack {
+            Text("Quantity")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Spacer()
+            HStack(spacing: 12) {
+                Button {
+                    Task { await viewModel.adjustQuantity(for: currentItem, by: -1) }
+                } label: {
+                    Image(systemName: "minus.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(currentItem.quantity > 0 ? MilitaryTheme.odGreen : .gray)
+                }
+                .disabled(currentItem.quantity <= 0)
+
+                Text("\(currentItem.quantity)")
+                    .font(.headline.monospacedDigit())
+                    .frame(minWidth: 36)
+
+                Button {
+                    Task { await viewModel.adjustQuantity(for: currentItem, by: 1) }
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(MilitaryTheme.odGreen)
+                }
+            }
         }
     }
 
     private var notesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader(title: "Notes", sfSymbol: "note.text")
-            Text(item.notes)
+            Text(currentItem.notes)
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .padding(12)
@@ -118,9 +154,9 @@ struct ItemDetailView: View {
     private var metadataSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader(title: "Sync Metadata", sfSymbol: "clock.fill")
-            DetailRow(label: "Last Modified", value: item.lastModified.formatted(date: .abbreviated, time: .shortened))
-            DetailRow(label: "Modified By", value: item.modifiedBy.isEmpty ? "Local" : item.modifiedBy)
-            DetailRow(label: "Item ID", value: item.id.uuidString.prefix(8).description, monospaced: true)
+            DetailRow(label: "Last Modified", value: currentItem.lastModified.formatted(date: .abbreviated, time: .shortened))
+            DetailRow(label: "Modified By", value: currentItem.modifiedBy.isEmpty ? "Local" : currentItem.modifiedBy)
+            DetailRow(label: "Item ID", value: currentItem.id.uuidString.prefix(8).description, monospaced: true)
         }
     }
 }

@@ -115,6 +115,13 @@ final class InventoryViewModel {
         items = []
     }
 
+    func adjustQuantity(for item: InventoryItem, by delta: Int) async {
+        var updated = item
+        updated.quantity = max(0, item.quantity + delta)
+        updated.lastModified = Date()
+        await saveItem(updated)
+    }
+
     func clearFilters() {
         selectedCategory = nil
         selectedCondition = nil
