@@ -632,6 +632,25 @@ impl SyncCapable for AutomergeBackend {
                         &active_handlers_for_events,
                     );
 
+                    // Explicitly push all local documents to the new peer.
+                    // The sync handler above handles incoming streams, but we also
+                    // need to proactively push our documents to ensure bidirectional sync.
+                    let coordinator_for_push = Arc::clone(&coordinator_for_events);
+                    let push_peer_id = endpoint_id;
+                    tokio::spawn(async move {
+                        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                        if let Err(e) = coordinator_for_push
+                            .sync_all_documents_with_peer(push_peer_id)
+                            .await
+                        {
+                            tracing::debug!(
+                                "Proactive document push to peer {:?} failed: {}",
+                                push_peer_id,
+                                e
+                            );
+                        }
+                    });
+
                     // ADR-034 Phase 2: Exchange tombstones with new peer
                     // This ensures deletions are synchronized when peers connect
                     let coordinator_for_tombstones = Arc::clone(&coordinator_for_events);
@@ -685,6 +704,56 @@ impl SyncCapable for AutomergeBackend {
         });
 
         *self.incoming_handler_task.write().unwrap() = Some(task);
+
+        // Phase 6.5: Spawn local change propagation task
+        //
+        // Subscribe to AutomergeStore change notifications and push changed
+        // documents to all connected peers. This ensures documents created after
+        // the initial connection handshake (e.g., platoon summaries created by
+        // aggregation loops) propagate to peers automatically.
+        {
+            let store_for_changes = Arc::clone(&self.store);
+            let coordinator_for_changes: Arc<peat_mesh::storage::AutomergeSyncCoordinator> =
+                Arc::clone(self.sync_coordinator.as_ref().unwrap());
+            let sync_active_for_changes = Arc::clone(&self.sync_active);
+            tokio::spawn(async move {
+                let mut change_rx = store_for_changes.subscribe_to_changes();
+                // Debounce: track last push time per doc to avoid sync loops
+                let mut last_push: std::collections::HashMap<String, std::time::Instant> =
+                    std::collections::HashMap::new();
+                let debounce = std::time::Duration::from_secs(2);
+                while sync_active_for_changes.load(Ordering::Relaxed) {
+                    match change_rx.recv().await {
+                        Ok(doc_key) => {
+                            // Skip if we pushed this doc recently (prevents sync echo loops)
+                            let now = std::time::Instant::now();
+                            if let Some(last) = last_push.get(&doc_key) {
+                                if now.duration_since(*last) < debounce {
+                                    continue;
+                                }
+                            }
+                            last_push.insert(doc_key.clone(), now);
+
+                            if let Err(e) = coordinator_for_changes
+                                .sync_document_with_all_peers(&doc_key)
+                                .await
+                            {
+                                tracing::trace!(
+                                    "Change propagation failed for '{}': {}",
+                                    doc_key,
+                                    e
+                                );
+                            }
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
+                            // Acceptable — we'll catch up on next change
+                        }
+                        Err(_) => break,
+                    }
+                }
+                tracing::debug!("Local change propagation task stopped");
+            });
+        }
 
         // Phase 6.4: Spawn incoming heartbeat handler task
         //
