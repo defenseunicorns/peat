@@ -39,8 +39,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          claude -p --allowedTools 'Bash(gh pr diff *),Bash(gh pr view *),Bash(gh pr review *)' \
-            "You are the QA review agent for the Peat Protocol ecosystem.
+          cat <<'PROMPT' | claude -p --allowedTools 'Bash(gh pr diff *),Bash(gh pr view *),Bash(gh pr review *)'
+          You are the QA review agent for the Peat Protocol ecosystem.
 
           Review PR #${{ github.event.pull_request.number }} in ${{ github.repository }} (HEAD: ${{ steps.check.outputs.short_sha }}).
 
@@ -57,4 +57,5 @@ jobs:
           4. Post findings with: gh pr review ${{ github.event.pull_request.number }} --comment --body 'YOUR_REVIEW'
              Start the body with: ## Peat QA Review (SHA: ${{ steps.check.outputs.short_sha }})
              Use severity tags: [BLOCKER], [WARNING], [SUGGESTION]
-             NEVER approve or request-changes — comment only."
+             NEVER approve or request-changes — comment only.
+          PROMPT
