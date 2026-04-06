@@ -1363,18 +1363,28 @@ class PeatMapComponent : DropDownMapComponent() {
 
                             currentTask = when {
                                 isDestroying -> "DESTROY: SKUNK-1"
-                                isIntercepting && _targetDestroyed -> "BDA: TARGET NEUTRALIZED"
+                                isIntercepting && _targetDestroyed -> "BDA: TARGET NEUTRALIZED — RTB"
                                 else -> "SHADOW: SKUNK-1"
                             }
 
                             // Phase transition:
                             // Destroy LightFish reaches target → freeze SKUNK-1
-                            // Shadow LightFish transitions to BDA reporting automatically
                             if (isDestroying && progress >= 0.95 && !_targetDestroyed) {
                                 _targetDestroyed = true
                                 _targetFrozenLat = redTrack.lat
                                 _targetFrozenLon = redTrack.lon
                                 Log.i(TAG, "SKUNK-1 neutralized at ${redTrack.lat}, ${redTrack.lon}")
+                            }
+
+                            // Shadow LightFish returns to station 30s after neutralization
+                            if (isIntercepting && _targetDestroyed) {
+                                val destroyTime = _destroyStartTime ?: 0L
+                                val sinceDestroy = (System.currentTimeMillis() - destroyTime) / 1000.0 - 60.0 // 60s destroy transit
+                                if (sinceDestroy > 30.0) {
+                                    // Clear intercept — LightFish returns to normal patrol
+                                    _interceptUsvIndex = null
+                                    _interceptStartTime = null
+                                }
                             }
                         } else {
                             // Normal: circle around station at 50m radius
