@@ -1,0 +1,60 @@
+name: QA Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main, develop]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  qa-review:
+    name: Peat QA Review
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: peat-arm64-linux-gb10
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for existing review
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SHORT_SHA="${{ github.event.pull_request.head.sha }}"
+          SHORT_SHA="${SHORT_SHA:0:7}"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          EXISTING=$(gh pr view "${{ github.event.pull_request.number }}" --json comments --jq \
+            ".comments[] | select(.body | contains(\"Peat QA Review (SHA: ${SHORT_SHA})\")) | .id" 2>/dev/null || true)
+          if [ -n "$EXISTING" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Review PR with Claude Code
+        if: steps.check.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          claude -p --allowedTools 'Bash(gh pr diff *),Bash(gh pr view *),Bash(gh pr review *)' \
+            "You are the QA review agent for the Peat Protocol ecosystem.
+
+          Review PR #${{ github.event.pull_request.number }} in ${{ github.repository }} (HEAD: ${{ steps.check.outputs.short_sha }}).
+
+          Steps:
+          1. Run: gh pr diff ${{ github.event.pull_request.number }}
+          2. Run: gh pr view ${{ github.event.pull_request.number }}
+          3. Review the diff against these criteria:
+             - Protocol/schema: backward-compatible with cap-schema; check ADR decisions
+             - peat-mesh: must not break Automerge sync semantics or Iroh peer discovery
+             - peat-ffi / peat-btle: FFI/BLE changes must validate all platform bindings (Android JNI, iOS UniFFI, Linux BlueZ, aarch64)
+             - Security primitives: Ed25519/X25519/ChaCha20/HMAC-SHA256 — flag any deviation as [BLOCKER]
+             - Performance: flag anything likely to increase convergence latency >20% or bandwidth beyond baselines
+             - peat-lite: must maintain OTA safety and A/B partition integrity
+          4. Post findings with: gh pr review ${{ github.event.pull_request.number }} --comment --body 'YOUR_REVIEW'
+             Start the body with: ## Peat QA Review (SHA: ${{ steps.check.outputs.short_sha }})
+             Use severity tags: [BLOCKER], [WARNING], [SUGGESTION]
+             NEVER approve or request-changes — comment only."
