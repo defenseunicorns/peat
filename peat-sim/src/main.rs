@@ -2222,7 +2222,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         }
                                     }
                                 });
-                                println!("[{}] ✓ Scenario signal handler registered (SIGUSR1/SIGUSR2)", node_id);
+                                println!(
+                                    "[{}] ✓ Scenario signal handler registered (SIGUSR1/SIGUSR2)",
+                                    node_id
+                                );
 
                                 // Cell publisher loop (includes scenario_command field)
                                 tokio::spawn(async move {
@@ -2245,11 +2248,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                                 .filter(|n| !n.is_empty())
                                                 .collect();
                                             // Include scenario command if signal was received
-                                            let scenario_cmd = match scenario_state.load(Ordering::SeqCst) {
-                                                1 => serde_json::json!("START_SCENARIO"),
-                                                2 => serde_json::json!("STOP_SCENARIO"),
-                                                _ => serde_json::Value::Null,
-                                            };
+                                            let scenario_cmd =
+                                                match scenario_state.load(Ordering::SeqCst) {
+                                                    1 => serde_json::json!("START_SCENARIO"),
+                                                    2 => serde_json::json!("STOP_SCENARIO"),
+                                                    _ => serde_json::Value::Null,
+                                                };
                                             let cell_json = serde_json::json!({
                                                 "name": format!("{} ({} USV Swarm)", display_name, summary.member_count),
                                                 "status": status,
