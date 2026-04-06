@@ -13,18 +13,6 @@ mgmt:
 topology:
   nodes:
 
-    # Lab Orchestrator - deployed first, other nodes register with it
-    # Topology file is bind-mounted for node name validation
-    orchestrator:
-      kind: linux
-      image: peat-sim-node:latest
-      ports:
-        - 8080:8080
-      binds:
-        - /tmp/lab4-48n.yaml:/topology.yaml:ro
-      entrypoint: /usr/local/bin/lab-orchestrator
-      cmd: --topology /topology.yaml --port 8080
-
     # ===== COMPANY ALPHA =====
 
     company-ALPHA-commander:

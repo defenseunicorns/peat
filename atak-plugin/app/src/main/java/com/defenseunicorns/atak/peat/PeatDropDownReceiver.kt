@@ -66,6 +66,7 @@ class PeatDropDownReceiver(
     // Track detail view state
     private var selectedTrackId: String? = null
     private var coaResponse: String? = null
+    private var recommendedUsvIndex: Int? = null
 
     // User's role in the hierarchy (for PoC, using default role)
     private var userRole: PeatRole = PeatRole.defaultRole()
@@ -1126,10 +1127,11 @@ class PeatDropDownReceiver(
         }
         headerRow.addView(name)
 
+        val ageMs = System.currentTimeMillis() - cell.lastUpdate
         val statusColor = when (cell.status) {
             PeatCell.Status.ACTIVE -> Color.parseColor("#4CAF50")
             PeatCell.Status.FORMING -> Color.parseColor("#FFC107")
-            else -> Color.parseColor("#F44336")
+            else -> Color.parseColor("#888888")
         }
         val statusText = TextView(pluginContext).apply {
             text = cell.status.name
@@ -1138,6 +1140,21 @@ class PeatDropDownReceiver(
         }
         headerRow.addView(statusText)
         card.addView(headerRow)
+
+        // Show "last seen" for stale/offline cells
+        if (cell.status == PeatCell.Status.OFFLINE && ageMs > 10_000) {
+            val lastSeen = when {
+                ageMs < 60_000 -> "${ageMs / 1000}s ago"
+                ageMs < 3_600_000 -> "${ageMs / 60_000}m ago"
+                else -> "${ageMs / 3_600_000}h ago"
+            }
+            val staleLabel = TextView(pluginContext).apply {
+                text = "Last seen: $lastSeen"
+                textSize = 11f
+                setTextColor(Color.parseColor("#888888"))
+            }
+            card.addView(staleLabel)
+        }
 
         // Get actual platforms in this cell (for display)
         val displayPlatforms = mapComponent.platforms.filter { it.cellId == cell.id }
@@ -1251,6 +1268,46 @@ class PeatDropDownReceiver(
             setTextColor(Color.parseColor("#888888"))
         }
         card.addView(confidence)
+
+        // Show execution status on hostile tracks
+        if (isHostile && mapComponent.interceptActive) {
+            card.addView(createSpacer(8))
+            if (mapComponent.targetDestroyed) {
+                val neutralized = TextView(pluginContext).apply {
+                    text = "TARGET NEUTRALIZED"
+                    textSize = 12f
+                    setTextColor(Color.parseColor("#4CAF50"))
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                }
+                card.addView(neutralized)
+            } else {
+                val statusRow = LinearLayout(pluginContext).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                }
+                val statusLabel = TextView(pluginContext).apply {
+                    text = "INTERCEPT IN PROGRESS"
+                    textSize = 11f
+                    setTextColor(Color.parseColor("#FF9800"))
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                }
+                statusRow.addView(statusLabel)
+                val abortBtn = Button(pluginContext).apply {
+                    text = "ABORT"
+                    textSize = 10f
+                    setTextColor(Color.WHITE)
+                    setBackgroundColor(Color.parseColor("#B71C1C"))
+                    setPadding(16, 4, 16, 4)
+                    setOnClickListener {
+                        mapComponent.abortTasking()
+                        refreshContent()
+                    }
+                }
+                statusRow.addView(abortBtn)
+                card.addView(statusRow)
+            }
+        }
 
         return card
     }
@@ -1420,6 +1477,34 @@ class PeatDropDownReceiver(
             }
             responseCard.addView(responseText)
             container.addView(responseCard)
+            container.addView(createSpacer(8))
+
+            // Execute button — tasks the recommended LightFish
+            if (recommendedUsvIndex != null && !mapComponent.interceptActive) {
+                val recIdx = recommendedUsvIndex!!
+                val recCallsign = if (recIdx == 0) "LightFish-CDR" else "LightFish-$recIdx"
+                val executeBtn = Button(pluginContext).apply {
+                    text = "Execute COA 2: Task $recCallsign to Shadow"
+                    textSize = 12f
+                    setTextColor(Color.WHITE)
+                    setBackgroundColor(Color.parseColor("#E65100"))
+                    setPadding(24, 12, 24, 12)
+                    setOnClickListener {
+                        mapComponent.taskIntercept(recIdx)
+                        refreshContent()
+                    }
+                }
+                container.addView(executeBtn)
+            } else if (mapComponent.interceptActive) {
+                val statusText = TextView(pluginContext).apply {
+                    text = "EXECUTING: Assets tasked — intercept + BDA in progress"
+                    textSize = 12f
+                    setTextColor(Color.parseColor("#FF9800"))
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    setPadding(0, 8, 0, 0)
+                }
+                container.addView(statusText)
+            }
         }
 
         return container
@@ -1476,25 +1561,35 @@ class PeatDropDownReceiver(
         sb.appendLine()
 
         // COA 2
-        sb.appendLine("COA 2 — SHADOW & TRACK")
+        sb.appendLine("COA 2 — SHADOW & TRACK → AUTO-ENGAGE")
         if (bestTrail.isNotEmpty()) {
-            sb.appendLine("  Task ${bestTrail.first().platform.callsign} to maintain 500m trail")
+            sb.appendLine("  Task ${bestTrail.first().platform.callsign} to shadow at 500m trail")
             sb.appendLine("  Continuous track via GNSS RTK + sonar")
-            sb.appendLine("  ${operational.size - 1} USVs maintain patrol coverage")
-            sb.appendLine("  Risk: Low — single asset, patrol maintained")
+            sb.appendLine("  ${operational.size - 1} USVs maintain wall coverage")
+            sb.appendLine("  Auto-deploy BDA asset when shadow established")
+            sb.appendLine("  IF $callsign breaches cell perimeter:")
+            sb.appendLine("    → Nearest wall USV auto-engages to neutralize")
+            sb.appendLine("    → Shadow asset transitions to BDA reporting")
+            sb.appendLine("  Risk: Low — graduated response, wall maintained until breach")
         }
         sb.appendLine()
 
         // COA 3
         sb.appendLine("COA 3 — REPOSITION SWARM")
-        sb.appendLine("  Shift patrol box to envelop $callsign")
-        sb.appendLine("  All ${operational.size} USVs maintain formation around contact")
+        sb.appendLine("  Shift entire wall to envelop $callsign")
+        sb.appendLine("  All ${operational.size} USVs reposition around contact")
         sb.appendLine("  Full sensor coverage: sonar, EO, magnetometer")
         sb.appendLine("  Risk: High — abandons patrol sector, 10-15 min reposition")
         sb.appendLine()
 
         val recAsset = bestTrail.firstOrNull()?.platform
-        sb.append("RECOMMENDATION: COA 2. ${recAsset?.callsign ?: "LightFish-1"} (${recAsset?.batteryPercent ?: 70}% batt) has endurance for 2+ hr trail. Maintains patrol posture while tracking $callsign.")
+        sb.append("RECOMMENDATION: COA 2. ${recAsset?.callsign ?: "LightFish-1"} (${recAsset?.batteryPercent ?: 70}% batt) shadows $callsign. Graduated response: shadow → BDA → auto-engage on breach. Wall posture maintained.")
+
+        // Store recommended USV index for Execute button
+        recommendedUsvIndex = if (recAsset != null) {
+            val idx = recAsset.callsign.removePrefix("LightFish-").toIntOrNull()
+            if (recAsset.callsign == "LightFish-CDR") 0 else idx
+        } else null
 
         return sb.toString()
     }

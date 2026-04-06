@@ -555,12 +555,24 @@ demo-disco-destroy:
 	@echo "✓ DiSCO flotilla destroyed"
 
 # ---- Demo Flow Control ----
+# Pre-demo: build everything (run once before the demo)
+demo-prep: build-docker build-atak-plugin deploy-atak-plugin
+	@cp peat-sim/topologies/lab4-48n-1gbps.yaml /tmp/lab4-48n.yaml
+	@echo "✓ Demo prep complete — Docker image + APK built and deployed"
+
+# Clean reset: tear down everything, clear ATAK store, restart fresh
+demo-reset: stop-atak
+	@docker ps -a --filter "name=clab-" -q | xargs -r docker rm -f 2>/dev/null || true
+	@docker network rm lab4-48n disco-8usv 2>/dev/null || true
+	@adb shell "run-as $(ATAK_PACKAGE) rm -rf /data/user/0/$(ATAK_PACKAGE)/files/peat" 2>/dev/null || true
+	@echo "✓ Clean reset complete"
+
 # Phase 1: ATAK only (BRAVO cell = tablet + watch)
 demo-phase1: configure-atak start-atak
 	@echo "✓ Phase 1: ATAK running (BRAVO cell)"
 
 # Phase 2: Bring up ALPHA company (48-node ground force)
-demo-phase2: build-docker
+demo-phase2:
 	@cp peat-sim/topologies/lab4-48n-1gbps.yaml /tmp/lab4-48n.yaml
 	@echo "Deploying ALPHA company..."
 	@sudo BACKEND=automerge CAP_IN_MEMORY=true containerlab deploy -t $(TOPOLOGY) --reconfigure --timeout 5m

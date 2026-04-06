@@ -87,15 +87,69 @@ class PeatMapComponent : DropDownMapComponent() {
     private var _scenarioStartTime: Long? = null
     val scenarioActive: Boolean get() = _scenarioStartTime != null
 
+    // Intercept tasking state
+    private var _interceptUsvIndex: Int? = null      // which LightFish is intercepting
+    private var _interceptStartTime: Long? = null
+    private var _bdaUsvIndex: Int? = null             // which LightFish is doing BDA
+    private var _bdaStartTime: Long? = null
+    private var _destroyUsvIndex: Int? = null         // which LightFish is destroying
+    private var _destroyStartTime: Long? = null
+    private var _targetDestroyed: Boolean = false     // SKUNK-1 neutralized
+    private var _targetFrozenLat: Double = 0.0       // frozen position when destroyed
+    private var _targetFrozenLon: Double = 0.0
+    val interceptActive: Boolean get() = _interceptUsvIndex != null
+    val targetDestroyed: Boolean get() = _targetDestroyed
+
     fun startRedTrackScenario() {
         _scenarioStartTime = System.currentTimeMillis()
+        _interceptUsvIndex = null
+        _interceptStartTime = null
+        _bdaUsvIndex = null
+        _bdaStartTime = null
+        _destroyUsvIndex = null
+        _destroyStartTime = null
+        _targetDestroyed = false
         Log.i(TAG, "Red track scenario started")
     }
 
     fun stopRedTrackScenario() {
         _scenarioStartTime = null
+        _interceptUsvIndex = null
+        _interceptStartTime = null
+        _bdaUsvIndex = null
+        _bdaStartTime = null
+        _destroyUsvIndex = null
+        _destroyStartTime = null
+        _targetDestroyed = false
         _tracks.removeAll { it.id == "red-track-1" }
         Log.i(TAG, "Red track scenario stopped")
+    }
+
+    /** Task a LightFish to intercept SKUNK-1. Called from COA Execute button. */
+    fun taskIntercept(usvIndex: Int) {
+        _interceptUsvIndex = usvIndex
+        _interceptStartTime = System.currentTimeMillis()
+        Log.i(TAG, "Tasked LightFish-$usvIndex to intercept SKUNK-1")
+    }
+
+    /** Abort all tasking — LightFish return to stations */
+    fun abortTasking() {
+        val wasActive = _interceptUsvIndex != null
+        _interceptUsvIndex = null
+        _interceptStartTime = null
+        _bdaUsvIndex = null
+        _bdaStartTime = null
+        _destroyUsvIndex = null
+        _destroyStartTime = null
+        _targetDestroyed = false
+        if (wasActive) Log.i(TAG, "Tasking aborted — LightFish returning to stations")
+    }
+
+    /** Task a LightFish for BDA. Auto-triggered when intercept reaches trail distance. */
+    fun taskBda(usvIndex: Int) {
+        _bdaUsvIndex = usvIndex
+        _bdaStartTime = System.currentTimeMillis()
+        Log.i(TAG, "Tasked LightFish-$usvIndex for BDA on SKUNK-1")
     }
 
     /** Distance in meters between two lat/lon points */
@@ -125,6 +179,28 @@ class PeatMapComponent : DropDownMapComponent() {
         val startPos = offsetPosition(wallCenter, 180.0, 2000.0) // south, open ocean
         val endPos = offsetPosition(wallCenter, 0.0, 2000.0)     // north, toward shore
 
+        // Frozen when destroyed — stop moving, mark as neutralized
+        if (_targetDestroyed) {
+            val destroyerCallsign = _destroyUsvIndex?.let {
+                if (it == 0) "LightFish-CDR" else "LightFish-$it"
+            } ?: "LightFish-CDR"
+            return PeatTrack(
+                id = "red-track-1",
+                sourcePlatform = destroyerCallsign,
+                cellId = charlieCell.id,
+                lat = _targetFrozenLat,
+                lon = _targetFrozenLon,
+                heading = 0.0,
+                speed = 0.0,
+                classification = "a-h-S",
+                confidence = 0.95,
+                category = PeatTrack.Category.VESSEL,
+                attributes = mapOf("callsign" to "SKUNK-1 [NEUTRALIZED]", "speed_kts" to "0.0"),
+                createdAt = startTime,
+                lastUpdate = System.currentTimeMillis()
+            )
+        }
+
         // 8 knots = ~4.1 m/s, 4km path = ~16 min
         val elapsedSec = (System.currentTimeMillis() - startTime) / 1000.0
         val totalPathM = 4000.0
@@ -135,13 +211,17 @@ class PeatMapComponent : DropDownMapComponent() {
         val lat = startPos[0] + (endPos[0] - startPos[0]) * progress
         val lon = startPos[1] + (endPos[1] - startPos[1]) * progress
 
+        // Source: nearest LightFish USV (the one that detected it)
+        val usvPlatforms = _platforms.filter { it.platformType == PeatPlatform.PlatformType.USV }
+        val detector = usvPlatforms.minByOrNull { haversineDistanceM(it.lat, it.lon, lat, lon) }
+
         return PeatTrack(
             id = "red-track-1",
-            sourcePlatform = "LightFish-CDR",
+            sourcePlatform = detector?.callsign ?: "LightFish-CDR",
             cellId = charlieCell.id,
             lat = lat,
             lon = lon,
-            heading = 0.0, // approaching from south, heading north
+            heading = 0.0,
             speed = speedMps,
             classification = "a-h-S",
             confidence = 0.82,
@@ -1044,14 +1124,17 @@ class PeatMapComponent : DropDownMapComponent() {
                 if (!activeCapabilities.contains("GATEWAY")) activeCapabilities.add("GATEWAY")
             }
 
-            // Cell status: for BLE cells, derive from local platform count.
-            // For sim/FFI cells (non-BLE), trust the aggregated status from the mesh.
+            // Cell status: derive from connectivity and freshness
             val activeCount = activePlatforms.size
             val isBleCell = cell.capabilities.contains("BLE_MESH")
+            val ageMs = System.currentTimeMillis() - cell.lastUpdate
+            val isStale = ageMs > 30_000 // No update in 30s = stale
             val newStatus = if (isBleCell) {
                 if (activeCount == 0) PeatCell.Status.OFFLINE else PeatCell.Status.ACTIVE
+            } else if (isStale) {
+                PeatCell.Status.OFFLINE
             } else {
-                cell.status  // Trust FFI-provided status (from hierarchical aggregation)
+                cell.status
             }
 
             // For sim cells, use generated platform count if available, else FFI count
@@ -1174,6 +1257,7 @@ class PeatMapComponent : DropDownMapComponent() {
             for (cell in _cells) {
                 if (cell.capabilities.contains("BLE_MESH")) continue
                 if (cell.centerLat == 0.0 && cell.centerLon == 0.0) continue
+                if (cell.status == PeatCell.Status.OFFLINE) continue
 
                 val center = doubleArrayOf(cell.centerLat, cell.centerLon)
 
@@ -1197,17 +1281,107 @@ class PeatMapComponent : DropDownMapComponent() {
                     val elapsedTicks = (System.currentTimeMillis() / (REFRESH_INTERVAL_MS)).toInt()
                     val elapsedMinutes = (System.currentTimeMillis() - cell.lastUpdate) / 60_000.0
 
+                    // Get red track position for intercept/BDA targeting
+                    val redTrack = _tracks.find { it.id == "red-track-1" }
+
+                    // Auto-deploy destroy LightFish when SKUNK-1 reaches the wall perimeter
+                    if (redTrack != null && _interceptUsvIndex != null && _destroyUsvIndex == null && !_targetDestroyed) {
+                        // Check distance to nearest station on the wall
+                        val distToNearestStation = (0 until numTotal).minOf { idx ->
+                            val s = offsetPosition(arcCenter,
+                                arcStartDeg + (idx.toDouble() / (numTotal - 1)) * arcSpan,
+                                arcRadius)
+                            haversineDistanceM(s[0], s[1], redTrack.lat, redTrack.lon)
+                        }
+                        Log.d(TAG, "SKUNK-1 dist to nearest wall station: ${distToNearestStation.toInt()}m")
+                        if (distToNearestStation <= 500.0) { // within 500m of any station
+                            val taskedIndices = setOf(_interceptUsvIndex)
+                            val nearest = (0 until numTotal)
+                                .filter { it !in taskedIndices }
+                                .minByOrNull { idx ->
+                                    val s = offsetPosition(arcCenter,
+                                        arcStartDeg + (idx.toDouble() / (numTotal - 1)) * arcSpan,
+                                        arcRadius)
+                                    haversineDistanceM(s[0], s[1], redTrack.lat, redTrack.lon)
+                                }
+                            if (nearest != null) {
+                                _destroyUsvIndex = nearest
+                                _destroyStartTime = System.currentTimeMillis()
+                                Log.i(TAG, "SKUNK-1 at wall perimeter — tasked LightFish-$nearest to destroy")
+                            }
+                        }
+                    }
+
                     for (i in 0 until numTotal) {
                         // Station position on the arc
                         val arcDeg = arcStartDeg + (i.toDouble() / (numTotal - 1)) * arcSpan
                         val station = offsetPosition(arcCenter, arcDeg, arcRadius)
 
-                        // Animate: circle around station at 50m radius
-                        val circleAngle = ((elapsedTicks + i * 5) % 36) * 10.0 // 10° per tick
-                        val pos = offsetPosition(station, circleAngle, stationRadius)
+                        var pos: DoubleArray
+                        var headingDeg: Double
+                        var currentTask: String? = null
 
-                        // Heading tangent to circle
-                        val headingDeg = (circleAngle + 90.0) % 360.0
+                        // Check if this USV is tasked (2 assets max: shadow + destroy)
+                        val isIntercepting = _interceptUsvIndex == i && _interceptStartTime != null
+                        val isDestroying = _destroyUsvIndex == i && _destroyStartTime != null
+                        val isTasked = (isIntercepting || isDestroying) && redTrack != null
+
+                        if (isTasked && redTrack != null) {
+                            val taskStart = if (isDestroying) _destroyStartTime!! else _interceptStartTime!!
+                            val taskElapsed = (System.currentTimeMillis() - taskStart) / 1000.0
+                            val targetDist = if (isDestroying) 0.0 else 500.0
+                            val approachBearing = if (isDestroying) 270.0 else 0.0
+
+                            val targetPos = offsetPosition(
+                                doubleArrayOf(redTrack.lat, redTrack.lon),
+                                (redTrack.heading ?: 0.0) + 180.0 + approachBearing,
+                                targetDist
+                            )
+
+                            val transitTime = if (isDestroying) 60.0 else 240.0 // destroy is emergency sprint
+                            val progress = (taskElapsed / transitTime).coerceIn(0.0, 1.0)
+
+                            if (progress >= 1.0) {
+                                // At target — hold trail position relative to SKUNK-1
+                                pos = targetPos
+                            } else {
+                                // In transit — interpolate from station to target
+                                pos = doubleArrayOf(
+                                    station[0] + (targetPos[0] - station[0]) * progress,
+                                    station[1] + (targetPos[1] - station[1]) * progress
+                                )
+                            }
+
+                            val dLat = targetPos[0] - pos[0]
+                            val dLon = targetPos[1] - pos[1]
+                            headingDeg = if (progress >= 1.0) {
+                                // At target — face same direction as SKUNK-1
+                                redTrack.heading ?: 0.0
+                            } else {
+                                Math.toDegrees(Math.atan2(dLon, dLat))
+                            }
+
+                            currentTask = when {
+                                isDestroying -> "DESTROY: SKUNK-1"
+                                isIntercepting && _targetDestroyed -> "BDA: TARGET NEUTRALIZED"
+                                else -> "SHADOW: SKUNK-1"
+                            }
+
+                            // Phase transition:
+                            // Destroy LightFish reaches target → freeze SKUNK-1
+                            // Shadow LightFish transitions to BDA reporting automatically
+                            if (isDestroying && progress >= 0.95 && !_targetDestroyed) {
+                                _targetDestroyed = true
+                                _targetFrozenLat = redTrack.lat
+                                _targetFrozenLon = redTrack.lon
+                                Log.i(TAG, "SKUNK-1 neutralized at ${redTrack.lat}, ${redTrack.lon}")
+                            }
+                        } else {
+                            // Normal: circle around station at 50m radius
+                            val circleAngle = ((elapsedTicks + i * 5) % 36) * 10.0
+                            pos = offsetPosition(station, circleAngle, stationRadius)
+                            headingDeg = (circleAngle + 90.0) % 360.0
+                        }
 
                         // Each USV starts at different battery level and drains at different rate
                         // Simulates fleet deployed at staggered times
@@ -1254,6 +1428,9 @@ class PeatMapComponent : DropDownMapComponent() {
                         val callsign = if (i == 0) "LightFish-CDR" else "LightFish-$i"
                         val platId = if (i == 0) "${cell.id}-disco-leader" else "${cell.id}-disco-$i"
 
+                        // Tasked USVs leave the cell boundary (null cellId = no bounding circle)
+                        val platformCellId = if (currentTask != null) null else cell.id
+
                         _platforms.add(PeatPlatform(
                             id = platId, callsign = callsign,
                             platformType = PeatPlatform.PlatformType.USV,
@@ -1261,7 +1438,8 @@ class PeatMapComponent : DropDownMapComponent() {
                             heading = headingDeg,
                             batteryPercent = batteryPct,
                             status = platformStatus,
-                            cellId = cell.id, capabilities = caps,
+                            cellId = platformCellId, capabilities = caps,
+                            currentTask = currentTask,
                             lastUpdate = System.currentTimeMillis()
                         ))
                     }
