@@ -718,34 +718,40 @@ impl SyncCapable for AutomergeBackend {
             let sync_active_for_changes = Arc::clone(&self.sync_active);
             tokio::spawn(async move {
                 let mut change_rx = store_for_changes.subscribe_to_changes();
-                let mut push_count: u64 = 0;
+                // Debounce: track last push time per doc to avoid sync loops
+                let mut last_push: std::collections::HashMap<String, std::time::Instant> =
+                    std::collections::HashMap::new();
+                let debounce = std::time::Duration::from_secs(2);
                 while sync_active_for_changes.load(Ordering::Relaxed) {
                     match change_rx.recv().await {
                         Ok(doc_key) => {
-                            push_count += 1;
-                            if push_count <= 10 || push_count % 100 == 0 {
-                                eprintln!(
-                                    "[change-propagation] Pushing doc '{}' to peers (push #{})",
-                                    doc_key, push_count
-                                );
+                            // Skip if we pushed this doc recently (prevents sync echo loops)
+                            let now = std::time::Instant::now();
+                            if let Some(last) = last_push.get(&doc_key) {
+                                if now.duration_since(*last) < debounce {
+                                    continue;
+                                }
                             }
+                            last_push.insert(doc_key.clone(), now);
+
                             if let Err(e) = coordinator_for_changes
                                 .sync_document_with_all_peers(&doc_key)
                                 .await
                             {
-                                eprintln!(
-                                    "[change-propagation] FAILED to push '{}': {}",
-                                    doc_key, e
+                                tracing::trace!(
+                                    "Change propagation failed for '{}': {}",
+                                    doc_key,
+                                    e
                                 );
                             }
                         }
-                        Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                            eprintln!("[change-propagation] Lagged by {} messages", n);
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
+                            // Acceptable — we'll catch up on next change
                         }
                         Err(_) => break,
                     }
                 }
-                eprintln!("[change-propagation] Task stopped");
+                tracing::debug!("Local change propagation task stopped");
             });
         }
 
