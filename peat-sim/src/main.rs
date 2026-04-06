@@ -2173,6 +2173,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             // Flat cell publishing: if this squad leader has COMPANY_ID set,
                             // it publishes a cell directly (no platoon/company hierarchy needed).
                             // This supports flat cells like the DiSCO USV swarm.
+                            //
+                            // Scenario commands (SIGUSR1/SIGUSR2) are piggybacked on the cell doc
+                            // as a "scenario_command" field, since the cells collection is already
+                            // synced to ATAK. The separate "commands" collection doesn't sync
+                            // reliably because ATAK connects inbound and the push-based sync
+                            // only targets outbound peers.
                             if let Ok(company_id) = std::env::var("COMPANY_ID") {
                                 let cells_coll =
                                     automerge_backend.storage_backend().collection("cells");
@@ -2189,6 +2195,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                             .unwrap_or(&company_id)
                                             .to_uppercase()
                                     });
+
+                                // Shared scenario state: signal handler sets, cell publisher reads
+                                use std::sync::atomic::{AtomicU8, Ordering};
+                                let scenario_state = Arc::new(AtomicU8::new(0)); // 0=none, 1=start, 2=stop
+
+                                // Signal handler: SIGUSR1 → start, SIGUSR2 → stop
+                                let sig_state = Arc::clone(&scenario_state);
+                                let sig_node_id = node_id.clone();
+                                tokio::spawn(async move {
+                                    use tokio::signal::unix::{signal, SignalKind};
+                                    let mut sig1 = signal(SignalKind::user_defined1())
+                                        .expect("Failed to register SIGUSR1");
+                                    let mut sig2 = signal(SignalKind::user_defined2())
+                                        .expect("Failed to register SIGUSR2");
+                                    loop {
+                                        tokio::select! {
+                                            _ = sig1.recv() => {
+                                                sig_state.store(1, Ordering::SeqCst);
+                                                println!("[{}] ▶ SIGUSR1 received — scenario_command=START_SCENARIO", sig_node_id);
+                                            }
+                                            _ = sig2.recv() => {
+                                                sig_state.store(2, Ordering::SeqCst);
+                                                println!("[{}] ■ SIGUSR2 received — scenario_command=STOP_SCENARIO", sig_node_id);
+                                            }
+                                        }
+                                    }
+                                });
+                                println!(
+                                    "[{}] ✓ Scenario signal handler registered (SIGUSR1/SIGUSR2)",
+                                    node_id
+                                );
+
+                                // Cell publisher loop (includes scenario_command field)
                                 tokio::spawn(async move {
                                     // Wait for first aggregation
                                     sleep(Duration::from_secs(10)).await;
@@ -2208,6 +2247,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                                 .map(|c| c.name.clone())
                                                 .filter(|n| !n.is_empty())
                                                 .collect();
+                                            // Include scenario command if signal was received
+                                            let scenario_cmd =
+                                                match scenario_state.load(Ordering::SeqCst) {
+                                                    1 => serde_json::json!("START_SCENARIO"),
+                                                    2 => serde_json::json!("STOP_SCENARIO"),
+                                                    _ => serde_json::Value::Null,
+                                                };
                                             let cell_json = serde_json::json!({
                                                 "name": format!("{} ({} USV Swarm)", display_name, summary.member_count),
                                                 "status": status,
@@ -2218,6 +2264,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                                 "formation_id": serde_json::Value::Null,
                                                 "leader_id": &cell_node_id,
                                                 "last_update": now_micros() / 1000,
+                                                "scenario_command": scenario_cmd,
                                             });
                                             let _ = cells_coll.upsert(
                                                 &cell_company_id,

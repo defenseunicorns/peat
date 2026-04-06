@@ -40,7 +40,7 @@ buildscript {
     ext.takrepoUrl = getProperty(urlKey, 'https://localhost/')
     ext.takrepoUser = getProperty('takrepo.user', 'invalid')
     ext.takrepoPassword = getProperty('takrepo.password', 'invalid')
-    ext.takdevPlugin = getProperty('takdev.plugin', "${rootDir}/../ATAK-CIV-5.6.0-SDK/atak-gradle-takdev.jar")
+    ext.takdevPlugin = getProperty('takdev.plugin', "/home/kit/Code/ATAK-CIV-5.6.0-SDK/atak-gradle-takdev.jar")
 
     repositories {
         google()
@@ -58,7 +58,7 @@ buildscript {
         }
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.13.0'
+        classpath 'com.android.tools.build:gradle:8.13.2'
         if(isDevKitEnabled()) {
             classpath "com.atakmap.gradle:atak-gradle-takdev:${takdevVersion}"
         } else {
@@ -212,7 +212,7 @@ dependencies {
 
     // ATAK SDK - manually add main.jar for compilation (provided by ATAK at runtime)
     // The atak-takdev-plugin should add this but may not work without remote TAK repo access
-    compileOnly files("/home/kit/Code/revolve/ATAK-CIV-5.6.0-SDK/main.jar")
+    compileOnly files("/home/kit/Code/ATAK-CIV-5.6.0-SDK/main.jar")
 
     // Compose DISABLED - causes lifecycle conflicts with ATAK SDK
     // The plugin uses traditional Android Views instead

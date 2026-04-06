@@ -585,17 +585,18 @@ demo-phase3:
 	@echo "✓ Phase 3: CHARLIE USV swarm deployed"
 
 # Phase 4: Start red track scenario (hostile vessel approaches USV box)
+# Sends SIGUSR1 to disco-leader container, which publishes START_SCENARIO
+# to the "commands" collection. ATAK polls commands and triggers the scenario.
 demo-phase4:
-	@echo "Starting red track scenario..."
-	@adb logcat -c 2>/dev/null
-	@adb shell am broadcast -a com.defenseunicorns.atak.peat.SCENARIO_START -p com.atakmap.app.civ 2>/dev/null || true
-	@echo "✓ Phase 4: Red track scenario active — tap SKUNK-1 in Peat panel"
+	@echo "Starting red track scenario via mesh command..."
+	@docker kill -s USR1 clab-disco-8usv-disco-leader
+	@echo "✓ Phase 4: START_SCENARIO published to mesh — ATAK will pick it up within ~10s"
 
 # Stop red track scenario
 demo-phase4-stop:
-	@echo "Stopping red track scenario..."
-	@adb shell am broadcast -a com.defenseunicorns.atak.peat.SCENARIO_STOP -p com.atakmap.app.civ 2>/dev/null || true
-	@echo "✓ Red track scenario stopped"
+	@echo "Stopping red track scenario via mesh command..."
+	@docker kill -s USR2 clab-disco-8usv-disco-leader
+	@echo "✓ STOP_SCENARIO published to mesh"
 
 # Stop everything
 demo-stop: stop-atak demo-sim-destroy demo-disco-destroy
