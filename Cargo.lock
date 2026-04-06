@@ -4538,9 +4538,9 @@ dependencies = [
 
 [[package]]
 name = "peat-mesh"
-version = "0.7.0"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00d9c5aa8419a94ad93e9ddbf3630125e9a64a92353763a8afb49e8479c75e31"
+checksum = "e1094f45fbd841cb30b39638c43c3c8b69a8c8c70ba055ec24703e79bec02680"
 dependencies = [
  "anyhow",
  "async-trait",

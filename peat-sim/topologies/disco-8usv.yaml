@@ -1,0 +1,196 @@
+# DiSCO LightFish Flotilla: 8 autonomous surface vehicles
+# 1 leader + 7 patrol boats — flat cell, no platoon/squad hierarchy
+# Joins the same Peat mesh as ALPHA via shared formation credentials
+# Leader aggregates USV states and publishes cell CHARLIE directly
+
+name: disco-8usv
+
+mgmt:
+  network: disco-8usv
+  ipv4-subnet: 172.20.21.0/24
+
+topology:
+  nodes:
+
+    # ===== DiSCO FLOTILLA =====
+
+    # Leader node: aggregates USV states → publishes cell CHARLIE
+    disco-leader:
+      kind: linux
+      image: peat-sim-node:latest
+      ports:
+        - 12500:12500/udp
+      env:
+        NODE_ID: disco-leader
+        ROLE: squad_leader
+        PLATFORM_TYPE: usv
+        NODE_TYPE: usv
+        MODE: hierarchical
+        BACKEND: ${BACKEND}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-false}"
+        SQUAD_ID: disco-swarm
+        SQUAD_MEMBERS: "disco-1,disco-2,disco-3,disco-4,disco-5,disco-6,disco-7"
+        COMPANY_ID: company-CHARLIE
+        UPDATE_RATE_MS: "5000"
+        TCP_LISTEN: "12500"
+        TCP_CONNECT: "disco-1|disco-1:12510,disco-2|disco-2:12511,disco-3|disco-3:12512,disco-4|disco-4:12513,disco-5|disco-5:12514,disco-6|disco-6:12515,disco-7|disco-7:12516"
+        PEAT_APP_ID: default-formation
+        PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
+        DEMO_CENTER_LAT: "32.6723"
+        DEMO_CENTER_LON: "-117.2425"
+
+    # ----- LightFish Patrol Boats -----
+
+    disco-1:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: disco-1
+        ROLE: soldier
+        PLATFORM_TYPE: usv
+        NODE_TYPE: usv
+        MODE: hierarchical
+        BACKEND: ${BACKEND}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-false}"
+        SQUAD_ID: disco-swarm
+        UPDATE_RATE_MS: "3000"
+        TCP_LISTEN: "12510"
+        TCP_CONNECT: "disco-leader|disco-leader:12500"
+        PEAT_APP_ID: default-formation
+        PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
+        USV_INDEX: "0"
+        USV_TOTAL: "7"
+        DEMO_CENTER_LAT: "32.6723"
+        DEMO_CENTER_LON: "-117.2425"
+
+    disco-2:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: disco-2
+        ROLE: soldier
+        PLATFORM_TYPE: usv
+        NODE_TYPE: usv
+        MODE: hierarchical
+        BACKEND: ${BACKEND}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-false}"
+        SQUAD_ID: disco-swarm
+        UPDATE_RATE_MS: "3000"
+        TCP_LISTEN: "12511"
+        TCP_CONNECT: "disco-leader|disco-leader:12500"
+        PEAT_APP_ID: default-formation
+        PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
+        USV_INDEX: "1"
+        USV_TOTAL: "7"
+        DEMO_CENTER_LAT: "32.6723"
+        DEMO_CENTER_LON: "-117.2425"
+
+    disco-3:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: disco-3
+        ROLE: soldier
+        PLATFORM_TYPE: usv
+        NODE_TYPE: usv
+        MODE: hierarchical
+        BACKEND: ${BACKEND}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-false}"
+        SQUAD_ID: disco-swarm
+        UPDATE_RATE_MS: "3000"
+        TCP_LISTEN: "12512"
+        TCP_CONNECT: "disco-leader|disco-leader:12500"
+        PEAT_APP_ID: default-formation
+        PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
+        USV_INDEX: "2"
+        USV_TOTAL: "7"
+        DEMO_CENTER_LAT: "32.6723"
+        DEMO_CENTER_LON: "-117.2425"
+
+    disco-4:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: disco-4
+        ROLE: soldier
+        PLATFORM_TYPE: usv
+        NODE_TYPE: usv
+        MODE: hierarchical
+        BACKEND: ${BACKEND}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-false}"
+        SQUAD_ID: disco-swarm
+        UPDATE_RATE_MS: "3000"
+        TCP_LISTEN: "12513"
+        TCP_CONNECT: "disco-leader|disco-leader:12500"
+        PEAT_APP_ID: default-formation
+        PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
+        USV_INDEX: "3"
+        USV_TOTAL: "7"
+        DEMO_CENTER_LAT: "32.6723"
+        DEMO_CENTER_LON: "-117.2425"
+
+    disco-5:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: disco-5
+        ROLE: soldier
+        PLATFORM_TYPE: usv
+        NODE_TYPE: usv
+        MODE: hierarchical
+        BACKEND: ${BACKEND}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-false}"
+        SQUAD_ID: disco-swarm
+        UPDATE_RATE_MS: "3000"
+        TCP_LISTEN: "12514"
+        TCP_CONNECT: "disco-leader|disco-leader:12500"
+        PEAT_APP_ID: default-formation
+        PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
+        USV_INDEX: "4"
+        USV_TOTAL: "7"
+        DEMO_CENTER_LAT: "32.6723"
+        DEMO_CENTER_LON: "-117.2425"
+
+    disco-6:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: disco-6
+        ROLE: soldier
+        PLATFORM_TYPE: usv
+        NODE_TYPE: usv
+        MODE: hierarchical
+        BACKEND: ${BACKEND}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-false}"
+        SQUAD_ID: disco-swarm
+        UPDATE_RATE_MS: "3000"
+        TCP_LISTEN: "12515"
+        TCP_CONNECT: "disco-leader|disco-leader:12500"
+        PEAT_APP_ID: default-formation
+        PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
+        USV_INDEX: "5"
+        USV_TOTAL: "7"
+        DEMO_CENTER_LAT: "32.6723"
+        DEMO_CENTER_LON: "-117.2425"
+
+    disco-7:
+      kind: linux
+      image: peat-sim-node:latest
+      env:
+        NODE_ID: disco-7
+        ROLE: soldier
+        PLATFORM_TYPE: usv
+        NODE_TYPE: usv
+        MODE: hierarchical
+        BACKEND: ${BACKEND}
+        CAP_IN_MEMORY: "${CAP_IN_MEMORY:-false}"
+        SQUAD_ID: disco-swarm
+        UPDATE_RATE_MS: "3000"
+        TCP_LISTEN: "12516"
+        TCP_CONNECT: "disco-leader|disco-leader:12500"
+        PEAT_APP_ID: default-formation
+        PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
+        USV_INDEX: "6"
+        USV_TOTAL: "7"
+        DEMO_CENTER_LAT: "32.6723"
+        DEMO_CENTER_LON: "-117.2425"

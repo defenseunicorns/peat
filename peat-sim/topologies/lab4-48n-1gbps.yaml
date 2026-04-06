@@ -13,18 +13,6 @@ mgmt:
 topology:
   nodes:
 
-    # Lab Orchestrator - deployed first, other nodes register with it
-    # Topology file is bind-mounted for node name validation
-    orchestrator:
-      kind: linux
-      image: peat-sim-node:latest
-      ports:
-        - 8080:8080
-      binds:
-        - /tmp/lab4-48n.yaml:/topology.yaml:ro
-      entrypoint: /usr/local/bin/lab-orchestrator
-      cmd: --topology /topology.yaml --port 8080
-
     # ===== COMPANY ALPHA =====
 
     company-ALPHA-commander:
@@ -47,7 +35,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-leader|company-ALPHA-platoon-1-leader:12346,company-ALPHA-platoon-2-leader|company-ALPHA-platoon-2-leader:12371"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -73,7 +61,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-commander|company-ALPHA-commander:12345,company-ALPHA-platoon-1-squad-1-leader|company-ALPHA-platoon-1-squad-1-leader:12347,company-ALPHA-platoon-1-squad-2-leader|company-ALPHA-platoon-1-squad-2-leader:12355,company-ALPHA-platoon-1-squad-3-leader|company-ALPHA-platoon-1-squad-3-leader:12363"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -97,7 +85,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-leader|company-ALPHA-platoon-1-leader:12346"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -120,7 +108,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-squad-1-leader|company-ALPHA-platoon-1-squad-1-leader:12347"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -143,7 +131,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-squad-1-leader|company-ALPHA-platoon-1-squad-1-leader:12347"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -166,7 +154,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-squad-1-leader|company-ALPHA-platoon-1-squad-1-leader:12347"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -189,7 +177,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-squad-1-leader|company-ALPHA-platoon-1-squad-1-leader:12347"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -212,7 +200,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-squad-1-leader|company-ALPHA-platoon-1-squad-1-leader:12347"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -235,7 +223,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-squad-1-leader|company-ALPHA-platoon-1-squad-1-leader:12347"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -258,7 +246,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-squad-1-leader|company-ALPHA-platoon-1-squad-1-leader:12347"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -282,7 +270,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-leader|company-ALPHA-platoon-1-leader:12346"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -305,7 +293,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-squad-2-leader|company-ALPHA-platoon-1-squad-2-leader:12355"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -328,7 +316,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-squad-2-leader|company-ALPHA-platoon-1-squad-2-leader:12355"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -351,7 +339,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-squad-2-leader|company-ALPHA-platoon-1-squad-2-leader:12355"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -374,7 +362,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-squad-2-leader|company-ALPHA-platoon-1-squad-2-leader:12355"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -397,7 +385,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-squad-2-leader|company-ALPHA-platoon-1-squad-2-leader:12355"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -420,7 +408,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-squad-2-leader|company-ALPHA-platoon-1-squad-2-leader:12355"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -443,7 +431,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-squad-2-leader|company-ALPHA-platoon-1-squad-2-leader:12355"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -467,7 +455,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-leader|company-ALPHA-platoon-1-leader:12346"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -490,7 +478,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-squad-3-leader|company-ALPHA-platoon-1-squad-3-leader:12363"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -513,7 +501,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-squad-3-leader|company-ALPHA-platoon-1-squad-3-leader:12363"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -536,7 +524,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-squad-3-leader|company-ALPHA-platoon-1-squad-3-leader:12363"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -559,7 +547,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-squad-3-leader|company-ALPHA-platoon-1-squad-3-leader:12363"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -582,7 +570,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-squad-3-leader|company-ALPHA-platoon-1-squad-3-leader:12363"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -605,7 +593,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-squad-3-leader|company-ALPHA-platoon-1-squad-3-leader:12363"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -628,7 +616,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-1-squad-3-leader|company-ALPHA-platoon-1-squad-3-leader:12363"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -654,7 +642,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-commander|company-ALPHA-commander:12345,company-ALPHA-platoon-2-squad-1-leader|company-ALPHA-platoon-2-squad-1-leader:12372,company-ALPHA-platoon-2-squad-2-leader|company-ALPHA-platoon-2-squad-2-leader:12380,company-ALPHA-platoon-2-squad-3-leader|company-ALPHA-platoon-2-squad-3-leader:12388"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -678,7 +666,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-leader|company-ALPHA-platoon-2-leader:12371"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -701,7 +689,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-squad-1-leader|company-ALPHA-platoon-2-squad-1-leader:12372"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -724,7 +712,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-squad-1-leader|company-ALPHA-platoon-2-squad-1-leader:12372"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -747,7 +735,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-squad-1-leader|company-ALPHA-platoon-2-squad-1-leader:12372"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -770,7 +758,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-squad-1-leader|company-ALPHA-platoon-2-squad-1-leader:12372"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -793,7 +781,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-squad-1-leader|company-ALPHA-platoon-2-squad-1-leader:12372"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -816,7 +804,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-squad-1-leader|company-ALPHA-platoon-2-squad-1-leader:12372"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -839,7 +827,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-squad-1-leader|company-ALPHA-platoon-2-squad-1-leader:12372"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -863,7 +851,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-leader|company-ALPHA-platoon-2-leader:12371"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -886,7 +874,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-squad-2-leader|company-ALPHA-platoon-2-squad-2-leader:12380"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -909,7 +897,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-squad-2-leader|company-ALPHA-platoon-2-squad-2-leader:12380"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -932,7 +920,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-squad-2-leader|company-ALPHA-platoon-2-squad-2-leader:12380"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -955,7 +943,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-squad-2-leader|company-ALPHA-platoon-2-squad-2-leader:12380"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -978,7 +966,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-squad-2-leader|company-ALPHA-platoon-2-squad-2-leader:12380"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1001,7 +989,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-squad-2-leader|company-ALPHA-platoon-2-squad-2-leader:12380"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1024,7 +1012,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-squad-2-leader|company-ALPHA-platoon-2-squad-2-leader:12380"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1048,7 +1036,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-leader|company-ALPHA-platoon-2-leader:12371"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1071,7 +1059,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-squad-3-leader|company-ALPHA-platoon-2-squad-3-leader:12388"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1094,7 +1082,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-squad-3-leader|company-ALPHA-platoon-2-squad-3-leader:12388"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1117,7 +1105,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-squad-3-leader|company-ALPHA-platoon-2-squad-3-leader:12388"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1140,7 +1128,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-squad-3-leader|company-ALPHA-platoon-2-squad-3-leader:12388"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1163,7 +1151,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-squad-3-leader|company-ALPHA-platoon-2-squad-3-leader:12388"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1186,7 +1174,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-squad-3-leader|company-ALPHA-platoon-2-squad-3-leader:12388"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"
@@ -1209,7 +1197,7 @@ topology:
         TCP_CONNECT: "company-ALPHA-platoon-2-squad-3-leader|company-ALPHA-platoon-2-squad-3-leader:12388"
         PEAT_APP_ID: default-formation
         PEAT_SHARED_KEY: 2Df7UyLyBgAphJ2RXnbdBCoXWbqRAu8Quwi7J3K+hBU=
-        ORCHESTRATOR_URL: http://orchestrator:8080
+
         CIRCUIT_FAILURE_THRESHOLD: "3"
         CIRCUIT_FAILURE_WINDOW_SECS: "2"
         CIRCUIT_OPEN_TIMEOUT_SECS: "2"

@@ -164,6 +164,7 @@ pub enum PlatformType {
     Soldier,
     Ugv,
     Uav,
+    Usv,
 }
 
 impl PlatformType {
@@ -172,6 +173,7 @@ impl PlatformType {
             PlatformType::Soldier => "SOLDIER",
             PlatformType::Ugv => "UGV",
             PlatformType::Uav => "UAV",
+            PlatformType::Usv => "USV",
         }
     }
 
@@ -181,6 +183,7 @@ impl PlatformType {
             PlatformType::Soldier => 1.4,
             PlatformType::Ugv => 3.0,
             PlatformType::Uav => 8.0,
+            PlatformType::Usv => 5.0, // ~10 knots
         }
     }
 
@@ -190,16 +193,18 @@ impl PlatformType {
             PlatformType::Soldier => 50.0,
             PlatformType::Ugv => 80.0,
             PlatformType::Uav => 150.0,
+            PlatformType::Usv => 300.0,
         }
     }
 
     /// Fuel/battery drain per tick (minutes lost).
-    /// Soldiers: ~5.5hr patrol endurance. UGV: ~3.3hr battery. UAV: ~2hr flight time.
+    /// Soldiers: ~5.5hr patrol endurance. UGV: ~3.3hr battery. UAV: ~2hr flight time. USV: ~8hr endurance.
     pub fn fuel_drain_per_tick(&self) -> f64 {
         match self {
             PlatformType::Soldier => 0.3, // ~330 min endurance
             PlatformType::Ugv => 0.5,     // ~200 min battery
             PlatformType::Uav => 0.8,     // ~125 min flight time
+            PlatformType::Usv => 0.2,     // ~500 min endurance
         }
     }
 
@@ -212,19 +217,25 @@ impl PlatformType {
     }
 }
 
-/// Assign platform type based on soldier index within squad.
-/// Per squad (6 nodes): soldier-1..4 = Soldier, soldier-5 = UGV, soldier-6 = UAV.
+/// Assign platform type based on node ID.
+/// For squads: soldier-1..4 = Soldier, soldier-5 = UGV, soldier-6 = UAV.
+/// For USV nodes: any node with "disco" or "usv" in the ID.
 pub fn assign_platform_type(node_id: &str) -> PlatformType {
-    let parts: Vec<&str> = node_id.split('-').collect();
-    let soldier_idx = parts
-        .last()
-        .and_then(|s| s.parse::<usize>().ok())
-        .unwrap_or(1);
+    // DiSCO USV nodes
+    if node_id.contains("disco") || node_id.contains("usv") {
+        return PlatformType::Usv;
+    }
 
     // Only actual soldier nodes get robot assignments; leaders stay as-is
     if !node_id.contains("soldier") {
         return PlatformType::Soldier;
     }
+
+    let soldier_idx = node_id
+        .split('-')
+        .next_back()
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(1);
 
     match soldier_idx {
         5 => PlatformType::Ugv,
@@ -246,6 +257,9 @@ pub struct NodeSimState {
     pub health: i32, // HealthStatus enum: 1=Nominal, 2=Degraded, 3=Critical
     heading: f64,
     patrol_target: Option<(f64, f64)>,
+    /// Waypoint list for perimeter patrol (USVs). Cycles through these.
+    waypoints: Vec<(f64, f64)>,
+    waypoint_idx: usize,
     tick_count: u64,
 }
 
@@ -261,6 +275,73 @@ impl NodeSimState {
             health: 1, // Nominal
             heading: 0.0,
             patrol_target: None,
+            waypoints: Vec::new(),
+            waypoint_idx: 0,
+            tick_count: 0,
+        }
+    }
+
+    /// Create a USV node with box perimeter patrol waypoints.
+    /// `node_index` (0-based) determines starting position on the perimeter.
+    /// `total_nodes` is the total number of USVs in the patrol.
+    pub fn new_usv_patrol(
+        _node_id: &str,
+        seed: &PositionSeed,
+        node_index: usize,
+        total_nodes: usize,
+    ) -> Self {
+        let center = (seed.center_lat, seed.center_lon);
+        // Box perimeter: ~600m x 400m rectangle offshore (south-southwest of center)
+        let box_center = offset_position(center, 200.0, 800.0); // 800m SSW into the water
+        let half_w: f64 = 300.0; // 600m wide
+        let half_h: f64 = 200.0; // 400m tall
+
+        // 4 corners of the box (clockwise from NW)
+        let nw = offset_position(
+            box_center,
+            315.0,
+            (half_w * half_w + half_h * half_h).sqrt(),
+        );
+        let ne = offset_position(box_center, 45.0, (half_w * half_w + half_h * half_h).sqrt());
+        let se = offset_position(
+            box_center,
+            135.0,
+            (half_w * half_w + half_h * half_h).sqrt(),
+        );
+        let sw = offset_position(
+            box_center,
+            225.0,
+            (half_w * half_w + half_h * half_h).sqrt(),
+        );
+
+        // Build waypoint list: perimeter segments with intermediate points
+        let mut waypoints = Vec::new();
+        let segments = [(nw, ne), (ne, se), (se, sw), (sw, nw)];
+        let points_per_side = 4;
+        for (start, end) in &segments {
+            for i in 0..points_per_side {
+                let t = i as f64 / points_per_side as f64;
+                let lat = start.0 + (end.0 - start.0) * t;
+                let lon = start.1 + (end.1 - start.1) * t;
+                waypoints.push((lat, lon));
+            }
+        }
+
+        // Each USV starts at a different point on the perimeter
+        let total_waypoints = waypoints.len();
+        let start_idx = (node_index * total_waypoints / total_nodes) % total_waypoints;
+        let position = waypoints[start_idx];
+
+        Self {
+            position,
+            home: box_center,
+            platform_type: PlatformType::Usv,
+            fuel_minutes: 100.0,
+            health: 1,
+            heading: 0.0,
+            patrol_target: Some(waypoints[(start_idx + 1) % total_waypoints]),
+            waypoints,
+            waypoint_idx: start_idx,
             tick_count: 0,
         }
     }
@@ -270,25 +351,41 @@ impl NodeSimState {
         self.tick_count += 1;
         let mut rng = rand::thread_rng();
 
-        // --- Movement: random walk within patrol radius of squad center ---
-        let patrol_radius = self.platform_type.patrol_radius_m();
         let speed = self.platform_type.speed_mps();
 
-        // Pick a new target if we don't have one or reached current target
-        if self.patrol_target.is_none()
-            || haversine_distance(self.position, self.patrol_target.unwrap()) < 3.0
-        {
-            let angle = rng.gen_range(0.0..360.0);
-            let dist = rng.gen_range(0.0..patrol_radius);
-            self.patrol_target = Some(offset_position(self.home, angle, dist));
-        }
-
-        if let Some(target) = self.patrol_target {
+        if !self.waypoints.is_empty() {
+            // --- Waypoint patrol mode (USVs): follow waypoints around perimeter ---
+            let target = self.waypoints[self.waypoint_idx];
             self.heading = bearing(self.position, target);
             let move_dist = speed * dt_secs;
             let dist_to_target = haversine_distance(self.position, target);
-            let actual_dist = move_dist.min(dist_to_target);
-            self.position = offset_position(self.position, self.heading, actual_dist);
+
+            if dist_to_target < move_dist {
+                // Reached waypoint, advance to next
+                self.waypoint_idx = (self.waypoint_idx + 1) % self.waypoints.len();
+                self.position = target;
+            } else {
+                self.position = offset_position(self.position, self.heading, move_dist);
+            }
+        } else {
+            // --- Random walk within patrol radius of squad center ---
+            let patrol_radius = self.platform_type.patrol_radius_m();
+
+            if self.patrol_target.is_none()
+                || haversine_distance(self.position, self.patrol_target.unwrap()) < 3.0
+            {
+                let angle = rng.gen_range(0.0..360.0);
+                let dist = rng.gen_range(0.0..patrol_radius);
+                self.patrol_target = Some(offset_position(self.home, angle, dist));
+            }
+
+            if let Some(target) = self.patrol_target {
+                self.heading = bearing(self.position, target);
+                let move_dist = speed * dt_secs;
+                let dist_to_target = haversine_distance(self.position, target);
+                let actual_dist = move_dist.min(dist_to_target);
+                self.position = offset_position(self.position, self.heading, actual_dist);
+            }
         }
 
         // --- Fuel drain ---
@@ -545,6 +642,57 @@ pub fn generate_capabilities(
                         "Edge AI (YOLOv8)".into(),
                         CapabilityType::Compute,
                         0.82,
+                    ));
+                }
+                PlatformType::Usv => {
+                    // DiSCO autonomous surface vehicle — maritime ISR/patrol
+                    caps.push(Capability::new(
+                        "comm-usv".into(),
+                        "Silvus MIMO Radio".into(),
+                        CapabilityType::Communication,
+                        0.90,
+                    ));
+                    caps.push(Capability::new(
+                        "mob-usv".into(),
+                        "Electric Hull (10kt)".into(),
+                        CapabilityType::Mobility,
+                        0.95,
+                    ));
+                    caps.push(Capability::new(
+                        "sensor-sonar-usv".into(),
+                        "Side-Scan Sonar".into(),
+                        CapabilityType::Sensor,
+                        0.92,
+                    ));
+                    caps.push(Capability::new(
+                        "sensor-radar-usv".into(),
+                        "Maritime Radar (X-band)".into(),
+                        CapabilityType::Sensor,
+                        0.88,
+                    ));
+                    caps.push(Capability::new(
+                        "sensor-ais-usv".into(),
+                        "AIS Receiver".into(),
+                        CapabilityType::Sensor,
+                        0.95,
+                    ));
+                    caps.push(Capability::new(
+                        "sensor-eo-usv".into(),
+                        "EO/IR Maritime Gimbal".into(),
+                        CapabilityType::Sensor,
+                        0.90,
+                    ));
+                    caps.push(Capability::new(
+                        "sensor-ctd-usv".into(),
+                        "CTD Oceanographic".into(),
+                        CapabilityType::Sensor,
+                        0.85,
+                    ));
+                    caps.push(Capability::new(
+                        "compute-usv".into(),
+                        "Edge AI (Maritime)".into(),
+                        CapabilityType::Compute,
+                        0.80,
                     ));
                 }
             }
