@@ -1326,6 +1326,8 @@ pub struct CellInfo {
     pub leader_id: Option<String>,
     /// Last update timestamp (Unix millis)
     pub last_update: i64,
+    /// Optional scenario command piggybacked on cell (e.g., "START_SCENARIO", "STOP_SCENARIO")
+    pub scenario_command: Option<String>,
 }
 
 /// Track category enumeration
@@ -1747,6 +1749,7 @@ fn parse_cell_json(id: &str, json: &str) -> Result<CellInfo, PeatError> {
         formation_id: v["formation_id"].as_str().map(|s| s.to_string()),
         leader_id: v["leader_id"].as_str().map(|s| s.to_string()),
         last_update: v["last_update"].as_i64().unwrap_or(0),
+        scenario_command: v["scenario_command"].as_str().map(|s| s.to_string()),
     })
 }
 
@@ -1761,6 +1764,7 @@ fn serialize_cell_json(cell: &CellInfo) -> Result<String, PeatError> {
         "formation_id": cell.formation_id,
         "leader_id": cell.leader_id,
         "last_update": cell.last_update,
+        "scenario_command": cell.scenario_command,
     });
     serde_json::to_string(&v).map_err(|e| PeatError::EncodingError { msg: e.to_string() })
 }
@@ -2635,6 +2639,7 @@ pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_getCellsJni(
                         "formation_id": c.formation_id,
                         "leader_id": c.leader_id,
                         "last_update": c.last_update,
+                        "scenario_command": c.scenario_command,
                     })
                 })
                 .collect();
@@ -2743,6 +2748,56 @@ pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_getPlatformsJn
                         "capabilities": p.capabilities,
                         "cell_id": p.cell_id,
                         "last_heartbeat": p.last_heartbeat,
+                    })
+                })
+                .collect();
+            serde_json::to_string(&json_array).unwrap_or_else(|_| "[]".to_string())
+        }
+        Err(_) => "[]".to_string(),
+    };
+
+    // Don't drop the Arc - we're just borrowing
+    std::mem::forget(node);
+
+    env.new_string(&result)
+        .expect("Failed to create Java string")
+        .into_raw()
+}
+
+/// JNI: Get all commands as JSON array string
+///
+/// Kotlin signature: external fun getCommandsJni(handle: Long): String
+/// Returns JSON array of command objects, or "[]" on error
+#[cfg(feature = "sync")]
+#[no_mangle]
+pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_getCommandsJni(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: i64,
+) -> jstring {
+    if handle == 0 {
+        return env
+            .new_string("[]")
+            .expect("Failed to create Java string")
+            .into_raw();
+    }
+
+    let node = unsafe { Arc::from_raw(handle as *const PeatNode) };
+    let result = match node.get_commands() {
+        Ok(commands) => {
+            let json_array: Vec<serde_json::Value> = commands
+                .iter()
+                .map(|c| {
+                    serde_json::json!({
+                        "id": c.id,
+                        "command_type": c.command_type,
+                        "target_id": c.target_id,
+                        "parameters": c.parameters,
+                        "priority": c.priority,
+                        "status": c.status.as_str(),
+                        "originator": c.originator,
+                        "created_at": c.created_at,
+                        "last_update": c.last_update,
                     })
                 })
                 .collect();
@@ -3058,6 +3113,12 @@ pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_nativeInit(
         },
         #[cfg(feature = "sync")]
         NativeMethod {
+            name: "getCommandsJni".into(),
+            sig: "(J)Ljava/lang/String;".into(),
+            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_getCommandsJni as *mut c_void,
+        },
+        #[cfg(feature = "sync")]
+        NativeMethod {
             name: "publishPlatformJni".into(),
             sig: "(JLjava/lang/String;)Z".into(),
             fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_publishPlatformJni as *mut c_void,
@@ -3285,6 +3346,12 @@ pub extern "C" fn JNI_OnLoad(vm: *mut JavaVM, _reserved: *mut c_void) -> jint {
                     name: "getPlatformsJni".into(),
                     sig: "(J)Ljava/lang/String;".into(),
                     fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_getPlatformsJni as *mut c_void,
+                },
+                #[cfg(feature = "sync")]
+                NativeMethod {
+                    name: "getCommandsJni".into(),
+                    sig: "(J)Ljava/lang/String;".into(),
+                    fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_getCommandsJni as *mut c_void,
                 },
                 #[cfg(feature = "sync")]
                 NativeMethod {

@@ -186,6 +186,14 @@ object PeatJni {
     external fun getPlatformsJni(handle: Long): String
 
     /**
+     * Get all commands as JSON array string from the "commands" collection.
+     * @param handle Node handle from createNodeJni
+     * @return JSON array of command objects, or "[]" on error
+     */
+    @JvmStatic
+    external fun getCommandsJni(handle: Long): String
+
+    /**
      * Publish a platform (self-position/PLI) to the Peat network.
      * @param handle Node handle from createNodeJni
      * @param platformJson JSON string representing the platform data
@@ -446,6 +454,12 @@ class PeatNodeJni private constructor(private val handle: Long) : AutoCloseable 
      * @return JSON array of platform objects
      */
     fun getPlatformsJson(): String = PeatJni.getPlatformsJni(handle)
+
+    /**
+     * Get all commands as JSON array string.
+     * @return JSON array of command objects
+     */
+    fun getCommandsJson(): String = PeatJni.getCommandsJni(handle)
 
     /**
      * Publish a platform (self-position/PLI) to the Peat network.

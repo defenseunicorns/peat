@@ -8,9 +8,11 @@ import android.content.Context
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
+import com.atakmap.android.cot.CotMapComponent
 import com.atakmap.android.dropdown.DropDownMapComponent
 import com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter
 import com.atakmap.android.maps.MapView
+import com.atakmap.coremap.cot.event.CotEvent
 import com.atakmap.coremap.log.Log
 import com.atakmap.coremap.maps.coords.GeoPoint
 import com.defenseunicorns.atak.peat.model.PeatCell
@@ -447,6 +449,9 @@ class PeatMapComponent : DropDownMapComponent() {
         // Register BLE marker callback for mesh-synced map markers
         registerBleMarkerCallback()
 
+        // Register BLE chat callback for mesh chat messages
+        registerBleChatCallback()
+
         // Register observer for BLE peer connectivity changes to update cell composition immediately
         registerBlePeerConnectivityObserver()
 
@@ -589,6 +594,68 @@ class PeatMapComponent : DropDownMapComponent() {
     }
 
     /**
+     * Register callback for BLE chat messages from mesh peers.
+     */
+    private fun registerBleChatCallback() {
+        try {
+            val bleManager = PeatPluginLifecycle.getInstance()?.getPeatBleManager()
+            if (bleManager != null) {
+                bleManager.setChatCallback { chat, peer ->
+                    onBleChatReceived(chat, peer)
+                }
+                Log.i(TAG, "BLE chat callback registered")
+            } else {
+                Log.w(TAG, "BLE manager not available for chat callback")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error registering BLE chat callback: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Handle chat message received from BLE mesh peer.
+     * Builds a GeoChat CoT XML and dispatches it into ATAK's internal CoT processing
+     * so it appears in ATAK's native chat UI.
+     */
+    private fun onBleChatReceived(chat: com.defenseunicorns.peat.PeatChat, fromPeer: PeatPeer) {
+        refreshHandler.post {
+            try {
+                val senderUid = "PEAT-${chat.originNode.toString(16).uppercase()}"
+                val uid = java.util.UUID.randomUUID().toString()
+                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
+                sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                val timeStr = sdf.format(java.util.Date())
+
+                val meshName = PeatPluginLifecycle.getInstance()?.getPeatBleManager()?.meshId ?: "PEAT"
+                val displayMessage = "[$meshName] ${chat.message}"
+
+                val cotXml = """<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<event version='2.0' uid='GeoChat.$senderUid.All Chat Rooms.$uid' type='b-t-f' time='$timeStr' start='$timeStr' stale='$timeStr' how='h-g-i-g-o'>
+    <point lat='0.0' lon='0.0' hae='0.0' ce='9999999.0' le='9999999.0'/>
+    <detail>
+        <__chat parent='RootContactGroup' groupOwner='false' messageId='$uid' chatroom='All Chat Rooms' id='All Chat Rooms' senderCallsign='${chat.sender}'>
+            <chatgrp uid0='$senderUid' uid1='All Chat Rooms' id='All Chat Rooms'/>
+        </__chat>
+        <link uid='$senderUid' type='a-f-G-U-C' relation='p-p'/>
+        <remarks source='$senderUid' to='All Chat Rooms' time='$timeStr'>$displayMessage</remarks>
+    </detail>
+</event>"""
+
+                // Dispatch into ATAK's CoT processing pipeline
+                val cotEvent = CotEvent.parse(cotXml)
+                if (cotEvent != null) {
+                    CotMapComponent.getInternalDispatcher().dispatch(cotEvent)
+                    Log.i(TAG, "[CHAT-RX] Dispatched mesh chat from ${chat.sender}: ${chat.message}")
+                } else {
+                    Log.e(TAG, "[CHAT-RX] Failed to parse chat CoT XML")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "[CHAT-RX] Error processing mesh chat: ${e.message}", e)
+            }
+        }
+    }
+
+    /**
      * Handle marker received from BLE mesh peer.
      * Creates/updates ATAK map markers for mesh-synced waypoints and POIs.
      */
@@ -666,6 +733,28 @@ class PeatMapComponent : DropDownMapComponent() {
         }
 
         return bleManager.sendCannedMessage(messageType)
+    }
+
+    /**
+     * Send a chat message to all BLE mesh peers.
+     *
+     * @param callsign Sender callsign
+     * @param message Message text
+     * @return true if sent successfully
+     */
+    fun sendChatToMesh(callsign: String, message: String): Boolean {
+        val bleManager = PeatPluginLifecycle.getInstance()?.getPeatBleManager()
+        if (bleManager == null) {
+            Log.w(TAG, "Cannot send chat - BLE manager not available")
+            return false
+        }
+
+        if (!bleManager.isRunning.value) {
+            Log.e(TAG, "Cannot send chat - mesh not running")
+            return false
+        }
+
+        return bleManager.sendChat(callsign, message)
     }
 
     /**
@@ -1213,13 +1302,16 @@ class PeatMapComponent : DropDownMapComponent() {
             // Only clear FFI-sourced data (_platforms and _tracks from JSON), preserve BLE data
             _platforms.clear()
             _tracks.clear()
+            // Inject red track scenario even in BLE-only mode (local simulation)
+            generateRedTrack()?.let { _tracks.add(it) }
             // Don't clear _cells - synthetic BLE cell is preserved
             return  // Skip FFI calls, BLE data is managed by callbacks
         }
 
         // Fetch cells from Peat sync (only when FFI node is available)
+        var cellsJson = "[]"
         try {
-            val cellsJson = node.getCellsJson()
+            cellsJson = node.getCellsJson()
             Log.d(TAG, "Cells JSON: $cellsJson")
             // Preserve synthetic BLE cells when loading from FFI
             val bleCells = _cells.filter { it.capabilities.contains("BLE_MESH") }
@@ -1247,6 +1339,32 @@ class PeatMapComponent : DropDownMapComponent() {
             Log.i(TAG, "Loaded ${_tracks.size} tracks from Peat")
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching tracks: ${e.message}", e)
+        }
+
+        // Check for scenario commands piggybacked on cell documents
+        // The disco-leader embeds "scenario_command" in the CHARLIE cell JSON
+        // when SIGUSR1/SIGUSR2 is received. This piggybacks on the already-syncing
+        // cells collection instead of using a separate "commands" collection.
+        try {
+            val cellsArr = JSONArray(cellsJson)
+            for (i in 0 until cellsArr.length()) {
+                val cellObj = cellsArr.getJSONObject(i)
+                val scenarioCmd = cellObj.optString("scenario_command", "")
+                if (scenarioCmd.isNotEmpty() && scenarioCmd != "null") {
+                    when (scenarioCmd) {
+                        "START_SCENARIO" -> if (!scenarioActive) {
+                            Log.i(TAG, "Received START_SCENARIO from cell ${cellObj.optString("id")}")
+                            startRedTrackScenario()
+                        }
+                        "STOP_SCENARIO" -> if (scenarioActive) {
+                            Log.i(TAG, "Received STOP_SCENARIO from cell ${cellObj.optString("id")}")
+                            stopRedTrackScenario()
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking scenario commands: ${e.message}", e)
         }
 
         // Generate platform markers from cell hierarchy (avoids CRDT sync overhead)
