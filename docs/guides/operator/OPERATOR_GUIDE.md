@@ -70,14 +70,17 @@ Peat (Hierarchical Intelligence for Versatile Entities) is a protocol for scalab
 
 ### 1.4 Supported Platforms
 
-| Platform | Backend | Status |
-|----------|---------|--------|
-| Linux (x86_64) | Ditto, Automerge | Production |
-| Linux (aarch64) | Ditto, Automerge | Production |
-| macOS (x86_64, arm64) | Ditto, Automerge | Production |
-| Android | Automerge only | Beta |
-| Windows | Ditto | Experimental |
-| Jetson (CUDA) | Automerge | Beta |
+Peat ships with a single Automerge + Iroh CRDT/transport stack on all supported
+platforms.
+
+| Platform | Status |
+|----------|--------|
+| Linux (x86_64) | Production |
+| Linux (aarch64) | Production |
+| macOS (x86_64, arm64) | Production |
+| Android | Beta |
+| Windows | Experimental |
+| Jetson (CUDA) | Beta |
 
 ---
 
@@ -182,24 +185,17 @@ cargo --version
 
 ### 3.3 Build from Source
 
-#### Standard Build (Ditto Backend)
+#### Standard Build
 
 ```bash
 git clone https://github.com/defenseunicorns/peat.git
 cd peat
 
-# Build all crates
+# Build all crates (uses the default Automerge + Iroh backend)
 cargo build --release
 
 # Binaries located at:
 # - target/release/peat-sim
-```
-
-#### Build with Automerge Backend (Pure OSS)
-
-```bash
-# Build with Automerge instead of Ditto
-cargo build --release --no-default-features --features automerge-backend
 ```
 
 #### Build for Android
@@ -268,14 +264,13 @@ sudo apt install mold
 
 ### 4.1 Environment Variables
 
-#### Ditto Backend Configuration
+#### Core Configuration
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
-| `DITTO_APP_ID` | Ditto application identifier | - | Yes (Ditto) |
-| `DITTO_OFFLINE_TOKEN` | Offline authentication token | - | Yes (Ditto) |
-| `DITTO_SHARED_KEY` | Shared key for formation security | - | No |
-| `DITTO_PERSISTENCE_DIR` | Directory for Ditto state | `./ditto_data` | No |
+| `PEAT_APP_ID` | Peat application identifier (distinguishes logical deployments) | - | Yes |
+| `PEAT_SECRET_KEY` | Shared secret for formation authentication | - | Yes |
+| `PEAT_PERSISTENCE_DIR` | Directory for persisted CRDT state | `./peat_data` | No |
 
 #### General Configuration
 
@@ -337,7 +332,6 @@ encryption_enabled = true
 tls_enabled = true
 
 [storage]
-backend = "ditto"                  # ditto or automerge
 persistence_dir = "/var/lib/peat/data"
 max_state_size_mb = 100
 
@@ -391,19 +385,15 @@ Enable/disable features at compile time:
 
 | Feature | Description | Default |
 |---------|-------------|---------|
-| `ditto-backend` | Use Ditto CRDT backend | Enabled |
-| `automerge-backend` | Use Automerge/Iroh backend | Disabled |
+| `automerge-backend` | Automerge + Iroh CRDT/transport stack | Enabled |
 | `onnx-inference` | Enable ONNX ML inference | Disabled |
 | `video-capture` | Enable GStreamer video | Disabled |
 | `llm-inference` | Enable LLM via llama.cpp | Disabled |
 
 Build with specific features:
 ```bash
-# Ditto only (default)
+# Default build (Automerge + Iroh)
 cargo build --release
-
-# Automerge only
-cargo build --release --no-default-features --features automerge-backend
 
 # With ML inference
 cargo build --release --features onnx-inference
@@ -480,10 +470,8 @@ export PEAT_STATIC_PEERS="192.168.1.10:4040"
 For resource-constrained edge devices (Jetson, Raspberry Pi):
 
 ```bash
-# Build with minimal features
-cargo build --release \
-    --no-default-features \
-    --features automerge-backend
+# Build with default features
+cargo build --release
 
 # Deploy binary
 scp target/release/peat-sim edge-device:/opt/peat/
@@ -658,7 +646,7 @@ sudo firewall-cmd --reload
 
 ### 6.3 NAT Traversal
 
-Peat uses Iroh for NAT traversal when using the Automerge backend:
+Peat uses Iroh for NAT traversal:
 
 ```toml
 # peat.toml
@@ -1103,25 +1091,25 @@ curl localhost:8080/metrics | grep sync_latency
 3. Increase bandwidth allocation
 4. Check for network congestion
 
-#### Issue: Ditto SDK Errors
+#### Issue: Persistence / Backend Errors
 
-**Symptoms**: "Ditto authentication failed" or similar errors
+**Symptoms**: CRDT open/load failures at startup, corrupted state errors
 
 **Diagnosis**:
 ```bash
 # Verify credentials
-echo $DITTO_APP_ID
-echo $DITTO_OFFLINE_TOKEN
+echo $PEAT_APP_ID
+echo $PEAT_SECRET_KEY
 
-# Check Ditto data directory
-ls -la ./ditto_data/
+# Check persistence directory
+ls -la ./peat_data/
 ```
 
 **Solutions**:
-1. Verify `DITTO_APP_ID` and `DITTO_OFFLINE_TOKEN` are set
-2. Clear Ditto persistence directory and restart
-3. Check Ditto license validity
-4. Use Automerge backend if Ditto unavailable
+1. Verify `PEAT_APP_ID` and `PEAT_SECRET_KEY` are set
+2. Ensure the persistence directory is writable and not full
+3. If state is corrupted, archive and clear the persistence directory; the node will re-sync from peers
+4. Check disk space and filesystem health
 
 ### 11.2 Diagnostic Commands
 
@@ -1258,8 +1246,8 @@ curl localhost:8080/health
 
 ```bash
 # Minimum environment
-export DITTO_APP_ID="your-app-id"
-export DITTO_OFFLINE_TOKEN="your-token"
+export PEAT_APP_ID="your-app-id"
+export PEAT_SECRET_KEY="your-secret-key"
 export PEAT_FORMATION_KEY="your-formation-key"
 ```
 

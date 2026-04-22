@@ -21,7 +21,7 @@ peat/
 │       ├── hierarchy/        # Phase 3: Hierarchical Operations
 │       ├── models/           # Core data structures
 │       ├── security/         # Auth, encryption
-│       ├── storage/          # CRDT backends (Ditto/Automerge)
+│       ├── storage/          # CRDT backend (Automerge)
 │       ├── sync/             # Sync abstraction
 │       └── transport/        # Mesh transport
 ├── peat-transport/            # HTTP/REST API layer
@@ -49,8 +49,6 @@ peat/
   ```bash
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
   ```
-
-- **Ditto SDK** - The Ditto Rust SDK will be installed via Cargo
 
 ### Optional
 
@@ -272,7 +270,7 @@ Network Transport
 
 ### CRDT Integration
 
-The protocol uses Ditto SDK for CRDT synchronization:
+The protocol uses Automerge for CRDT synchronization over Iroh QUIC transport:
 
 - **G-Set** - Grow-only sets (static capabilities)
 - **OR-Set** - Observed-remove sets (cell membership)
@@ -337,9 +335,9 @@ perf report
 
 ### Build Issues
 
-**Problem**: Ditto SDK not found
+**Problem**: Dependency resolution failures
 
-**Solution**: Ensure Cargo can access the Ditto crate. Check network connectivity and cargo registry.
+**Solution**: Check network connectivity to crates.io. Run `cargo clean && cargo build` to rebuild from scratch.
 
 ### Test Failures
 
@@ -400,7 +398,8 @@ cargo doc --document-private-items
 
 - [Architecture Decision Records](docs/adr/) - Technical decision documentation
 - [Validation Results](docs/VALIDATION_RESULTS.md) - Experimental validation
-- [Ditto Documentation](https://docs.ditto.live/rust/)
+- [Automerge Documentation](https://automerge.org/docs/)
+- [Iroh Documentation](https://iroh.computer/docs/)
 - [Rust Book](https://doc.rust-lang.org/book/)
 
 ## Documentation

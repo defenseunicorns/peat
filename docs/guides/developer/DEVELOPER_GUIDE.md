@@ -131,7 +131,7 @@ make test-unit
 # Integration tests (2 minutes)
 make test-integration
 
-# End-to-end tests (5 minutes, requires real Ditto sync)
+# End-to-end tests (5 minutes, exercises real CRDT sync)
 make test-e2e
 
 # Full test suite (10 minutes)
@@ -233,15 +233,14 @@ peat/
 │                               │                                              │
 │  ┌────────────────────────────▼────────────────────────────────────────┐    │
 │  │                       Storage Abstraction                            │    │
-│  │  ┌─────────────────────┐      ┌─────────────────────────────┐       │    │
-│  │  │    Ditto Backend    │      │    Automerge/Iroh Backend   │       │    │
-│  │  │    (Production)     │      │       (Pure OSS)            │       │    │
-│  │  └─────────────────────┘      └─────────────────────────────┘       │    │
+│  │  ┌─────────────────────────────────────────────────────────┐         │    │
+│  │  │          Automerge + Iroh Backend (Pure OSS)            │         │    │
+│  │  └─────────────────────────────────────────────────────────┘         │    │
 │  └────────────────────────────┬────────────────────────────────────────┘    │
 │                               │                                              │
 │  ┌────────────────────────────▼────────────────────────────────────────┐    │
 │  │                        Network Layer                                 │    │
-│  │            P2P Mesh (Ditto SDK / Iroh QUIC)                         │    │
+│  │                   P2P Mesh (Iroh QUIC)                              │    │
 │  └─────────────────────────────────────────────────────────────────────┘    │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -285,9 +284,7 @@ peat-protocol (core) ◄──────────────────�
     │                                        │
     ├── peat-schema (protobuf)               │
     │                                        │
-    ├──► Ditto Backend (default)             │
-    │    OR                                  │
-    └──► Automerge + Iroh (feature flag)     │
+    └──► Automerge + Iroh Backend            │
                                              │
 peat-transport ──────────────────────────────┤
     │                                        │
@@ -299,11 +296,11 @@ peat-persistence ─────────────────────
                                              │
 peat-ffi (mobile) ───────────────────────────┤
     │                                        │
-    └──► peat-protocol (automerge only)      │
+    └──► peat-protocol                       │
                                              │
 peat-inference ──────────────────────────────┘
     │
-    └──► peat-protocol (automerge)
+    └──► peat-protocol
 ```
 
 ### 3.4 CRDT Usage
@@ -1122,7 +1119,7 @@ use peat_protocol::testing::{E2eHarness, TestObserver};
 
 #[tokio::test]
 async fn test_state_sync_e2e() {
-    // Create E2E harness with real Ditto
+    // Create E2E harness with real CRDT sync (Automerge + Iroh)
     let harness = E2eHarness::new()
         .with_node_count(3)
         .with_observer(TestObserver::new())
@@ -1272,7 +1269,10 @@ cargo tarpaulin --out Html
 
 ### 9.1 Backend Architecture
 
-Peat abstracts the CRDT backend to support multiple implementations:
+Peat defines a backend-agnostic sync trait. Today the workspace ships a single
+implementation — Automerge + Iroh — but the abstraction is preserved so
+alternative CRDT/transport engines can be added later without churning the
+protocol layer.
 
 ```rust
 /// Backend-agnostic sync trait
@@ -1294,36 +1294,10 @@ pub trait SyncBackend: Send + Sync {
 }
 ```
 
-### 9.2 Ditto Backend (Default)
+### 9.2 Automerge + Iroh Backend
 
-Production-ready CRDT backend using Ditto SDK:
-
-```rust
-use peat_protocol::storage::ditto::DittoBackend;
-
-// Configure Ditto
-let ditto_config = DittoConfig::new()
-    .with_app_id(env::var("DITTO_APP_ID")?)
-    .with_offline_token(env::var("DITTO_OFFLINE_TOKEN")?)
-    .with_persistence_dir("/var/lib/peat/ditto");
-
-let backend = DittoBackend::new(ditto_config).await?;
-let sync_engine = SyncEngine::new(backend);
-```
-
-**Advantages**:
-- Production-tested at scale
-- Built-in P2P mesh
-- Automatic conflict resolution
-- Mobile SDK support
-
-**Requirements**:
-- Ditto license (free for evaluation)
-- `DITTO_APP_ID` and `DITTO_OFFLINE_TOKEN`
-
-### 9.3 Automerge Backend (Pure OSS)
-
-Pure Rust implementation using Automerge + Iroh:
+Pure Rust implementation using Automerge for CRDT state and Iroh for QUIC
+transport:
 
 ```rust
 use peat_protocol::storage::automerge::AutomergeBackend;
@@ -1336,39 +1310,19 @@ let backend = AutomergeBackend::new(automerge_config).await?;
 let sync_engine = SyncEngine::new(backend);
 ```
 
-**Advantages**:
-- 100% open source (MIT/Apache-2.0)
-- No external dependencies
-- Iroh QUIC transport
-- Works on all platforms including Android
+**Characteristics**:
+- 100% open source (MIT / Apache-2.0)
+- No proprietary runtime dependencies
+- Iroh QUIC transport with multi-path and connection migration
+- Works on all supported platforms, including Android
 
-**Current Status**: ~70% feature parity with Ditto
+### 9.3 Historical Note
 
-### 9.4 Switching Backends
-
-Build with specific backend:
-
-```bash
-# Ditto backend (default)
-cargo build --release
-
-# Automerge backend
-cargo build --release --no-default-features --features automerge-backend
-
-# Both backends (for testing)
-cargo build --release --features automerge-backend
-```
-
-Runtime selection (if both compiled):
-
-```rust
-use peat_protocol::storage::{DittoBackend, AutomergeBackend, BackendSelector};
-
-let backend: Box<dyn SyncBackend> = match config.backend {
-    BackendType::Ditto => Box::new(DittoBackend::new(ditto_config).await?),
-    BackendType::Automerge => Box::new(AutomergeBackend::new(am_config).await?),
-};
-```
+An earlier version of Peat included a second backend based on the proprietary
+Ditto SDK. That backend has been removed from the workspace; only the
+Automerge + Iroh stack ships today. See
+[ADR-011](../../adr/011-ditto-vs-automerge-iroh.md) for the historical
+comparison and decision record.
 
 ---
 
@@ -1393,7 +1347,7 @@ Mobile support via peat-ffi using UniFFI:
                   ▼
 ┌─────────────────────────────────────────┐
 │           peat-protocol                  │
-│      (Automerge backend only)           │
+│      (Automerge + Iroh backend)         │
 └─────────────────────────────────────────┘
 ```
 
@@ -1681,7 +1635,7 @@ Key Architecture Decision Records:
 |-----|-------|
 | [001](../../adr/001-cap-protocol-poc.md) | Peat Protocol POC |
 | [004](../../adr/004-human-machine-cell-composition.md) | Human-Machine Cell Composition |
-| [011](../../adr/011-ditto-vs-automerge-iroh.md) | Ditto vs Automerge/Iroh |
+| [011](../../adr/011-ditto-vs-automerge-iroh.md) | Ditto vs Automerge/Iroh (historical) |
 | [012](../../adr/012-schema-definition-protocol-extensibility.md) | Schema Definition |
 | [017](../../adr/017-p2p-mesh-management-discovery.md) | P2P Mesh Discovery |
 | [018](../../adr/018-ai-model-capability-advertisement.md) | AI Model Advertisement |
@@ -1690,7 +1644,6 @@ Key Architecture Decision Records:
 
 ### 13.3 External Resources
 
-- [Ditto Documentation](https://docs.ditto.live/rust/)
 - [Automerge Documentation](https://automerge.org/docs/)
 - [Iroh Documentation](https://iroh.computer/docs/)
 - [Tokio Tutorial](https://tokio.rs/tokio/tutorial)

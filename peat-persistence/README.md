@@ -1,14 +1,21 @@
-# CAP Persistence
+# Peat Persistence
 
-Storage abstraction layer for the Capability Aggregation Protocol (CAP).
+Storage abstraction layer for the Peat Protocol (CAP).
 
 ## Overview
 
-`peat-persistence` provides a backend-agnostic interface for persisting and querying Peat protocol data, enabling external systems to access CAP state without coupling to specific storage implementations.
+`peat-persistence` provides a backend-agnostic interface for persisting and
+querying Peat protocol data, enabling external systems to access CAP state
+without coupling to a specific storage implementation.
+
+The crate defines the `DataStore` trait and the query / event types used by
+the rest of the workspace. A concrete backend based on Automerge + Iroh lives
+in the `peat-protocol` storage module; additional backends can be added by
+implementing `DataStore`.
 
 ## Features
 
-- **Backend Agnostic**: Works with Ditto, Automerge, or any CRDT backend via the `DataStore` trait
+- **Backend Agnostic**: `DataStore` trait abstracts over any CRDT / storage engine
 - **Query Interface**: Filter, sort, and paginate CAP data with type-safe queries
 - **Live Updates**: Subscribe to real-time changes via observers
 - **External API**: HTTP/REST endpoints for non-CAP systems (optional `external-api` feature)
@@ -30,9 +37,9 @@ External System (C2 Dashboard, Analytics)
           ↓ implemented by
   ┌──────────────────────┐
   │  Storage Backends    │
-  │  • Ditto             │
-  │  • Automerge (planned)│
+  │  • Automerge + Iroh  │
   │  • SQLite (planned)  │
+  │  • PostgreSQL (planned) │
   └──────────────────────┘
 ```
 
@@ -48,95 +55,10 @@ peat-persistence = { path = "../peat-persistence" }
 peat-persistence = { path = "../peat-persistence", features = ["external-api"] }
 ```
 
-## Quick Start
-
-### Using the DataStore Trait
-
-```rust
-use cap_persistence::{DataStore, Query};
-use cap_persistence::backends::DittoStore;
-use cap_protocol::sync::ditto::DittoBackend;
-use cap_protocol::sync::{BackendConfig, DataSyncBackend};
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-
-#[derive(Debug, Serialize, Deserialize)]
-struct NodeState {
-    node_id: String,
-    phase: String,
-    health: String,
-}
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize Ditto backend
-    let backend = Arc::new(DittoBackend::new());
-    let config = BackendConfig {
-        app_id: "my-cap-app".to_string(),
-        persistence_dir: "/tmp/cap-data".into(),
-        // ... other config
-    };
-    backend.initialize(config).await?;
-
-    // Create persistence store
-    let store = DittoStore::new(backend);
-
-    // Save data
-    let node = NodeState {
-        node_id: "node-1".to_string(),
-        phase: "discovery".to_string(),
-        health: "nominal".to_string(),
-    };
-    let id = store.save("node_states", &node).await?;
-    println!("Saved node with ID: {}", id);
-
-    // Query data
-    let nodes: Vec<NodeState> = store.query("node_states", Query::all()).await?;
-    println!("Found {} nodes", nodes.len());
-
-    // Subscribe to changes
-    let mut stream = store.observe("node_states", Query::all()).await?;
-    tokio::spawn(async move {
-        while let Some(event) = stream.recv().await {
-            println!("Change detected: {:?}", event);
-        }
-    });
-
-    Ok(())
-}
-```
-
-### Using the HTTP Server
-
-```rust
-use cap_persistence::external::Server;
-use cap_persistence::backends::DittoStore;
-use cap_protocol::sync::ditto::DittoBackend;
-use std::sync::Arc;
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize backend and store
-    let backend = Arc::new(DittoBackend::new());
-    // backend.initialize(config).await?;
-
-    let store = Arc::new(DittoStore::new(backend));
-
-    // Create and start HTTP server
-    let server = Server::new(store)
-        .bind("0.0.0.0:8080")
-        .await?;
-
-    println!("REST API listening on http://0.0.0.0:8080");
-    server.serve().await?;
-
-    Ok(())
-}
-```
-
 ## REST API
 
-When built with the `external-api` feature, the crate provides HTTP endpoints for querying CAP data.
+When built with the `external-api` feature, the crate provides HTTP endpoints
+for querying CAP data.
 
 ### Endpoints
 
@@ -150,8 +72,8 @@ GET /api/v1/health
 ```json
 {
   "status": "healthy",
-  "store": "Ditto",
-  "version": "4.12.0"
+  "store": "Automerge+Iroh",
+  "version": "0.1.0"
 }
 ```
 
@@ -177,8 +99,7 @@ GET /api/v1/collections/{name}?limit=10&offset=0
       "node_id": "node-1",
       "phase": "discovery",
       "health": "nominal"
-    },
-    ...
+    }
   ]
 }
 ```
@@ -264,10 +185,10 @@ pub trait DataStore: Send + Sync {
 
 ## Query Builder
 
-Build complex queries with the fluent API:
+Build queries with the fluent API:
 
 ```rust
-use cap_persistence::Query;
+use peat_persistence::Query;
 
 let query = Query::new()
     .limit(10)
@@ -284,37 +205,24 @@ let query = Query::new()
 
 ## Storage Backends
 
-### Ditto Backend
+### Automerge + Iroh (current)
 
-The current production implementation wraps the existing `DataSyncBackend` from `peat-protocol`.
+The production storage backend used by `peat-protocol` is built on Automerge
+CRDTs with Iroh QUIC transport. It implements `DataStore` and is what
+workspace binaries (peat-sim, peat-transport, FFI bindings) run against today.
 
-```rust
-use cap_persistence::backends::DittoStore;
-use cap_protocol::sync::ditto::DittoBackend;
-use std::sync::Arc;
+### Historical Note
 
-let backend = Arc::new(DittoBackend::new());
-let store = DittoStore::new(backend);
-```
+An earlier revision of the workspace also supplied a `DittoStore` backend
+implementing `DataStore` against the proprietary Ditto SDK. That backend has
+been removed; only Automerge + Iroh ships today. See
+[ADR-011](../docs/adr/011-ditto-vs-automerge-iroh.md) for the historical
+backend comparison.
 
-### Future Backends
+### Planned Backends
 
-Planned implementations:
-- **Automerge + Iroh**: Open-source CRDT sync engine
 - **SQLite**: Local persistence for testing
 - **PostgreSQL**: Centralized storage for C2 systems
-
-## Examples
-
-See the `examples/` directory for complete working examples:
-
-```bash
-# Basic usage
-cargo run --example basic_usage
-
-# HTTP server
-cargo run --example http_server --features external-api
-```
 
 ## Testing
 
@@ -339,14 +247,10 @@ peat-persistence/
 │   ├── error.rs         # Error types
 │   ├── types.rs         # Core types (Query, DocumentId, etc.)
 │   ├── store.rs         # DataStore trait
-│   ├── backends/        # Storage backend implementations
-│   │   ├── mod.rs
-│   │   └── ditto.rs     # Ditto adapter
 │   └── external/        # HTTP API (optional feature)
 │       ├── mod.rs
 │       ├── server.rs    # HTTP server
 │       └── routes.rs    # API routes
-├── examples/            # Usage examples
 ├── Cargo.toml
 └── README.md
 ```
@@ -355,16 +259,15 @@ peat-persistence/
 
 To implement a new storage backend:
 
-1. Create a new file in `src/backends/`
-2. Implement the `DataStore` trait
-3. Add to `src/backends/mod.rs`
-4. Add tests
+1. Create a new crate or module implementing `DataStore`
+2. Add tests demonstrating conformance with the trait contract
+3. Wire the backend into the host crate (e.g. `peat-protocol`) behind a
+   feature flag
 
 Example:
 
 ```rust
-// src/backends/sqlite.rs
-use crate::store::DataStore;
+use peat_persistence::{DataStore, DocumentId, Query, Result};
 use async_trait::async_trait;
 
 pub struct SqliteStore {
@@ -379,23 +282,24 @@ impl DataStore for SqliteStore {
         document: &T,
     ) -> Result<DocumentId> {
         // Implementation
+        todo!()
     }
     // ... other methods
 }
 ```
 
-## Integration with CAP Ecosystem
+## Integration with Peat Ecosystem
 
 `peat-persistence` is part of the larger Peat Protocol ecosystem:
 
 - **peat-schema**: Protobuf message definitions (stores these messages)
-- **peat-protocol**: Core protocol logic (uses this for state storage)
+- **peat-protocol**: Core protocol logic (provides the Automerge + Iroh backend and consumes this trait)
 - **peat-transport**: HTTP/gRPC transports (complementary external access)
 
 ## Performance Considerations
 
-- **Ditto Backend**: Performance depends on Ditto SDK (typically <10ms for local queries)
-- **HTTP API**: Add ~5-10ms overhead for serialization and transport
+- **Automerge + Iroh backend**: Typically <10ms for local queries
+- **HTTP API**: Adds ~5-10ms overhead for serialization and transport
 - **Observers**: Near real-time updates (typically <100ms latency)
 
 ## Security
@@ -412,21 +316,22 @@ When deploying the HTTP API:
 - [ ] Advanced query filters (Eq, Gt, Lt, Contains, etc.)
 - [ ] Authentication and authorization middleware
 - [ ] WebSocket streaming API for live updates
-- [ ] Automerge backend implementation
 - [ ] SQLite backend for testing
 - [ ] Query performance optimization
 - [ ] Metrics and observability
 
 ## License
 
-See the main CAP repository for license information.
+See the main Peat repository for license information.
 
 ## Contributing
 
-Contributions are welcome! See `DEVELOPMENT.md` in the repository root for guidelines.
+Contributions are welcome! See `CONTRIBUTING.md` in the repository root for
+guidelines.
 
 ## References
 
 - [ADR-012: Schema Definition and Protocol Extensibility](../docs/adr/012-schema-definition-protocol-extensibility.md)
 - [Peat Protocol Documentation](../README.md)
-- [Ditto SDK Documentation](https://docs.ditto.live/)
+- [Automerge Documentation](https://automerge.org/docs/)
+- [Iroh Documentation](https://iroh.computer/docs/)

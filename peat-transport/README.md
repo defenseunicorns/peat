@@ -10,7 +10,7 @@ HTTP/REST API transport layer for Peat Protocol external integration.
 
 - **HTTP/REST API**: Query nodes, cells, and beacons via REST endpoints
 - **Read-only**: External systems can query state but not mutate (safety)
-- **Backend agnostic**: Works with Ditto or Automerge+Iroh sync backends
+- **Backend agnostic**: Works with any sync backend implementing the workspace `DataSyncBackend` trait (today: Automerge + Iroh)
 - **JSON responses**: Uses peat-schema protobuf → JSON encoding
 - **Per-node architecture**: Each CAP node runs its own HTTP server
 - **Extensible**: Trait-based design for future WebSocket/gRPC support
@@ -18,21 +18,18 @@ HTTP/REST API transport layer for Peat Protocol external integration.
 ## Quick Start
 
 ```rust
-use cap_transport::http::Server;
-use cap_protocol::sync::ditto::DittoBackend;
-use cap_protocol::sync::DataSyncBackend;
+use peat_transport::http::Server;
+use peat_protocol::sync::{automerge::AutomergeIrohBackend, DataSyncBackend};
 use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize sync backend (Ditto)
-    let backend = Arc::new(DittoBackend::new());
-    backend.initialize(config).await?;
+    // Initialize the sync backend (Automerge + Iroh)
+    let backend = Arc::new(AutomergeIrohBackend::new());
+    // backend.initialize(config).await?;
 
     // Start HTTP server
-    let server = Server::new(backend)
-        .bind("0.0.0.0:8080")
-        .await?;
+    let server = Server::new(backend).bind("0.0.0.0:8080").await?;
 
     println!("REST API listening on http://0.0.0.0:8080");
     server.serve().await?;
@@ -55,7 +52,7 @@ Returns API server health status.
 ```json
 {
   "status": "healthy",
-  "backend": "Ditto"
+  "backend": "Automerge+Iroh"
 }
 ```
 
@@ -208,7 +205,7 @@ External System (C2 Dashboard, ROS2, etc.)
   └──────────────────────┘
           ↓ stores in
   ┌──────────────────────┐
-  │  Ditto / Automerge   │
+  │  Automerge + Iroh    │
   │  (Sync Backend)      │
   └──────────────────────┘
 ```

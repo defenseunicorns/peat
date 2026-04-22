@@ -36,12 +36,11 @@ Thank you for your interest in contributing to Peat. This document covers develo
 
 ### Feature Flags
 
-The `peat-protocol` crate uses feature flags for backend selection:
+The `peat-protocol` crate uses feature flags for optional transports and bindings:
 
 | Feature | Description |
 |---------|-------------|
-| `ditto-backend` (default) | Ditto CRDT backend (proprietary) |
-| `automerge-backend` | Automerge CRDT backend (open-source) |
+| `automerge-backend` (default) | Automerge CRDT backend with Iroh QUIC transport |
 | `lite-transport` | Embedded node transport via peat-lite |
 | `bluetooth` | BLE mesh transport via peat-btle |
 
@@ -49,8 +48,7 @@ The `peat-protocol` crate uses feature flags for backend selection:
 
 ```bash
 make build                  # full workspace
-cargo build                 # default features
-cargo build --features automerge-backend  # Automerge backend
+cargo build                 # default features (Automerge + Iroh)
 ```
 
 ## Testing

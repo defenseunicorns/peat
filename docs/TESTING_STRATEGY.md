@@ -21,7 +21,7 @@ The Peat Protocol is designed for **autonomous multi-agent systems** operating i
 ## Test Pyramid
 
 ```
-           E2E (Ditto P2P Sync)
+          E2E (Automerge + Iroh P2P Sync)
           /                    \
          /  Integration Tests   \
         /________________________\
@@ -45,7 +45,7 @@ The Peat Protocol is designed for **autonomous multi-agent systems** operating i
 
 ### E2E Tests (Critical Validation)
 - **10% of test effort, 100% of mission assurance value**
-- Test real Ditto P2P synchronization
+- Test real Automerge + Iroh P2P synchronization
 - Validate distributed state convergence
 - Observer-based event-driven assertions
 - **Example**: Multi-peer cell formation with CRDT sync
@@ -75,7 +75,7 @@ The Peat Protocol is designed for **autonomous multi-agent systems** operating i
 **Purpose**: Validate cross-component interactions without external dependencies
 
 **Coverage**:
-- Storage abstractions (mocked Ditto)
+- Storage abstractions (mocked sync backend)
 - Cell formation workflow (without real P2P)
 - Phase transitions
 - Error handling paths
@@ -83,17 +83,17 @@ The Peat Protocol is designed for **autonomous multi-agent systems** operating i
 **Characteristics**:
 - Runs in ~100ms
 - May use filesystem (temp directories)
-- No real network/Ditto required
+- No real network required
 - Can run in CI without credentials
 
 **Location**: `peat-protocol/tests/*_integration.rs`
 
-### 3. E2E Tests (Real Ditto P2P)
+### 3. E2E Tests (Real Automerge + Iroh P2P)
 
 **Purpose**: Validate distributed system behavior with real CRDT sync
 
 **Coverage**:
-- Multi-peer Ditto synchronization
+- Multi-peer CRDT synchronization
 - Node advertisement propagation
 - Cell formation state convergence
 - Role assignment sync across mesh
@@ -102,7 +102,7 @@ The Peat Protocol is designed for **autonomous multi-agent systems** operating i
 
 **Characteristics**:
 - Runs in ~500ms per scenario
-- **Requires real Ditto instances**
+- **Requires real CRDT/transport instances (Automerge + Iroh)**
 - Observer-based (no polling)
 - Event-driven assertions
 - Isolated test sessions
@@ -125,9 +125,9 @@ In a distributed CRDT system:
 ### E2E Test Requirements
 
 Every E2E test MUST:
-1. **Use real Ditto instances** (no mocks)
+1. **Use real CRDT/transport instances** (Automerge + Iroh, no mocks)
 2. **Create isolated sessions** (unique persistence directories)
-3. **Store data in Ditto** (PlatformConfig, SquadState, etc.)
+3. **Store data through the storage abstraction** (PlatformConfig, SquadState, etc.)
 4. **Validate sync via observers** (not polling!)
 5. **Be fast** (<1s per test)
 6. **Be deterministic** (no flaky timeouts)
@@ -137,7 +137,7 @@ Every E2E test MUST:
 
 See [`peat-protocol/docs/testing/e2e-cell-formation.md`](../peat-protocol/docs/testing/e2e-cell-formation.md) for detailed scenario matrix.
 
-**Core Scenarios** (must be validated with real Ditto sync):
+**Core Scenarios** (must be validated with real Automerge + Iroh sync):
 
 1. **Node Advertisement Sync**
    - Store PlatformConfig on peer1
@@ -151,7 +151,7 @@ See [`peat-protocol/docs/testing/e2e-cell-formation.md`](../peat-protocol/docs/t
 
 3. **Role Assignment Distribution**
    - Leader election on peer1
-   - Role assignments stored in Ditto
+   - Role assignments stored via the CRDT backend
    - All peers converge to same role map
 
 4. **Human Approval Workflow**
@@ -170,17 +170,17 @@ See [`peat-protocol/docs/testing/e2e-cell-formation.md`](../peat-protocol/docs/t
 
 ```rust
 pub struct E2EHarness {
-    // Creates isolated Ditto instances
-    pub async fn create_ditto_store(&mut self) -> Result<DittoStore>
+    // Creates isolated storage instances (Automerge + Iroh)
+    pub async fn create_store(&mut self) -> Result<PeatStore>
 
     // Observer-based sync validation
-    pub async fn observe_cell(&self, store: &DittoStore, cell_id: &str) -> Result<SquadObserver>
+    pub async fn observe_cell(&self, store: &PeatStore, cell_id: &str) -> Result<SquadObserver>
 
     // Event-driven peer connection
     pub async fn wait_for_peer_connection(&self, ...) -> Result<()>
 
     // Clean resource management
-    pub async fn shutdown_store(&self, store: DittoStore)
+    pub async fn shutdown_store(&self, store: PeatStore)
 }
 ```
 
@@ -240,11 +240,11 @@ cargo test -- --test-threads=1
 **GitHub Actions CI** (Automated on PR):
 - Runs **ONLY unit tests**: `cargo test --lib`
 - Fast and reliable (<2 minutes)
-- No Ditto mDNS/CRDT sync required
+- No mDNS/CRDT sync required
 - Provides quick feedback on PRs
 
 **Why E2E tests are excluded from CI**:
-- E2E tests depend on Ditto mDNS peer discovery and CRDT synchronization
+- E2E tests depend on mDNS peer discovery and CRDT synchronization
 - GitHub Actions CI environment has unreliable network timing and resource contention
 - mDNS discovery can fail or timeout inconsistently in containerized CI environments
 - CRDT sync requires stabilization time after peer connection that varies by CI load
@@ -271,14 +271,14 @@ cargo test -- --test-threads=1
 - Cell scenarios as code (not JSON)
 - Reusable test helpers
 
-### Ditto Test Data
+### Storage Test Data
 - Isolated persistence directories (auto-cleanup)
 - Unique app_id per test run
 - Observer-based validation (no manual queries)
 
 ### Environment Configuration
-- `.env` file for Ditto credentials
-- `DITTO_APP_ID`, `DITTO_OFFLINE_TOKEN`, `DITTO_SHARED_KEY`
+- `.env` file for per-test credentials
+- `PEAT_APP_ID`, `PEAT_SECRET_KEY`
 - Makefile loads .env automatically
 
 ## Test Metrics
@@ -402,7 +402,7 @@ Epic 5 implements a 3-tier hierarchical coordination system (Node → Cell → Z
 1. **test_e2e_zone_formation** ✅
    - Creates zone with 3 cells (9 nodes)
    - Validates zone formation complete
-   - Uses E2EHarness with real Ditto
+   - Uses E2EHarness with real Automerge + Iroh sync
 
 2. **test_e2e_routing_table_hierarchy** ✅
    - Tests 3-level hierarchy (node → cell → zone)
@@ -503,7 +503,7 @@ fn create_test_cell(id: &str, member_count: usize, max_size: usize) -> CellState
 - ⏳ Multi-zone rebalancing (cross-zone merges)
 - ⏳ Concurrent merge/split operations
 - ⏳ Network partition during rebalancing
-- ⏳ RebalancingCoordinator with real Ditto store
+- ⏳ RebalancingCoordinator with real CRDT store
 
 **Planned Additions**:
 - Chaos testing (random node join/leave)
@@ -544,9 +544,9 @@ fn test_capability_aggregation_nominal_health() {
 async fn test_node_sync_across_peers() {
     let mut harness = E2EHarness::new("node_sync");
 
-    // Create isolated Ditto instances
-    let peer1 = harness.create_ditto_store().await.unwrap();
-    let peer2 = harness.create_ditto_store().await.unwrap();
+    // Create isolated storage instances (Automerge + Iroh)
+    let peer1 = harness.create_store().await.unwrap();
+    let peer2 = harness.create_store().await.unwrap();
 
     // Set up observer BEFORE storing data
     let mut observer = harness.observe_node(&peer2, "node1").await.unwrap();
@@ -568,7 +568,7 @@ async fn test_node_sync_across_peers() {
 ```
 
 **Principles**:
-- ✅ Real Ditto instances (no mocks)
+- ✅ Real CRDT/transport instances (no mocks)
 - ✅ Observer-based validation
 - ✅ Event-driven (no sleep/polling)
 - ✅ Isolated sessions
