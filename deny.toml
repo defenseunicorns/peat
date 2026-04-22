@@ -15,7 +15,6 @@ ignore = [
     { id = "RUSTSEC-2025-0134", reason = "rustls-pemfile unmaintained; tracked for migration to rustls-pki-types" },
     # Transitive via iroh — cannot fix locally, tracked upstream
     { id = "RUSTSEC-2023-0089", reason = "atomic-polyfill unmaintained; transitive via iroh" },
-    { id = "RUSTSEC-2024-0384", reason = "instant unmaintained; transitive via iroh -> web-time migration needed upstream" },
     # Transitive via iroh -> aws-lc-sys
     { id = "RUSTSEC-2026-0044", reason = "aws-lc X.509 bypass; transitive via iroh, awaiting upstream update" },
     { id = "RUSTSEC-2026-0048", reason = "aws-lc CRL logic error; transitive via iroh, awaiting upstream update" },
