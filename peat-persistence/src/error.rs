@@ -5,7 +5,7 @@ use thiserror::Error;
 /// Persistence error type
 #[derive(Error, Debug)]
 pub enum Error {
-    /// Backend-specific error (Ditto, Automerge, etc.)
+    /// Backend-specific error
     #[error("Backend error: {0}")]
     Backend(#[from] peat_protocol::Error),
 

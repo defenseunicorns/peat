@@ -2,7 +2,7 @@
 //!
 //! This adapter implements the BeaconStorage trait from peat-mesh using
 //! the DataStore backend, enabling beacon data to be persisted and queried
-//! through any CRDT backend (Ditto, Automerge, etc.).
+//! through any backend that implements `DataStore`.
 
 use crate::store::{ChangeEvent, DataStore};
 use crate::types::Query;
