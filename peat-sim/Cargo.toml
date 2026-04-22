@@ -11,7 +11,7 @@ automerge-backend = ["peat-protocol/automerge-backend"]
 
 [dependencies]
 peat-mesh = { workspace = true }
-peat-protocol = { path = "../peat-protocol" }
+peat-protocol = { path = "../peat-protocol", features = ["ditto-backend"] }
 peat-schema = { path = "../peat-schema" }
 tokio = { workspace = true }
 serde = { workspace = true }

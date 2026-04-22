@@ -67,7 +67,7 @@ log = { version = "0.4", optional = true }  # Logging for lite transport
 peat-btle = { workspace = true, optional = true }
 
 [features]
-default = ["ditto-backend"]
+default = []
 # Ditto backend - requires dittolive-ditto SDK (not available on Android)
 ditto-backend = ["dittolive-ditto"]
 # Automerge/Iroh backend - pure Rust, works on Android

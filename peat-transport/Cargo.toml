@@ -10,7 +10,7 @@ repository.workspace = true
 [dependencies]
 # CAP dependencies
 peat-schema = { path = "../peat-schema" }
-peat-protocol = { path = "../peat-protocol" }
+peat-protocol = { path = "../peat-protocol", features = ["ditto-backend"] }
 
 # HTTP server
 axum = { version = "0.7", features = ["macros"] }
