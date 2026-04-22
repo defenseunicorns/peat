@@ -306,11 +306,20 @@ async fn test_sequential_vs_parallel_initialization_timing() {
         (1.0 - parallel_time.as_secs_f64() / sequential_time.as_secs_f64()) * 100.0
     );
 
-    // Parallel should generally be faster or at least not significantly slower
-    // (may have variance due to system load)
+    // Parallel should generally be faster or at least not significantly slower.
+    // Allow the larger of +500 ms or +50% over sequential so the assertion still
+    // catches genuine regressions without flaking on loaded CI runners (GitHub
+    // Actions shared hosts show non-trivial scheduler jitter at this scale).
+    let seq_ms = sequential_time.as_millis();
+    let par_ms = parallel_time.as_millis();
+    let allowed_ms = seq_ms + std::cmp::max(500, seq_ms / 2);
     assert!(
-        parallel_time.as_millis() <= sequential_time.as_millis() + 100,
-        "Parallel init should not be significantly slower than sequential"
+        par_ms <= allowed_ms,
+        "Parallel init should not be significantly slower than sequential \
+         (sequential={}ms, parallel={}ms, allowed={}ms)",
+        seq_ms,
+        par_ms,
+        allowed_ms
     );
 }
 
