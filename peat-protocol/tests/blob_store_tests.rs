@@ -1,112 +1,39 @@
 //! BlobStore Unit/Integration Tests (Single-Node)
 //!
-//! These tests validate that both DittoBlobStore and IrohBlobStore implementations
-//! conform to the BlobStore trait and produce identical behavior.
+//! These tests validate that the IrohBlobStore implementation conforms to the
+//! BlobStore trait.
 //!
 //! **NOTE**: These are NOT end-to-end tests. They only test single-node operations.
 //! For actual multi-node blob sync tests, see `blob_sync_e2e.rs`.
 //!
 //! # Test Strategy
 //!
-//! - Each test has two variants: one for Ditto, one for Iroh
 //! - Tests use shared helper functions for identical test logic
 //! - Validates that BlobStore trait abstraction works correctly
 //!
 //! # What This Proves
 //!
-//! 1. **Trait Abstraction Works**: Both backends implement BlobStore correctly
+//! 1. **Trait Abstraction Works**: IrohBlobStore implements BlobStore correctly
 //! 2. **Content Addressing**: Blobs are identified by content hash
-//! 3. **Metadata Handling**: Both backends preserve metadata correctly
-//! 4. **CRUD Operations**: Create, read, delete operations work identically
+//! 3. **Metadata Handling**: Metadata is preserved correctly
+//! 4. **CRUD Operations**: Create, read, delete operations work
 //!
 //! # What This Does NOT Prove
 //!
 //! - Blob transfer between mesh peers
-//! - Attachment sync via Ditto's mesh protocol
 //! - Remote blob fetch capabilities
 
-use peat_protocol::storage::ditto_store::DittoConfig;
+#![cfg(feature = "automerge-backend")]
+
 use peat_protocol::storage::{BlobMetadata, BlobStore, BlobStoreExt};
 use std::sync::Arc;
 use tempfile::TempDir;
-
-// ============================================================================
-// Ditto BlobStore Tests
-// ============================================================================
-
-/// Test basic blob operations with DittoBlobStore
-#[tokio::test]
-async fn test_ditto_blob_store_basic_operations() {
-    dotenvy::dotenv().ok();
-
-    let ditto_app_id = std::env::var("PEAT_APP_ID")
-        .or_else(|_| std::env::var("DITTO_APP_ID"))
-        .expect("PEAT_APP_ID must be set for Ditto tests");
-
-    println!("=== BlobStore E2E: Ditto Basic Operations ===");
-
-    // Create Ditto store
-    let temp_dir = TempDir::new().expect("Failed to create temp dir");
-    let blob_dir = temp_dir.path().join("ditto_blobs");
-    std::fs::create_dir_all(&blob_dir).unwrap();
-
-    let ditto_store = create_ditto_store(&ditto_app_id, temp_dir.path());
-    let blob_store =
-        peat_protocol::storage::DittoBlobStore::with_blob_dir(Arc::new(ditto_store), blob_dir);
-
-    run_basic_blob_operations_test(Arc::new(blob_store), "DittoBlobStore").await;
-}
-
-/// Test blob metadata with DittoBlobStore
-#[tokio::test]
-async fn test_ditto_blob_store_metadata() {
-    dotenvy::dotenv().ok();
-
-    let ditto_app_id = std::env::var("PEAT_APP_ID")
-        .or_else(|_| std::env::var("DITTO_APP_ID"))
-        .expect("PEAT_APP_ID must be set for Ditto tests");
-
-    println!("=== BlobStore E2E: Ditto Metadata ===");
-
-    let temp_dir = TempDir::new().expect("Failed to create temp dir");
-    let blob_dir = temp_dir.path().join("ditto_blobs");
-    std::fs::create_dir_all(&blob_dir).unwrap();
-
-    let ditto_store = create_ditto_store(&ditto_app_id, temp_dir.path());
-    let blob_store =
-        peat_protocol::storage::DittoBlobStore::with_blob_dir(Arc::new(ditto_store), blob_dir);
-
-    run_metadata_test(Arc::new(blob_store), "DittoBlobStore").await;
-}
-
-/// Test blob from file with DittoBlobStore
-#[tokio::test]
-async fn test_ditto_blob_store_from_file() {
-    dotenvy::dotenv().ok();
-
-    let ditto_app_id = std::env::var("PEAT_APP_ID")
-        .or_else(|_| std::env::var("DITTO_APP_ID"))
-        .expect("PEAT_APP_ID must be set for Ditto tests");
-
-    println!("=== BlobStore E2E: Ditto From File ===");
-
-    let temp_dir = TempDir::new().expect("Failed to create temp dir");
-    let blob_dir = temp_dir.path().join("ditto_blobs");
-    std::fs::create_dir_all(&blob_dir).unwrap();
-
-    let ditto_store = create_ditto_store(&ditto_app_id, temp_dir.path());
-    let blob_store =
-        peat_protocol::storage::DittoBlobStore::with_blob_dir(Arc::new(ditto_store), blob_dir);
-
-    run_file_blob_test(Arc::new(blob_store), temp_dir.path(), "DittoBlobStore").await;
-}
 
 // ============================================================================
 // Iroh BlobStore Tests
 // ============================================================================
 
 /// Test basic blob operations with IrohBlobStore
-#[cfg(feature = "automerge-backend")]
 #[tokio::test]
 async fn test_iroh_blob_store_basic_operations() {
     println!("=== BlobStore E2E: Iroh Basic Operations ===");
@@ -122,7 +49,6 @@ async fn test_iroh_blob_store_basic_operations() {
 }
 
 /// Test blob metadata with IrohBlobStore
-#[cfg(feature = "automerge-backend")]
 #[tokio::test]
 async fn test_iroh_blob_store_metadata() {
     println!("=== BlobStore E2E: Iroh Metadata ===");
@@ -138,7 +64,6 @@ async fn test_iroh_blob_store_metadata() {
 }
 
 /// Test blob from file with IrohBlobStore
-#[cfg(feature = "automerge-backend")]
 #[tokio::test]
 async fn test_iroh_blob_store_from_file() {
     println!("=== BlobStore E2E: Iroh From File ===");
@@ -154,7 +79,6 @@ async fn test_iroh_blob_store_from_file() {
 }
 
 /// Test storage summary with IrohBlobStore
-#[cfg(feature = "automerge-backend")]
 #[tokio::test]
 async fn test_iroh_blob_store_storage_summary() {
     println!("=== BlobStore E2E: Iroh Storage Summary ===");
@@ -167,83 +91,6 @@ async fn test_iroh_blob_store_storage_summary() {
         .expect("Failed to create IrohBlobStore");
 
     run_storage_summary_test(Arc::new(blob_store), "IrohBlobStore").await;
-}
-
-// ============================================================================
-// Backend Comparison Tests
-// ============================================================================
-
-/// Test that both backends produce valid content hashes
-#[cfg(feature = "automerge-backend")]
-#[tokio::test]
-async fn test_both_backends_content_addressing() {
-    dotenvy::dotenv().ok();
-
-    println!("=== BlobStore E2E: Content Addressing Comparison ===");
-
-    let ditto_app_id = std::env::var("PEAT_APP_ID")
-        .or_else(|_| std::env::var("DITTO_APP_ID"))
-        .expect("PEAT_APP_ID must be set for Ditto tests");
-
-    let test_data = b"Test content for both backends";
-    let metadata = BlobMetadata::with_name("test.txt");
-
-    // Create Ditto blob
-    let temp_dir_ditto = TempDir::new().unwrap();
-    let blob_dir_ditto = temp_dir_ditto.path().join("ditto_blobs");
-    std::fs::create_dir_all(&blob_dir_ditto).unwrap();
-    let ditto_store = create_ditto_store(&ditto_app_id, temp_dir_ditto.path());
-    let ditto_blob_store = peat_protocol::storage::DittoBlobStore::with_blob_dir(
-        Arc::new(ditto_store),
-        blob_dir_ditto,
-    );
-
-    let ditto_token = ditto_blob_store
-        .create_blob_from_bytes(test_data, metadata.clone())
-        .await
-        .expect("Ditto should create blob");
-
-    // Create Iroh blob
-    let temp_dir_iroh = TempDir::new().unwrap();
-    let blob_dir_iroh = temp_dir_iroh.path().join("iroh_blobs");
-    let iroh_blob_store = peat_protocol::storage::IrohBlobStore::new_in_memory(blob_dir_iroh)
-        .await
-        .expect("Failed to create IrohBlobStore");
-
-    let iroh_token = iroh_blob_store
-        .create_blob_from_bytes(test_data, metadata)
-        .await
-        .expect("Iroh should create blob");
-
-    println!("  Ditto hash: {}", ditto_token.hash.as_hex());
-    println!("  Iroh hash:  {}", iroh_token.hash.as_hex());
-
-    // Verify both produce valid hashes (different algorithms: SHA256 vs BLAKE3)
-    assert!(
-        !ditto_token.hash.as_hex().is_empty(),
-        "Ditto hash should not be empty"
-    );
-    assert!(
-        !iroh_token.hash.as_hex().is_empty(),
-        "Iroh hash should not be empty"
-    );
-
-    // Both should have same size
-    assert_eq!(
-        ditto_token.size_bytes, iroh_token.size_bytes,
-        "Both should report same size"
-    );
-    assert_eq!(
-        ditto_token.size_bytes,
-        test_data.len() as u64,
-        "Size should match data length"
-    );
-
-    // Both should preserve metadata name
-    assert_eq!(ditto_token.metadata.name, Some("test.txt".to_string()));
-    assert_eq!(iroh_token.metadata.name, Some("test.txt".to_string()));
-
-    println!("  ✅ Both backends produce valid content-addressed hashes!");
 }
 
 // ============================================================================
@@ -408,7 +255,6 @@ async fn run_file_blob_test<B: BlobStore + 'static>(
 }
 
 /// Shared test logic for storage summary
-#[allow(dead_code)]
 async fn run_storage_summary_test<B: BlobStore + 'static>(blob_store: Arc<B>, backend_name: &str) {
     println!("  Testing storage summary with {} backend", backend_name);
 
@@ -458,46 +304,4 @@ async fn run_storage_summary_test<B: BlobStore + 'static>(blob_store: Arc<B>, ba
         "  ✅ {} backend: Storage summary test passed!",
         backend_name
     );
-}
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/// Create a Ditto store for testing
-/// Panics if credentials are not set (tests must fail, not skip)
-fn create_ditto_store(
-    app_id: &str,
-    base_path: &std::path::Path,
-) -> peat_protocol::storage::DittoStore {
-    use peat_protocol::credentials::PeatCredentials;
-    use peat_protocol::storage::DittoStore;
-
-    // Load credentials via PeatCredentials (supports PEAT_* with DITTO_* fallback)
-    let credentials = PeatCredentials::from_env().expect(
-        "Credentials required (PEAT_APP_ID/PEAT_SECRET_KEY or DITTO_APP_ID/DITTO_SHARED_KEY)",
-    );
-
-    let shared_key = credentials
-        .require_secret_key()
-        .expect("Secret key required for Ditto tests")
-        .to_string();
-    let offline_token = credentials
-        .require_offline_token()
-        .expect("Offline token required for Ditto tests")
-        .to_string();
-
-    let persistence_dir = base_path.join("ditto_data");
-    std::fs::create_dir_all(&persistence_dir).unwrap();
-
-    let config = DittoConfig {
-        app_id: app_id.to_string(),
-        persistence_dir,
-        shared_key,
-        offline_token,
-        tcp_listen_port: None,
-        tcp_connect_address: None,
-    };
-
-    DittoStore::new(config).expect("Failed to create DittoStore")
 }

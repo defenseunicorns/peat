@@ -9,25 +9,23 @@
 //!
 //! 1. **Create Blob**: Use `BlobStore::create_blob()` to add content
 //! 2. **Store Reference**: Use `store_blob_reference()` to put token in document
-//! 3. **Sync**: Document syncs to peers via CRDT (Ditto/Automerge)
+//! 3. **Sync**: Document syncs to peers via CRDT (Automerge)
 //! 4. **Fetch**: Peer retrieves token, uses `fetch_blob()` to download content
 //!
 //! # Example
 //!
 //! ```ignore
 //! use peat_protocol::storage::{
-//!     BlobDocumentIntegration, BlobStore, BlobMetadata, DittoBlobStore
+//!     BlobDocumentIntegration, BlobStore, BlobMetadata,
 //! };
 //!
-//! // Create blob
-//! let blob_store = DittoBlobStore::new(ditto_store);
+//! // Create blob (backend-specific, e.g. NetworkedIrohBlobStore)
 //! let token = blob_store.create_blob(
 //!     Path::new("/models/target_recognition.onnx"),
 //!     BlobMetadata::with_name("target_recognition.onnx"),
 //! ).await?;
 //!
-//! // Store in model registry document
-//! let integration = DittoBlobDocumentIntegration::new(ditto_store, blob_store);
+//! // Store in model registry document via the BlobDocumentIntegration trait
 //! integration.store_blob_reference(
 //!     "model_registry",
 //!     "target_recognition:4.2.1",
@@ -46,22 +44,10 @@
 //! }
 //! ```
 
-#[cfg(feature = "ditto-backend")]
-use super::blob_traits::BlobStore;
 use super::blob_traits::{BlobHash, BlobMetadata, BlobProgress, BlobToken};
-#[cfg(feature = "ditto-backend")]
-use super::ditto_store::DittoStore;
-#[cfg(feature = "ditto-backend")]
-use anyhow::Context;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "ditto-backend")]
-use serde_json::json;
 use std::collections::HashMap;
-#[cfg(feature = "ditto-backend")]
-use std::sync::Arc;
-#[cfg(feature = "ditto-backend")]
-use tracing::{debug, info, warn};
 
 /// Serializable blob reference for storage in documents
 ///
@@ -205,294 +191,6 @@ pub trait BlobDocumentIntegration: Send + Sync {
     ) -> Result<std::path::PathBuf>
     where
         F: FnMut(BlobProgress) + Send + 'static;
-}
-
-/// Ditto implementation of blob-document integration
-///
-/// Stores blob tokens as JSON in Ditto documents. When documents
-/// sync via Ditto's CRDT protocol, the blob references sync too.
-///
-/// # Blob Fetching
-///
-/// After retrieving a token from a synced document, use
-/// `DittoBlobStore::fetch_blob()` to download the actual content.
-/// Ditto's Attachment API handles the blob transfer automatically.
-#[cfg(feature = "ditto-backend")]
-pub struct DittoBlobDocumentIntegration<B: BlobStore> {
-    store: Arc<DittoStore>,
-    blob_store: Arc<B>,
-}
-
-#[cfg(feature = "ditto-backend")]
-impl<B: BlobStore> DittoBlobDocumentIntegration<B> {
-    /// Create new integration layer
-    ///
-    /// # Arguments
-    /// * `store` - DittoStore for document operations
-    /// * `blob_store` - BlobStore for blob operations
-    pub fn new(store: Arc<DittoStore>, blob_store: Arc<B>) -> Self {
-        Self { store, blob_store }
-    }
-
-    /// Access the underlying DittoStore
-    pub fn ditto_store(&self) -> &DittoStore {
-        &self.store
-    }
-
-    /// Access the underlying BlobStore
-    pub fn blob_store(&self) -> &B {
-        &self.blob_store
-    }
-}
-
-#[cfg(feature = "ditto-backend")]
-#[async_trait::async_trait]
-impl<B: BlobStore + 'static> BlobDocumentIntegration for DittoBlobDocumentIntegration<B> {
-    async fn store_blob_reference(
-        &self,
-        collection: &str,
-        doc_id: &str,
-        field: &str,
-        token: &BlobToken,
-    ) -> Result<()> {
-        info!(
-            "Storing blob reference: collection={}, doc_id={}, field={}, hash={}",
-            collection,
-            doc_id,
-            field,
-            token.hash.as_hex()
-        );
-
-        // Convert token to serializable reference
-        let reference = BlobReference::from(token);
-
-        // Use Ditto's DQL to upsert the document with blob reference
-        // The blob reference is stored as a nested JSON object
-        let query = format!(
-            "INSERT INTO {} DOCUMENTS (:doc) ON ID CONFLICT DO UPDATE",
-            collection
-        );
-
-        let doc = json!({
-            "_id": doc_id,
-            field: reference,
-        });
-
-        self.store
-            .ditto()
-            .store()
-            .execute_v2((query, json!({ "doc": doc })))
-            .await
-            .with_context(|| {
-                format!(
-                    "Failed to store blob reference in {}.{}.{}",
-                    collection, doc_id, field
-                )
-            })?;
-
-        debug!(
-            "Stored blob reference {} in {}.{}.{}",
-            token.hash.as_hex(),
-            collection,
-            doc_id,
-            field
-        );
-
-        Ok(())
-    }
-
-    async fn get_blob_reference(
-        &self,
-        collection: &str,
-        doc_id: &str,
-        field: &str,
-    ) -> Result<Option<BlobToken>> {
-        debug!(
-            "Getting blob reference: collection={}, doc_id={}, field={}",
-            collection, doc_id, field
-        );
-
-        // Query the specific document
-        let query = format!("SELECT * FROM {} WHERE _id = :id", collection);
-
-        let result = self
-            .store
-            .ditto()
-            .store()
-            .execute_v2((query, json!({ "id": doc_id })))
-            .await
-            .with_context(|| format!("Failed to query {}.{}", collection, doc_id))?;
-
-        // Parse results
-        let documents: Vec<serde_json::Value> = result
-            .iter()
-            .map(|item| {
-                serde_json::from_str(&item.json_string()).unwrap_or(serde_json::Value::Null)
-            })
-            .collect();
-
-        if documents.is_empty() {
-            debug!("Document {}.{} not found", collection, doc_id);
-            return Ok(None);
-        }
-
-        // Extract the field value
-        let value = &documents[0];
-
-        // Try to extract the blob reference field
-        if let Some(blob_ref_value) = value.get(field) {
-            // Check if it's null or missing
-            if blob_ref_value.is_null() {
-                return Ok(None);
-            }
-
-            // Try to deserialize as BlobReference
-            match serde_json::from_value::<BlobReference>(blob_ref_value.clone()) {
-                Ok(reference) => {
-                    let token = BlobToken::from(reference);
-                    debug!(
-                        "Found blob reference {} in {}.{}.{}",
-                        token.hash.as_hex(),
-                        collection,
-                        doc_id,
-                        field
-                    );
-                    Ok(Some(token))
-                }
-                Err(e) => {
-                    warn!(
-                        "Field {}.{}.{} is not a valid blob reference: {}",
-                        collection, doc_id, field, e
-                    );
-                    Ok(None)
-                }
-            }
-        } else {
-            debug!(
-                "Field {} not found in document {}.{}",
-                field, collection, doc_id
-            );
-            Ok(None)
-        }
-    }
-
-    async fn remove_blob_reference(
-        &self,
-        collection: &str,
-        doc_id: &str,
-        field: &str,
-    ) -> Result<()> {
-        info!(
-            "Removing blob reference: collection={}, doc_id={}, field={}",
-            collection, doc_id, field
-        );
-
-        // Use UPDATE to set the field to null
-        let query = format!("UPDATE {} SET {} = NULL WHERE _id = :id", collection, field);
-
-        self.store
-            .ditto()
-            .store()
-            .execute_v2((query, json!({ "id": doc_id })))
-            .await
-            .with_context(|| {
-                format!(
-                    "Failed to remove blob reference from {}.{}.{}",
-                    collection, doc_id, field
-                )
-            })?;
-
-        debug!(
-            "Removed blob reference from {}.{}.{}",
-            collection, doc_id, field
-        );
-
-        Ok(())
-    }
-
-    async fn list_blob_references(
-        &self,
-        collection: &str,
-        doc_id: &str,
-    ) -> Result<HashMap<String, BlobToken>> {
-        debug!(
-            "Listing blob references: collection={}, doc_id={}",
-            collection, doc_id
-        );
-
-        let mut references = HashMap::new();
-
-        // Query the document
-        let query = format!("SELECT * FROM {} WHERE _id = :id", collection);
-
-        let result = self
-            .store
-            .ditto()
-            .store()
-            .execute_v2((query, json!({ "id": doc_id })))
-            .await
-            .with_context(|| format!("Failed to query {}.{}", collection, doc_id))?;
-
-        // Parse results
-        let documents: Vec<serde_json::Value> = result
-            .iter()
-            .map(|item| {
-                serde_json::from_str(&item.json_string()).unwrap_or(serde_json::Value::Null)
-            })
-            .collect();
-
-        if documents.is_empty() {
-            return Ok(references);
-        }
-
-        let value = &documents[0];
-
-        // Iterate over all fields looking for blob references
-        if let Some(obj) = value.as_object() {
-            for (field, field_value) in obj {
-                // Skip system fields
-                if field.starts_with('_') {
-                    continue;
-                }
-
-                // Try to parse as blob reference
-                if let Ok(reference) = serde_json::from_value::<BlobReference>(field_value.clone())
-                {
-                    references.insert(field.clone(), BlobToken::from(reference));
-                }
-            }
-        }
-
-        debug!(
-            "Found {} blob references in {}.{}",
-            references.len(),
-            collection,
-            doc_id
-        );
-
-        Ok(references)
-    }
-
-    async fn store_and_fetch<F>(
-        &self,
-        collection: &str,
-        doc_id: &str,
-        field: &str,
-        token: &BlobToken,
-        progress: F,
-    ) -> Result<std::path::PathBuf>
-    where
-        F: FnMut(BlobProgress) + Send + 'static,
-    {
-        // Store the reference first
-        self.store_blob_reference(collection, doc_id, field, token)
-            .await?;
-
-        // Then fetch the blob locally
-        let handle = self.blob_store.fetch_blob(token, progress).await?;
-
-        Ok(handle.path.clone())
-    }
 }
 
 // ============================================================================

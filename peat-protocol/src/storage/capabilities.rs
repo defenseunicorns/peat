@@ -6,7 +6,6 @@
 //!
 //! A **backend is a complete, integrated solution** for storage, synchronization, and persistence:
 //!
-//! - **DittoBackend**: Ditto's proprietary CRDT storage + built-in P2P mesh + multi-transport
 //! - **AutomergeIrohBackend**: Automerge CRDTs + RocksDB persistence + Iroh QUIC + custom mesh (ADR-017)
 //! - **SimpleBackend**: RocksDB only (no CRDT, no sync, just local K/V storage)
 //!
@@ -30,30 +29,29 @@
 //! │ • flush() - Persistence guarantee                       │
 //! └─────────────────┬───────────────────────────────────────┘
 //!                   │
-//!        ┌──────────┴──────────────────┬─────────────┐
-//!        ▼                             ▼             ▼
-//! ┌─────────────────┐      ┌─────────────────────┐  ┌──────────┐
-//! │ DittoBackend    │      │ AutomergeIrohBackend│  │ Simple   │
-//! │ =============== │      │ ===================  │  │ Backend  │
-//! │ • Ditto CRDT    │      │ • Automerge CRDTs   │  │ ======== │
-//! │ • Ditto P2P     │      │ • RocksDB persist   │  │ • RocksDB│
-//! │ • Multi-trans   │      │ • Iroh QUIC         │  │   only   │
-//! │                 │      │ • Custom mesh       │  │          │
-//! │ + CrdtCapable   │      │   (ADR-017)         │  │          │
-//! │ + SyncCapable   │      │                     │  │          │
-//! │                 │      │ + CrdtCapable       │  │          │
-//! │                 │      │ + SyncCapable       │  │          │
-//! └─────────────────┘      └─────────────────────┘  └──────────┘
-//!   (one complete           (one complete OSS        (minimal
-//!    commercial              stack, not separate      backend)
-//!    solution)               pieces)
+//!        ┌──────────┴──────────────┐
+//!        ▼                         ▼
+//! ┌─────────────────────┐      ┌──────────┐
+//! │ AutomergeIrohBackend│      │ Simple   │
+//! │ ===================  │      │ Backend  │
+//! │ • Automerge CRDTs   │      │ ======== │
+//! │ • RocksDB persist   │      │ • RocksDB│
+//! │ • Iroh QUIC         │      │   only   │
+//! │ • Custom mesh       │      │          │
+//! │   (ADR-017)         │      │          │
+//! │                     │      │          │
+//! │ + CrdtCapable       │      │          │
+//! │ + SyncCapable       │      │          │
+//! └─────────────────────┘      └──────────┘
+//!   (one complete OSS            (minimal
+//!    stack, not separate          backend)
+//!    pieces)
 //! ```
 //!
 //! # Backend Comparison
 //!
 //! | Backend                | Components                          | CRDT | Sync | License    | Use Case                 |
 //! |------------------------|-------------------------------------|------|------|------------|--------------------------|
-//! | **DittoBackend**       | Ditto SDK (all-in-one)              | ✅   | ✅   | Proprietary| Managed service          |
 //! | **AutomergeIrohBackend**| Automerge + RocksDB + Iroh + mesh  | ✅   | ✅   | MIT/Apache | OSS, self-hosted         |
 //! | **SimpleBackend**      | RocksDB only                        | ❌   | ❌   | Apache 2.0 | Testing, local storage   |
 //!
@@ -72,19 +70,7 @@
 //!
 //! **Requirements:**
 //! - Protobuf messages must have `#[derive(Serialize, Deserialize)]`
-//! - Backend must support structured storage (JSON for Ditto, Automerge doc for Automerge)
-//!
-//! **Example (DittoBackend):**
-//! ```ignore
-//! use peat_protocol::storage::{DittoBackend, CrdtCapable};
-//! use peat_schema::hierarchy::v1::SquadSummary;
-//!
-//! let backend = DittoBackend::new(store);
-//! let squads: Arc<dyn TypedCollection<SquadSummary>> =
-//!     backend.typed_collection("squads");
-//! squads.upsert("squad-1", &summary)?;
-//! // → Ditto stores as JSON, enables CRDT merging
-//! ```
+//! - Backend must support structured storage (Automerge document)
 //!
 //! **Example (AutomergeIrohBackend):**
 //! ```ignore
@@ -101,7 +87,6 @@
 //!
 //! Backends that implement `SyncCapable` have built-in P2P synchronization.
 //!
-//! **DittoBackend**: Built-in mesh networking with Bluetooth, WiFi-Direct, TCP/IP
 //! **AutomergeIrohBackend**: Integrated with Iroh QUIC transport + custom mesh (ADR-017)
 //!
 //! # Decision Guide
@@ -123,7 +108,6 @@
 //! ## When to use `SyncCapable` interface:
 //!
 //! - ✅ Need to control sync lifecycle (start/stop)
-//! - ✅ Using Ditto's built-in P2P (not Iroh)
 //! - ✅ Need sync statistics and monitoring
 //!
 //! # Open Source Path
@@ -191,7 +175,7 @@ use std::sync::Arc;
 /// use peat_protocol::storage::{CrdtCapable, TypedCollection};
 /// use peat_schema::hierarchy::v1::SquadSummary;
 ///
-/// let backend = DittoBackend::new(store);
+/// let backend = AutomergeIrohBackend::new(config);
 /// let squads: Arc<dyn TypedCollection<SquadSummary>> =
 ///     backend.typed_collection("squads");
 ///
@@ -208,7 +192,6 @@ where
     /// Insert or update a typed document with CRDT merging
     ///
     /// Backends convert the message to their CRDT format:
-    /// - Ditto: `message` → JSON → Ditto CRDT
     /// - Automerge: `message` → Automerge document
     fn upsert(&self, doc_id: &str, message: &M) -> Result<()>;
 
@@ -238,7 +221,6 @@ where
 ///
 /// # Implementations
 ///
-/// - ✅ `DittoBackend` - JSON expansion with Ditto CRDTs
 /// - ✅ `AutomergeIrohBackend` - Native Automerge documents with RocksDB persistence
 /// - ❌ `SimpleBackend` - Blob storage, no CRDT support
 pub trait CrdtCapable: Send + Sync {
@@ -262,18 +244,13 @@ pub trait CrdtCapable: Send + Sync {
 ///
 /// # Implementations
 ///
-/// - ✅ `DittoBackend` - Built-in Bluetooth/WiFi/TCP mesh
 /// - ✅ `AutomergeIrohBackend` - Integrated Iroh QUIC transport with custom mesh (ADR-017)
 /// - ❌ `SimpleBackend` - Local storage only, no synchronization
 pub trait SyncCapable: Send + Sync {
     /// Start background synchronization
-    ///
-    /// For Ditto: Activates mesh networking (Bluetooth, WiFi-Direct, TCP)
     fn start_sync(&self) -> Result<()>;
 
     /// Stop background synchronization
-    ///
-    /// For Ditto: Disconnects from all peers, stops listening
     fn stop_sync(&self) -> Result<()>;
 
     /// Get current sync statistics
@@ -302,7 +279,6 @@ pub struct SyncStats {
 ///
 /// # Implementations
 ///
-/// - ✅ `DittoBackend` - Returns DittoSummaryStorage and DittoCommandStorage
 /// - ✅ `AutomergeBackend` - Returns AutomergeSummaryStorage and AutomergeCommandStorage
 /// - ❌ `SimpleBackend` - Not supported (no CRDT, no hierarchy)
 ///
@@ -344,6 +320,6 @@ mod tests {
 
     // Note: CrdtCapable is intentionally NOT object-safe due to generic method.
     // This is correct - use concrete backend types:
-    //   let backend = DittoBackend::new(store);
+    //   let backend = AutomergeIrohBackend::new(config);
     //   let collection = backend.typed_collection::<SquadSummary>("squads");
 }

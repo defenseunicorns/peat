@@ -19,16 +19,15 @@ use tracing::{debug, info, instrument, warn};
 /// This significantly reduces write load when many nodes are updating frequently.
 ///
 /// # Example
-/// ```no_run
+/// ```ignore
 /// use peat_protocol::storage::{NodeStore, ThrottledNodeStore};
 /// use peat_protocol::models::node::{NodeState, NodeStateExt};
-/// use peat_protocol::sync::ditto::DittoBackend;
 /// use std::time::Duration;
 /// use std::sync::Arc;
 ///
 /// # async fn example() -> peat_protocol::Result<()> {
-/// // Assuming you have a NodeStore
-/// # let backend = Arc::new(DittoBackend::new());
+/// // Assuming you have a NodeStore backed by an AutomergeIrohBackend
+/// # let backend: Arc<_> = unimplemented!();
 /// # let store = NodeStore::new(backend).await?;
 /// let throttled = ThrottledNodeStore::new(store, Duration::from_secs(5));
 ///
@@ -94,7 +93,7 @@ impl<B: DataSyncBackend> ThrottledNodeStore<B> {
         Ok(())
     }
 
-    /// Force flush all pending updates to Ditto
+    /// Force flush all pending updates to the backend
     ///
     /// Writes all queued state updates to the underlying NodeStore and clears the queue.
     #[instrument(skip(self))]
@@ -169,123 +168,10 @@ impl<B: DataSyncBackend> ThrottledNodeStore<B> {
 pub struct ThrottleStats {
     /// Number of updates waiting to be flushed
     pub pending_updates: usize,
-    /// Time since last sync to Ditto
+    /// Time since last sync to the backend
     pub time_since_last_sync: Duration,
     /// Configured sync interval
     pub sync_interval: Duration,
     /// Whether a sync should happen now
     pub should_sync_now: bool,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::models::node::NodeStateExt;
-    use crate::sync::ditto::DittoBackend;
-    use crate::sync::{BackendConfig, TransportConfig};
-
-    async fn create_test_store() -> Result<NodeStore<DittoBackend>> {
-        let temp_dir = tempfile::Builder::new()
-            .prefix("throttled_test_")
-            .tempdir()
-            .map_err(|e| {
-                Error::storage_error(
-                    format!("Failed to create temp dir: {}", e),
-                    "create_test_store",
-                    None,
-                )
-            })?;
-
-        let app_id = std::env::var("PEAT_APP_ID")
-            .or_else(|_| std::env::var("DITTO_APP_ID"))
-            .unwrap_or_else(|_| "test_app_id".to_string());
-        let shared_key = std::env::var("PEAT_SECRET_KEY")
-            .or_else(|_| std::env::var("DITTO_SHARED_KEY"))
-            .unwrap_or_else(|_| "test_shared_key".to_string());
-
-        let persistence_path = temp_dir.path().to_path_buf();
-        std::mem::forget(temp_dir); // Keep directory alive
-
-        let config = BackendConfig {
-            app_id,
-            persistence_dir: persistence_path,
-            shared_key: Some(shared_key),
-            transport: TransportConfig::default(),
-            extra: HashMap::new(),
-        };
-
-        let backend = DittoBackend::new();
-        backend.initialize(config).await?;
-        backend.sync_engine().start_sync().await?;
-
-        NodeStore::new(Arc::new(backend)).await
-    }
-
-    #[tokio::test]
-    async fn test_throttled_store_creation() {
-        if let Ok(store) = create_test_store().await {
-            let throttled = ThrottledNodeStore::new(store, Duration::from_secs(5));
-            assert_eq!(throttled.pending_count().await, 0);
-        }
-    }
-
-    #[tokio::test]
-    async fn test_update_queuing() {
-        if let Ok(store) = create_test_store().await {
-            let throttled = ThrottledNodeStore::new(store, Duration::from_secs(60));
-            let state = NodeState::new((37.7, -122.4, 100.0));
-
-            throttled.update_state("node1", &state).await.unwrap();
-            assert_eq!(throttled.pending_count().await, 1);
-
-            throttled.update_state("node2", &state).await.unwrap();
-            assert_eq!(throttled.pending_count().await, 2);
-        }
-    }
-
-    #[tokio::test]
-    async fn test_manual_flush() {
-        if let Ok(store) = create_test_store().await {
-            let throttled = ThrottledNodeStore::new(store, Duration::from_secs(60));
-            let state = NodeState::new((37.7, -122.4, 100.0));
-
-            throttled.update_state("node1", &state).await.unwrap();
-            assert_eq!(throttled.pending_count().await, 1);
-
-            throttled.flush().await.unwrap();
-            assert_eq!(throttled.pending_count().await, 0);
-        }
-    }
-
-    #[tokio::test]
-    async fn test_auto_flush_on_interval() {
-        if let Ok(store) = create_test_store().await {
-            let throttled = ThrottledNodeStore::new(store, Duration::from_millis(100));
-            let state = NodeState::new((37.7, -122.4, 100.0));
-
-            throttled.update_state("node1", &state).await.unwrap();
-            assert_eq!(throttled.pending_count().await, 1);
-
-            // Wait for interval to elapse
-            tokio::time::sleep(Duration::from_millis(150)).await;
-
-            // Next update should trigger flush
-            throttled.update_state("node2", &state).await.unwrap();
-
-            // Both should be flushed now
-            assert_eq!(throttled.pending_count().await, 0);
-        }
-    }
-
-    #[tokio::test]
-    async fn test_stats() {
-        if let Ok(store) = create_test_store().await {
-            let throttled = ThrottledNodeStore::new(store, Duration::from_secs(5));
-            let stats = throttled.stats().await;
-
-            assert_eq!(stats.pending_updates, 0);
-            assert_eq!(stats.sync_interval, Duration::from_secs(5));
-            assert!(stats.time_since_last_sync < Duration::from_secs(1));
-        }
-    }
 }

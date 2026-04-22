@@ -5,7 +5,6 @@ members = [
     "peat-protocol",
     "peat-transport",
     "peat-persistence",
-    "peat-sim",
     "peat-discovery",
     "peat-ffi",
     "peat-inference",

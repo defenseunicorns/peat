@@ -12,8 +12,8 @@
 //! # Local Discovery (Issue #226)
 //!
 //! Iroh's local network discovery uses swarm-discovery to automatically find peers
-//! on the same L2 network. This bridges the gap between Ditto's hostname:port
-//! addressing and Iroh's EndpointId-based addressing.
+//! on the same L2 network, bridging hostname:port-style addressing and Iroh's
+//! EndpointId-based addressing.
 //!
 //! ```ignore
 //! // Create transport with local discovery enabled (recommended for production)
@@ -55,7 +55,7 @@ use tokio::task::JoinHandle;
 /// Transport-level peer event (Issue #275)
 ///
 /// Emitted when connections are established or closed at the transport level.
-/// This is transport-agnostic - the same event type can be used for QUIC, Ditto, etc.
+/// This is transport-agnostic - the same event type can be used for different transports.
 #[cfg(feature = "automerge-backend")]
 #[derive(Debug, Clone)]
 pub enum TransportPeerEvent {
@@ -234,8 +234,8 @@ impl IrohTransport {
     /// Create a new Iroh transport with local network discovery enabled (Issue #226)
     ///
     /// This is the recommended constructor for containerlab and local network testing.
-    /// It enables automatic peer discovery via mDNS-like protocol, bridging the gap
-    /// between Ditto's hostname:port addressing and Iroh's EndpointId-based addressing.
+    /// It enables automatic peer discovery via mDNS-like protocol, bridging hostname:port-style
+    /// addressing and Iroh's EndpointId-based addressing.
     ///
     /// # How Local Discovery Works
     ///

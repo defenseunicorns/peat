@@ -12,19 +12,18 @@
 //! │  distribute() / status() / cancel()     │
 //! └──────────────────┬──────────────────────┘
 //!                    │
-//!        ┌───────────┴───────────┐
-//!        ▼                       ▼
-//! ┌──────────────────┐   ┌──────────────────┐
-//! │DittoFileDistrib. │   │IrohFileDistrib.  │
-//! │ (Collection sync)│   │ (Direct push)    │
-//! └──────────────────┘   └──────────────────┘
+//!                    ▼
+//!            ┌──────────────────┐
+//!            │IrohFileDistrib.  │
+//!            │ (Direct push)    │
+//!            └──────────────────┘
 //! ```
 //!
 //! # Usage
 //!
 //! ```ignore
 //! use peat_protocol::storage::{
-//!     FileDistribution, DittoFileDistribution,
+//!     FileDistribution, IrohFileDistribution,
 //!     DistributionScope, TransferPriority,
 //! };
 //!
@@ -44,28 +43,18 @@
 //! println!("Completed: {}/{}", status.completed, status.total_targets);
 //! ```
 
-#[cfg(feature = "ditto-backend")]
-use super::blob_document_integration::BlobReference;
-#[cfg(feature = "ditto-backend")]
-use super::blob_traits::BlobStore;
 use super::blob_traits::{BlobHash, BlobToken};
-#[cfg(feature = "ditto-backend")]
-use super::ditto_store::DittoStore;
-#[cfg(feature = "ditto-backend")]
-use anyhow::Context;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "ditto-backend")]
-use serde_json::json;
 use std::collections::HashMap;
-#[cfg(any(feature = "ditto-backend", feature = "automerge-backend"))]
+#[cfg(feature = "automerge-backend")]
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::broadcast;
-#[cfg(any(feature = "ditto-backend", feature = "automerge-backend"))]
+#[cfg(feature = "automerge-backend")]
 use tokio::sync::RwLock;
-#[cfg(any(feature = "ditto-backend", feature = "automerge-backend"))]
+#[cfg(feature = "automerge-backend")]
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
@@ -384,387 +373,6 @@ pub trait FileDistribution: Send + Sync {
         handle: &DistributionHandle,
     ) -> Result<broadcast::Receiver<DistributionStatus>>;
 }
-
-// ============================================================================
-// DittoFileDistribution Implementation
-// ============================================================================
-
-/// Distribution collection name for storing distribution metadata
-#[cfg(feature = "ditto-backend")]
-const DISTRIBUTION_COLLECTION: &str = "file_distributions";
-
-/// Ditto-based file distribution implementation
-///
-/// Uses Ditto's document sync to propagate distribution requests.
-/// Target nodes subscribe to the distribution collection and fetch
-/// blobs when they see relevant distribution documents.
-#[cfg(feature = "ditto-backend")]
-pub struct DittoFileDistribution<B: BlobStore> {
-    /// Underlying Ditto store
-    store: Arc<DittoStore>,
-    /// Blob store for creating/fetching blobs (used in Phase 4 ModelDistribution)
-    #[allow(dead_code)]
-    blob_store: Arc<B>,
-    /// Active distributions and their status
-    distributions: RwLock<HashMap<String, DistributionState>>,
-    /// Progress broadcast channels
-    progress_senders: RwLock<HashMap<String, broadcast::Sender<DistributionStatus>>>,
-}
-
-/// Internal state for tracking a distribution
-#[cfg(feature = "ditto-backend")]
-struct DistributionState {
-    status: DistributionStatus,
-    cancelled: bool,
-}
-
-#[cfg(feature = "ditto-backend")]
-impl<B: BlobStore + 'static> DittoFileDistribution<B> {
-    /// Create a new Ditto file distribution service
-    pub fn new(store: Arc<DittoStore>, blob_store: Arc<B>) -> Self {
-        Self {
-            store,
-            blob_store,
-            distributions: RwLock::new(HashMap::new()),
-            progress_senders: RwLock::new(HashMap::new()),
-        }
-    }
-
-    /// Get target node IDs based on scope
-    async fn resolve_targets(&self, scope: &DistributionScope) -> Result<Vec<String>> {
-        match scope {
-            DistributionScope::AllNodes => {
-                // Query all known nodes from node registry
-                self.query_all_nodes().await
-            }
-            DistributionScope::Formation { formation_id } => {
-                // Query nodes in specific formation
-                self.query_formation_nodes(formation_id).await
-            }
-            DistributionScope::Nodes { node_ids } => {
-                // Direct list of nodes
-                Ok(node_ids.clone())
-            }
-            DistributionScope::Capable {
-                min_gpu_gb,
-                cpu_arch,
-                min_storage_mb,
-            } => {
-                // Query nodes with matching capabilities
-                self.query_capable_nodes(*min_gpu_gb, cpu_arch.clone(), *min_storage_mb)
-                    .await
-            }
-        }
-    }
-
-    /// Query all known nodes
-    async fn query_all_nodes(&self) -> Result<Vec<String>> {
-        // Query the nodes collection for all node IDs
-        let result = self
-            .store
-            .ditto()
-            .store()
-            .execute_v2(("SELECT _id FROM nodes".to_string(), json!({})))
-            .await
-            .context("Failed to query all nodes")?;
-
-        let nodes: Vec<String> = result
-            .iter()
-            .filter_map(|item| {
-                let json_str = item.json_string();
-                serde_json::from_str::<serde_json::Value>(&json_str)
-                    .ok()
-                    .and_then(|v| v.get("_id").and_then(|id| id.as_str()).map(String::from))
-            })
-            .collect();
-
-        debug!("Found {} total nodes", nodes.len());
-        Ok(nodes)
-    }
-
-    /// Query nodes in a formation
-    async fn query_formation_nodes(&self, formation_id: &str) -> Result<Vec<String>> {
-        // Query cells collection for formation membership
-        let query = "SELECT members FROM cells WHERE _id = :formation_id";
-        let result = self
-            .store
-            .ditto()
-            .store()
-            .execute_v2((query.to_string(), json!({ "formation_id": formation_id })))
-            .await
-            .context("Failed to query formation nodes")?;
-
-        let mut nodes = Vec::new();
-        for item in result.iter() {
-            let json_str = item.json_string();
-            if let Ok(value) = serde_json::from_str::<serde_json::Value>(&json_str) {
-                if let Some(members) = value.get("members").and_then(|m| m.as_array()) {
-                    for member in members {
-                        if let Some(node_id) = member.as_str() {
-                            nodes.push(node_id.to_string());
-                        }
-                    }
-                }
-            }
-        }
-
-        debug!("Found {} nodes in formation {}", nodes.len(), formation_id);
-        Ok(nodes)
-    }
-
-    /// Query nodes with specific capabilities
-    async fn query_capable_nodes(
-        &self,
-        min_gpu_gb: Option<f64>,
-        cpu_arch: Option<String>,
-        min_storage_mb: Option<u64>,
-    ) -> Result<Vec<String>> {
-        // Build query based on capability requirements
-        let mut conditions = Vec::new();
-
-        if let Some(gpu) = min_gpu_gb {
-            conditions.push(format!("gpu_memory_gb >= {}", gpu));
-        }
-        if let Some(arch) = &cpu_arch {
-            conditions.push(format!("cpu_arch = '{}'", arch));
-        }
-        if let Some(storage) = min_storage_mb {
-            conditions.push(format!("available_storage_mb >= {}", storage));
-        }
-
-        let query = if conditions.is_empty() {
-            "SELECT _id FROM nodes".to_string()
-        } else {
-            format!("SELECT _id FROM nodes WHERE {}", conditions.join(" AND "))
-        };
-
-        let result = self
-            .store
-            .ditto()
-            .store()
-            .execute_v2((query, json!({})))
-            .await
-            .context("Failed to query capable nodes")?;
-
-        let nodes: Vec<String> = result
-            .iter()
-            .filter_map(|item| {
-                let json_str = item.json_string();
-                serde_json::from_str::<serde_json::Value>(&json_str)
-                    .ok()
-                    .and_then(|v| v.get("_id").and_then(|id| id.as_str()).map(String::from))
-            })
-            .collect();
-
-        debug!(
-            "Found {} capable nodes (gpu: {:?}, arch: {:?}, storage: {:?})",
-            nodes.len(),
-            min_gpu_gb,
-            cpu_arch,
-            min_storage_mb
-        );
-        Ok(nodes)
-    }
-
-    /// Store distribution document in Ditto
-    async fn store_distribution_document(
-        &self,
-        handle: &DistributionHandle,
-        token: &BlobToken,
-        target_nodes: &[String],
-    ) -> Result<()> {
-        let blob_ref = BlobReference::from(token);
-
-        let distribution_doc = json!({
-            "_id": handle.distribution_id,
-            "blob": blob_ref,
-            "scope": handle.scope,
-            "priority": handle.priority.as_numeric(),
-            "target_nodes": target_nodes,
-            "started_at": handle.started_at.to_rfc3339(),
-            "status": "active"
-        });
-
-        let query = format!(
-            "INSERT INTO {} DOCUMENTS :doc ON ID CONFLICT DO UPDATE",
-            DISTRIBUTION_COLLECTION
-        );
-
-        self.store
-            .ditto()
-            .store()
-            .execute_v2((query, json!({ "doc": distribution_doc })))
-            .await
-            .context("Failed to store distribution document")?;
-
-        debug!(
-            "Stored distribution {} for {} nodes",
-            handle.distribution_id,
-            target_nodes.len()
-        );
-        Ok(())
-    }
-
-    /// Update node status in the distribution (used by status observers)
-    #[allow(dead_code)]
-    async fn update_node_status(&self, distribution_id: &str, node_status: NodeTransferStatus) {
-        let mut distributions = self.distributions.write().await;
-        if let Some(state) = distributions.get_mut(distribution_id) {
-            state
-                .status
-                .node_statuses
-                .insert(node_status.node_id.clone(), node_status);
-            state.status.recalculate_counts();
-
-            // Broadcast update
-            if let Some(sender) = self.progress_senders.read().await.get(distribution_id) {
-                let _ = sender.send(state.status.clone());
-            }
-        }
-    }
-}
-
-#[cfg(feature = "ditto-backend")]
-#[async_trait::async_trait]
-impl<B: BlobStore + 'static> FileDistribution for DittoFileDistribution<B> {
-    async fn distribute(
-        &self,
-        blob_token: &BlobToken,
-        scope: DistributionScope,
-        priority: TransferPriority,
-    ) -> Result<DistributionHandle> {
-        info!(
-            "Starting distribution of blob {} with priority {:?}",
-            blob_token.hash.as_hex(),
-            priority
-        );
-
-        // Create distribution handle
-        let handle = DistributionHandle::new(blob_token.hash.clone(), scope.clone(), priority);
-
-        // Resolve target nodes
-        let target_nodes = self.resolve_targets(&scope).await?;
-
-        if target_nodes.is_empty() {
-            warn!("No target nodes found for distribution scope: {:?}", scope);
-        }
-
-        // Create initial status
-        let status =
-            DistributionStatus::new(handle.clone(), target_nodes.clone(), blob_token.size_bytes);
-
-        // Store in Ditto for sync
-        self.store_distribution_document(&handle, blob_token, &target_nodes)
-            .await?;
-
-        // Track internally
-        {
-            let mut distributions = self.distributions.write().await;
-            distributions.insert(
-                handle.distribution_id.clone(),
-                DistributionState {
-                    status: status.clone(),
-                    cancelled: false,
-                },
-            );
-        }
-
-        // Create progress broadcast channel
-        {
-            let (tx, _rx) = broadcast::channel(100);
-            let mut senders = self.progress_senders.write().await;
-            senders.insert(handle.distribution_id.clone(), tx);
-        }
-
-        info!(
-            "Distribution {} started for {} targets",
-            handle.distribution_id, status.total_targets
-        );
-
-        Ok(handle)
-    }
-
-    async fn status(&self, handle: &DistributionHandle) -> Result<DistributionStatus> {
-        let distributions = self.distributions.read().await;
-        distributions
-            .get(&handle.distribution_id)
-            .map(|state| state.status.clone())
-            .ok_or_else(|| anyhow::anyhow!("Distribution {} not found", handle.distribution_id))
-    }
-
-    async fn cancel(&self, handle: &DistributionHandle) -> Result<()> {
-        info!("Cancelling distribution {}", handle.distribution_id);
-
-        // Mark as cancelled internally
-        {
-            let mut distributions = self.distributions.write().await;
-            if let Some(state) = distributions.get_mut(&handle.distribution_id) {
-                state.cancelled = true;
-            }
-        }
-
-        // Update Ditto document to cancelled
-        let query = format!(
-            "UPDATE {} SET status = 'cancelled' WHERE _id = :id",
-            DISTRIBUTION_COLLECTION
-        );
-
-        self.store
-            .ditto()
-            .store()
-            .execute_v2((query, json!({ "id": handle.distribution_id })))
-            .await
-            .context("Failed to cancel distribution in Ditto")?;
-
-        Ok(())
-    }
-
-    async fn wait_for_completion(
-        &self,
-        handle: &DistributionHandle,
-        timeout: Duration,
-    ) -> Result<DistributionStatus> {
-        let deadline = tokio::time::Instant::now() + timeout;
-        let poll_interval = Duration::from_millis(500);
-
-        loop {
-            let status = self.status(handle).await?;
-
-            if status.is_complete() {
-                return Ok(status);
-            }
-
-            if tokio::time::Instant::now() > deadline {
-                return Err(anyhow::anyhow!(
-                    "Distribution {} timed out after {:?}",
-                    handle.distribution_id,
-                    timeout
-                ));
-            }
-
-            tokio::time::sleep(poll_interval).await;
-        }
-    }
-
-    async fn subscribe_progress(
-        &self,
-        handle: &DistributionHandle,
-    ) -> Result<broadcast::Receiver<DistributionStatus>> {
-        let senders = self.progress_senders.read().await;
-        senders
-            .get(&handle.distribution_id)
-            .map(|tx| tx.subscribe())
-            .ok_or_else(|| anyhow::anyhow!("Distribution {} not found", handle.distribution_id))
-    }
-}
-
-// ============================================================================
-// Shared BlobStore type alias
-// ============================================================================
-
-/// Type alias for Arc-wrapped BlobStore
-#[cfg(feature = "ditto-backend")]
-pub type SharedBlobStore = Arc<dyn BlobStore>;
 
 // ============================================================================
 // IrohFileDistribution Implementation (Issue #379, ADR-025)

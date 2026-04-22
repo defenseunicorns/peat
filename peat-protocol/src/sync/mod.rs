@@ -15,18 +15,17 @@
 //!
 //! ## Supported Backends
 //!
-//! - **Ditto** - Current production backend (proprietary CBOR-based)
-//! - **Automerge** - Future open-source backend (columnar storage) (planned)
+//! - **Automerge + Iroh** - Open-source CRDT with QUIC-based P2P transport
 //!
 //! ## Usage Example
 //!
 //! ```rust,ignore
 //! use peat_protocol::sync::{DataSyncBackend, BackendConfig};
-//! use peat_protocol::sync::ditto::DittoBackend;
+//! use peat_protocol::storage::AutomergeBackend;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create backend
-//! let backend = DittoBackend::new();
+//! let backend = AutomergeBackend::new();
 //!
 //! // Initialize with config
 //! let config = BackendConfig {
@@ -78,8 +77,6 @@ pub mod types;
 // Backend implementations
 #[cfg(feature = "automerge-backend")]
 pub mod automerge; // Automerge CRDT backend (E8 evaluation)
-#[cfg(feature = "ditto-backend")]
-pub mod ditto; // Wraps existing Ditto SDK
 
 // BLE translation layer (ADR-041, #557)
 #[cfg(feature = "bluetooth")]

@@ -1,7 +1,7 @@
 //! Multi-Node Mesh E2E Tests
 //!
-//! These tests validate that both DittoBackend and AutomergeIrohBackend support
-//! multi-node mesh topologies with correct CRDT convergence semantics.
+//! These tests validate that AutomergeIrohBackend supports multi-node mesh
+//! topologies with correct CRDT convergence semantics.
 //!
 //! # Test Strategy
 //!
@@ -15,6 +15,8 @@
 //! 2. **Full Mesh Topology**: All nodes connected (3 connections total)
 //! 3. **Convergence**: All nodes have identical final state
 //! 4. **Bidirectional Sync**: Documents propagate in all directions
+
+#![cfg(feature = "automerge-backend")]
 
 use peat_protocol::sync::{ChangeEvent, DataSyncBackend, Document, Query, Value};
 use peat_protocol::testing::E2EHarness;
@@ -31,50 +33,10 @@ const SYNC_POLL_INTERVAL: Duration = Duration::from_millis(200);
 const SYNC_OBSERVE_TIMEOUT: Duration = Duration::from_secs(30);
 
 // ============================================================================
-// Ditto Backend Tests
-// ============================================================================
-
-/// Test 3-node mesh with Ditto backend
-#[tokio::test]
-async fn test_ditto_three_node_mesh() {
-    dotenvy::dotenv().ok();
-    println!("=== Multi-Node Mesh E2E: Ditto 3-Node Mesh ===");
-
-    let mut harness = E2EHarness::new("ditto_3node_mesh");
-
-    // Allocate random TCP port to avoid conflicts with concurrent tests
-    let tcp_port = E2EHarness::allocate_tcp_port().expect("Failed to allocate TCP port");
-    println!("  Using TCP port: {}", tcp_port);
-
-    // Create 3 backends with explicit TCP configuration
-    println!("  Creating 3 Ditto backends...");
-    let backend1 = harness
-        .create_ditto_backend_with_tcp(Some(tcp_port), None)
-        .await
-        .expect("Should create backend1");
-
-    let backend2 = harness
-        .create_ditto_backend_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
-        .await
-        .expect("Should create backend2");
-
-    let backend3 = harness
-        .create_ditto_backend_with_tcp(None, Some(format!("127.0.0.1:{}", tcp_port)))
-        .await
-        .expect("Should create backend3");
-
-    println!("  ✓ 3 backends created");
-    println!("  Note: Ditto auto-discovers peers via TCP");
-
-    run_three_node_mesh_test(backend1, backend2, backend3, "Ditto").await;
-}
-
-// ============================================================================
 // Automerge+Iroh Backend Tests
 // ============================================================================
 
 /// Test 3-node mesh with Automerge+Iroh backend
-#[cfg(feature = "automerge-backend")]
 #[tokio::test]
 async fn test_automerge_three_node_mesh() {
     println!("=== Multi-Node Mesh E2E: Automerge+Iroh 3-Node Mesh ===");
@@ -378,8 +340,7 @@ async fn run_three_node_mesh_test<B: DataSyncBackend>(
         .expect("Should start sync on backend3");
     println!("  ✓ Sync started on all nodes");
 
-    // Create subscriptions (required for Ditto, no-op for Automerge)
-    // IMPORTANT: Keep subscription handles alive for Ditto sync
+    // Create subscriptions (no-op for Automerge but exercises the API)
     let _sub1 = backend1
         .sync_engine()
         .subscribe("mesh_test", &Query::All)
@@ -540,21 +501,18 @@ async fn run_three_node_mesh_test<B: DataSyncBackend>(
     println!("    Node 2: {} discovered peers", peers2.len());
     println!("    Node 3: {} discovered peers", peers3.len());
 
-    // In a full mesh, nodes should have discovered each other
-    // Note: For Ditto this might vary due to automatic discovery
+    // In a full mesh, nodes should have discovered each other.
     // For Automerge+Iroh we explicitly created connections, but with deterministic
     // tie-breaking only one side initiates. Document sync verified above proves
     // the mesh is functional.
-    if backend_name == "Automerge+Iroh" {
-        // With tie-breaking, only initiator-side connections show in discovered_peers
-        // Total discovered peers across all nodes should be >= 3 for a functional mesh
-        let total_discovered = peers1.len() + peers2.len() + peers3.len();
-        assert!(
-            total_discovered >= 3,
-            "Mesh should have at least 3 peer connections total, got {}",
-            total_discovered
-        );
-    }
+    // With tie-breaking, only initiator-side connections show in discovered_peers.
+    // Total discovered peers across all nodes should be >= 3 for a functional mesh.
+    let total_discovered = peers1.len() + peers2.len() + peers3.len();
+    assert!(
+        total_discovered >= 3,
+        "Mesh should have at least 3 peer connections total, got {}",
+        total_discovered
+    );
 
     println!("  ✅ {} backend: 3-node mesh test PASSED!", backend_name);
     println!("    - All nodes created and synced");
