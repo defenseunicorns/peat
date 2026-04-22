@@ -1538,8 +1538,12 @@ impl IrohTransport {
         Ok(())
     }
 
-    /// Close the transport and all connections
-    pub async fn close(self) -> Result<()> {
+    /// Close the transport and all connections.
+    ///
+    /// Takes `&self` so it can be called on an `Arc<IrohTransport>` (used by
+    /// tests and multi-task code); the underlying `iroh::Endpoint` already
+    /// accepts `&self` for close.
+    pub async fn close(&self) -> Result<()> {
         // Stop accept loop if running
         if self.accept_running.load(Ordering::Relaxed) {
             let _ = self.stop_accept_loop();
@@ -1848,9 +1852,10 @@ mod tests {
             "connected_peers() should not include closed connections"
         );
 
-        // Cleanup
-        drop(transport_a);
-        drop(transport_b);
+        // Cleanup — explicit endpoint close so subsequent tests start from a
+        // clean iroh state (macOS loopback is sensitive to socket churn).
+        let _ = transport_a.close().await;
+        let _ = transport_b.close().await;
     }
 
     #[tokio::test]
@@ -1921,8 +1926,8 @@ mod tests {
         }
 
         // Cleanup
-        drop(transport);
-        drop(transport2);
+        let _ = transport.close().await;
+        let _ = transport2.close().await;
     }
 
     #[tokio::test]
@@ -2055,6 +2060,6 @@ mod tests {
             "Peer count should be 0 after disconnect"
         );
 
-        drop(transport_a);
+        let _ = transport_a.close().await;
     }
 }
