@@ -171,8 +171,6 @@ Generated: $(date +%Y-%m-%d)
 | digest | 0.10.7 | Apache-2.0 OR MIT |
 | digest | 0.11.0-rc.3 | Apache-2.0 OR MIT |
 | displaydoc | 0.2.5 | Apache-2.0 OR MIT |
-| dittolive-ditto | 4.11.5 | null |
-| dittolive-ditto-sys | 4.11.5 | null |
 | dlopen2 | 0.5.0 | MIT |
 | document-features | 0.2.12 | Apache-2.0 OR MIT |
 | dotenvy | 0.15.7 | MIT |

@@ -42,7 +42,7 @@ uniffi = { version = "0.28", features = ["cli", "tokio"] }
 # JNI for direct Android native method binding (bypasses JNA symbol lookup issues)
 jni = "0.21"
 
-# Peat crates - no ditto-backend for Android cross-compilation
+# Peat crates
 peat-protocol = { path = "../peat-protocol", default-features = false }
 
 # Time handling

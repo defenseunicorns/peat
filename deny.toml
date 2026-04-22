@@ -12,8 +12,6 @@ feature-depth = 1
 [advisories]
 # Fail the build on any known vulnerability
 ignore = [
-    # Ditto SDK dependency — reference backend only, not shipped in production
-    { id = "RUSTSEC-2021-0127", reason = "serde_cbor via dittolive-ditto; Ditto is reference-only backend" },
     { id = "RUSTSEC-2025-0134", reason = "rustls-pemfile unmaintained; tracked for migration to rustls-pki-types" },
     # Transitive via iroh — cannot fix locally, tracked upstream
     { id = "RUSTSEC-2023-0089", reason = "atomic-polyfill unmaintained; transitive via iroh" },
@@ -57,17 +55,6 @@ crate = "ring"
 expression = "MIT AND ISC AND OpenSSL"
 license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
 
-# Ditto SDK — proprietary, reference backend only; unlicensed on crates.io
-[[licenses.clarify]]
-crate = "dittolive-ditto"
-expression = "MIT"
-license-files = []
-
-[[licenses.clarify]]
-crate = "dittolive-ditto-sys"
-expression = "MIT"
-license-files = []
-
 [licenses.private]
 ignore = true
 
@@ -87,11 +74,7 @@ deny = [
 ]
 
 skip = []
-skip-tree = [
-    # Ditto SDK — reference backend only, exclude from duplicate detection
-    { crate = "dittolive-ditto", depth = 20 },
-    { crate = "dittolive-ditto-sys", depth = 20 },
-]
+skip-tree = []
 
 # --- Source Policy ---
 [sources]

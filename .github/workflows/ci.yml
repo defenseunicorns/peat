@@ -53,7 +53,7 @@ jobs:
           cache-on-failure: true
           shared-key: clippy
 
-      # Exclude peat-ffi: its cdylib conflicts with dittoffi symbols during linking
+      # Exclude peat-ffi: UniFFI-generated cdylib has its own lint baseline
       # Exclude peat-inference: has platform-specific features (GStreamer, CUDA) requiring system libs
       - run: cargo clippy --all-targets --all-features --workspace --exclude peat-ffi --exclude peat-inference -- -D warnings
       # Run clippy on peat-inference without optional features (no GStreamer/CUDA deps)
@@ -90,7 +90,6 @@ jobs:
         env:
           PEAT_APP_ID: ${{ secrets.PEAT_APP_ID }}
           PEAT_SHARED_KEY: ${{ secrets.PEAT_SHARED_KEY }}
-          PEAT_OFFLINE_TOKEN: ${{ secrets.PEAT_OFFLINE_TOKEN }}
         run: |
           cargo nextest run --all-features --workspace --exclude peat-ffi --exclude peat-inference -E 'not test(e2e)'
           cargo nextest run -p peat-inference -E 'not test(e2e)'
@@ -126,7 +125,6 @@ jobs:
         env:
           PEAT_APP_ID: ${{ secrets.PEAT_APP_ID }}
           PEAT_SHARED_KEY: ${{ secrets.PEAT_SHARED_KEY }}
-          PEAT_OFFLINE_TOKEN: ${{ secrets.PEAT_OFFLINE_TOKEN }}
         run: |
           cargo nextest run --all-features --workspace --exclude peat-ffi --exclude peat-inference -E 'test(e2e)'
 

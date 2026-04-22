@@ -33,9 +33,6 @@ peat-mesh = "0.8.2"
 # BLE mesh transport (ADR-039)
 peat-btle = "0.2.0"
 
-# CRDT synchronization
-dittolive-ditto = "=4.11.5"
-
 # Async runtime
 tokio = { version = "1", features = ["full"] }
 

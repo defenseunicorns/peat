@@ -8,7 +8,7 @@ repository.workspace = true
 description = "Peat inference pipeline for edge AI and object tracking"
 
 [dependencies]
-# Peat Protocol with AutomergeIroh backend (disable ditto-backend to avoid symbol conflicts)
+# Peat Protocol with AutomergeIroh backend
 peat-protocol = { path = "../peat-protocol", default-features = false, features = ["automerge-backend"] }
 # Peat Schema - proto-generated types for capability advertisement and tracks
 peat-schema = { path = "../peat-schema" }
