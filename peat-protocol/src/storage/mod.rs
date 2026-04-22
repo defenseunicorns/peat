@@ -8,23 +8,11 @@ pub mod traits;
 // Blob storage trait abstraction (ADR-025)
 pub mod blob_document_integration;
 pub mod blob_traits;
-#[cfg(feature = "ditto-backend")]
-pub mod ditto_blob_store;
 pub mod file_distribution;
 pub mod model_distribution;
 
-// Backend implementations (E11.2)
-#[cfg(feature = "ditto-backend")]
-pub mod ditto_backend;
-
 // Existing implementations
 pub mod cell_store;
-#[cfg(feature = "ditto-backend")]
-pub mod ditto_command_storage;
-#[cfg(feature = "ditto-backend")]
-pub mod ditto_store;
-#[cfg(feature = "ditto-backend")]
-pub mod ditto_summary_storage;
 pub mod node_store;
 pub mod throttled_node_store;
 pub mod ttl;
@@ -65,12 +53,6 @@ pub mod sync_persistence;
 pub mod ttl_manager;
 
 pub use cell_store::CellStore;
-#[cfg(feature = "ditto-backend")]
-pub use ditto_command_storage::DittoCommandStorage;
-#[cfg(feature = "ditto-backend")]
-pub use ditto_store::DittoStore;
-#[cfg(feature = "ditto-backend")]
-pub use ditto_summary_storage::DittoSummaryStorage;
 pub use node_store::NodeStore;
 pub use throttled_node_store::{ThrottleStats, ThrottledNodeStore};
 pub use ttl::{EvictionStrategy, OfflineRetentionPolicy, TtlConfig};
@@ -122,13 +104,9 @@ pub use backend::{create_storage_backend, StorageConfig};
 pub use capabilities::{
     CrdtCapable, HierarchicalStorageCapable, SyncCapable, SyncStats, TypedCollection,
 };
-#[cfg(feature = "ditto-backend")]
-pub use ditto_backend::DittoBackend;
 pub use traits::{Collection, DocumentPredicate, StorageBackend};
 
 // Blob storage (ADR-025)
-#[cfg(feature = "ditto-backend")]
-pub use blob_document_integration::DittoBlobDocumentIntegration;
 pub use blob_document_integration::{
     BlobDocumentIntegration, BlobReference, BlobReferenceMetadata, ModelProvenance,
     ModelRegistryDocument, ModelVariantBlob,
@@ -137,10 +115,6 @@ pub use blob_traits::{
     BlobHandle, BlobHash, BlobMetadata, BlobProgress, BlobStorageSummary, BlobStore, BlobStoreExt,
     BlobToken, SharedBlobStore,
 };
-#[cfg(feature = "ditto-backend")]
-pub use ditto_blob_store::DittoBlobStore;
-#[cfg(feature = "ditto-backend")]
-pub use file_distribution::DittoFileDistribution;
 #[cfg(feature = "automerge-backend")]
 pub use file_distribution::IrohFileDistribution;
 pub use file_distribution::{

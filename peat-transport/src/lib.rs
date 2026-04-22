@@ -39,13 +39,12 @@
 //!
 //! ```rust,no_run
 //! use peat_transport::http::Server;
-//! use peat_protocol::sync::ditto::DittoBackend;
-//! use peat_protocol::sync::DataSyncBackend;
+//! use peat_protocol::sync::{automerge::AutomergeIrohBackend, DataSyncBackend};
 //! use std::sync::Arc;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! // Initialize sync backend (Ditto)
-//! let backend = Arc::new(DittoBackend::new());
+//! // Initialize sync backend (Automerge + Iroh)
+//! let backend = Arc::new(AutomergeIrohBackend::new());
 //! // backend.initialize(config).await?;
 //!
 //! // Start HTTP server

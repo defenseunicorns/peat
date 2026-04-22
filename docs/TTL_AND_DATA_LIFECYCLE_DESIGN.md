@@ -1,10 +1,15 @@
-# TTL and Data Lifecycle Management - Ditto Implementation
+# TTL and Data Lifecycle Management - Ditto Implementation (HISTORICAL)
 
-> **Architectural Decision**: See [ADR-016: TTL and Data Lifecycle Abstraction](adr/016-ttl-and-data-lifecycle-abstraction.md) for backend-agnostic design rationale and requirements for Automerge, Yjs, and future CRDT implementations.
+> **Status (April 2026):** The Ditto backend described below has been
+> removed from the Peat workspace. Peat now ships with Automerge + Iroh only.
+> This document is preserved as **historical reference**; it does not describe
+> any currently supported backend.
+>
+> **Architectural Decision**: See [ADR-016: TTL and Data Lifecycle Abstraction](adr/016-ttl-and-data-lifecycle-abstraction.md) for the backend-agnostic design rationale that is still in force for Automerge and any future CRDT implementations.
 
 ## Overview
 
-This document describes the **Ditto-specific implementation** of the TTL and data lifecycle management strategy defined in ADR-016. It focuses on how to leverage Ditto's built-in deletion and tombstone mechanisms to satisfy the three-tier lifecycle abstraction:
+This document describes the **historical Ditto-specific implementation** of the TTL and data lifecycle management strategy defined in ADR-016. It focuses on how Ditto's built-in deletion and tombstone mechanisms satisfied the three-tier lifecycle abstraction:
 
 1. **Soft-Delete**: Application-level `_deleted` flag (Tier 1)
 2. **Hard Delete**: Ditto tombstone propagation via DELETE (Tier 2)

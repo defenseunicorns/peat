@@ -44,10 +44,6 @@ criteria = "safe-to-deploy"
 version = "0.1.9"
 criteria = "safe-to-deploy"
 
-[[exemptions.getrandom]]
-version = "0.4.2"
-criteria = "safe-to-deploy"
-
 [[exemptions.hybrid-array]]
 version = "0.4.8"
 criteria = "safe-to-deploy"
@@ -86,18 +82,18 @@ criteria = "safe-to-deploy"
 
 [[exemptions.portable-atomic-util]]
 version = "0.2.6"
+criteria = "safe-to-run"
+
+[[exemptions.rand]]
+version = "0.8.6"
+criteria = "safe-to-deploy"
+
+[[exemptions.rand]]
+version = "0.9.4"
 criteria = "safe-to-deploy"
 
 [[exemptions.reflink-copy]]
 version = "0.1.29"
-criteria = "safe-to-deploy"
-
-[[exemptions.serde_with]]
-version = "3.18.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.serde_with_macros]]
-version = "3.18.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.vergen]]

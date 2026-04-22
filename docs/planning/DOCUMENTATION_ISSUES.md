@@ -36,9 +36,9 @@ Peat currently has extensive technical documentation (ADRs, design docs) but lac
   - Verification steps
 
 - [ ] **Configuration Reference**
-  - All environment variables (`DITTO_APP_ID`, `DITTO_OFFLINE_TOKEN`, etc.)
+  - All environment variables (`PEAT_APP_ID`, `PEAT_SECRET_KEY`, etc.)
   - Configuration file formats
-  - Feature flags and backend selection
+  - Feature flags
   - Network configuration
 
 - [ ] **Deployment Patterns**
@@ -162,9 +162,8 @@ While ADRs provide decision rationale and code has inline documentation, there's
   - Custom QoS configurations
 
 - [ ] **Backend Abstraction**
-  - Ditto backend usage
-  - Automerge backend usage
-  - Switching between backends
+  - Automerge + Iroh backend usage
+  - Storage abstraction trait for future backends
   - Backend-specific considerations
 
 - [ ] **Contributing Guide**

@@ -5,9 +5,8 @@
 //!
 //! # Environment Variables
 //!
-//! - `CAP_STORAGE_BACKEND`: Backend type ("ditto", "automerge-memory", "redb")
+//! - `CAP_STORAGE_BACKEND`: Backend type ("automerge-memory", "redb")
 //! - `CAP_DATA_PATH`: Data directory path for persistent backends
-//! - Ditto-specific variables (loaded by DittoStore)
 //!
 //! # Example
 //!
@@ -20,14 +19,14 @@
 //!
 //! // Or create manually
 //! let config = StorageConfig {
-//!     backend: "ditto".to_string(),
+//!     backend: "automerge-memory".to_string(),
 //!     data_path: Some("/var/cap/data".to_string()),
 //! };
 //! let storage = create_storage_backend(&config)?;
 //! ```
 
 use super::traits::StorageBackend;
-#[cfg(any(feature = "ditto-backend", feature = "automerge-backend"))]
+#[cfg(feature = "automerge-backend")]
 use anyhow::Context;
 use anyhow::{anyhow, Result};
 use std::path::PathBuf;
@@ -41,7 +40,6 @@ pub struct StorageConfig {
     /// Backend type identifier
     ///
     /// Supported values:
-    /// - `"ditto"`: Ditto SDK backend (proprietary, production-ready)
     /// - `"automerge-memory"`: Automerge in-memory (POC, testing)
     /// - `"redb"`: redb persistence (production target)
     pub backend: String,
@@ -63,14 +61,14 @@ pub struct StorageConfig {
 impl Default for StorageConfig {
     /// Create configuration with defaults
     ///
-    /// Uses Ditto backend with no data path (Ditto manages its own storage).
+    /// Uses the Automerge in-memory backend.
     ///
     /// # Returns
     ///
-    /// Default configuration (Ditto backend)
+    /// Default configuration (Automerge in-memory backend)
     fn default() -> Self {
         Self {
-            backend: "ditto".to_string(),
+            backend: "automerge-memory".to_string(),
             data_path: None,
             in_memory: false,
         }
@@ -82,7 +80,7 @@ impl StorageConfig {
     ///
     /// # Environment Variables
     ///
-    /// - `CAP_STORAGE_BACKEND` (default: "ditto")
+    /// - `CAP_STORAGE_BACKEND` (default: "automerge-memory")
     /// - `CAP_DATA_PATH` (optional, required for some backends)
     ///
     /// # Returns
@@ -92,16 +90,17 @@ impl StorageConfig {
     /// # Example
     ///
     /// ```bash
-    /// export CAP_STORAGE_BACKEND=rocksdb
+    /// export CAP_STORAGE_BACKEND=automerge-memory
     /// export CAP_DATA_PATH=/var/cap/data
     /// ```
     ///
     /// ```ignore
     /// let config = StorageConfig::from_env()?;
-    /// assert_eq!(config.backend, "rocksdb");
+    /// assert_eq!(config.backend, "automerge-memory");
     /// ```
     pub fn from_env() -> Result<Self> {
-        let backend = std::env::var("CAP_STORAGE_BACKEND").unwrap_or_else(|_| "ditto".to_string());
+        let backend =
+            std::env::var("CAP_STORAGE_BACKEND").unwrap_or_else(|_| "automerge-memory".to_string());
 
         let data_path = std::env::var("CAP_DATA_PATH").ok().map(PathBuf::from);
 
@@ -131,10 +130,6 @@ impl StorageConfig {
     /// - Unknown backend type
     pub fn validate(&self) -> Result<()> {
         match self.backend.as_str() {
-            "ditto" => {
-                // Ditto manages its own storage, no validation needed
-                Ok(())
-            }
             "automerge-memory" => {
                 // In-memory, no data path needed
                 Ok(())
@@ -183,27 +178,6 @@ pub fn create_storage_backend(config: &StorageConfig) -> Result<Arc<dyn StorageB
     config.validate()?;
 
     match config.backend.as_str() {
-        #[cfg(feature = "ditto-backend")]
-        "ditto" => {
-            // Import DittoStore and DittoBackend
-            use crate::storage::ditto_backend::DittoBackend;
-            use crate::storage::ditto_store::DittoStore;
-
-            // Create DittoStore from environment (loads config internally)
-            let ditto_store = DittoStore::from_env()
-                .context("Failed to create Ditto backend from environment")?;
-
-            // Wrap in DittoBackend trait adapter
-            let backend = DittoBackend::new(Arc::new(ditto_store));
-
-            Ok(Arc::new(backend))
-        }
-        #[cfg(not(feature = "ditto-backend"))]
-        "ditto" => Err(anyhow!(
-            "Ditto backend not enabled.\n\
-                 Rebuild with --features ditto-backend to use this backend.\n\
-                 For now, use CAP_STORAGE_BACKEND=automerge-memory"
-        )),
         "automerge-memory" => {
             #[cfg(feature = "automerge-backend")]
             {
@@ -231,8 +205,7 @@ pub fn create_storage_backend(config: &StorageConfig) -> Result<Arc<dyn StorageB
             {
                 Err(anyhow!(
                     "Automerge backend not enabled.\n\
-                     Rebuild with --features automerge-backend to use this backend.\n\
-                     For now, use CAP_STORAGE_BACKEND=ditto"
+                     Rebuild with --features automerge-backend to use this backend."
                 ))
             }
         }
@@ -241,13 +214,12 @@ pub fn create_storage_backend(config: &StorageConfig) -> Result<Arc<dyn StorageB
             // There's no standalone redb backend - use automerge-memory instead
             Err(anyhow!(
                 "Direct redb backend not available.\n\
-                 Use CAP_STORAGE_BACKEND=automerge-memory for redb-backed storage,\n\
-                 or CAP_STORAGE_BACKEND=ditto for production use."
+                 Use CAP_STORAGE_BACKEND=automerge-memory for redb-backed storage."
             ))
         }
         other => Err(anyhow!(
             "Unknown storage backend: {}\n\
-             Supported backends: ditto, automerge-memory, redb",
+             Supported backends: automerge-memory, redb",
             other
         )),
     }
@@ -260,18 +232,8 @@ mod tests {
     #[test]
     fn test_storage_config_default() {
         let config = StorageConfig::default();
-        assert_eq!(config.backend, "ditto");
+        assert_eq!(config.backend, "automerge-memory");
         assert!(config.data_path.is_none());
-    }
-
-    #[test]
-    fn test_storage_config_validation_ditto() {
-        let config = StorageConfig {
-            backend: "ditto".to_string(),
-            data_path: None,
-            in_memory: false,
-        };
-        assert!(config.validate().is_ok());
     }
 
     #[test]
@@ -309,15 +271,6 @@ mod tests {
             in_memory: false,
         };
         assert!(config.validate().is_err());
-    }
-
-    #[test]
-    fn test_create_backend_ditto_not_yet_implemented() {
-        let config = StorageConfig::default();
-        // This will panic with todo!() for now (Day 2 work)
-        // Once DittoBackend is implemented, this test will pass
-        // For now, just verify it would try to create Ditto
-        assert_eq!(config.backend, "ditto");
     }
 
     #[test]

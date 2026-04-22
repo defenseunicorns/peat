@@ -2,9 +2,10 @@
 //!
 //! Storage abstraction layer for the Capability Aggregation Protocol (CAP).
 //!
-//! This crate provides a backend-agnostic interface for persisting and querying
-//! Peat protocol data, enabling external systems to access CAP state without
-//! coupling to specific storage implementations.
+//! This crate provides a backend-agnostic interface for persisting and
+//! querying Peat protocol data. It ships only the abstraction — the
+//! `DataStore` trait, domain adapters, and an optional HTTP API — so that
+//! concrete storage backends can be swapped without touching consumers.
 //!
 //! ## Architecture
 //!
@@ -12,7 +13,7 @@
 //! External System (C2 Dashboard, Analytics)
 //!           ↓ HTTP/REST
 //!   ┌──────────────────────┐
-//!   │  cap-persistence     │
+//!   │  peat-persistence    │
 //!   │  (External API)      │
 //!   └──────────────────────┘
 //!           ↓ uses
@@ -21,83 +22,21 @@
 //!   └──────────────────────┘
 //!           ↓ implemented by
 //!   ┌──────────────────────┐
-//!   │  Storage Backends    │
-//!   │  • Ditto             │
-//!   │  • Automerge (planned)│
-//!   │  • SQLite (testing)  │
+//!   │  (consumer-supplied) │
 //!   └──────────────────────┘
 //! ```
 //!
 //! ## Features
 //!
-//! - **Backend Agnostic**: Works with Ditto, Automerge, or any CRDT backend
+//! - **Backend Agnostic**: `DataStore` trait abstracts over any storage impl
 //! - **Query Interface**: Filter, sort, and paginate CAP data
 //! - **Live Updates**: Subscribe to real-time changes via observers
 //! - **External API**: HTTP/REST endpoints for non-CAP systems
 //! - **Type Safe**: Strongly typed queries and results
 //!
-//! ## Usage
+//! ## REST API (optional `external-api` feature)
 //!
-//! ```rust,no_run
-//! use peat_persistence::{DataStore, Query};
-//! use peat_persistence::backends::DittoStore;
-//! use peat_protocol::sync::ditto::DittoBackend;
-//! use peat_protocol::sync::DataSyncBackend;
-//! use serde_json::json;
-//! use std::sync::Arc;
-//!
-//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! // Initialize backend
-//! let backend = Arc::new(DittoBackend::new());
-//! // backend.initialize(config).await?;
-//!
-//! // Create store
-//! let store = DittoStore::new(backend);
-//!
-//! // Save data
-//! let node = json!({
-//!     "node_id": "node-1",
-//!     "phase": "discovery"
-//! });
-//! let id = store.save("node_states", &node).await?;
-//!
-//! // Query data
-//! let nodes = store.query("node_states", Query::all()).await?;
-//! println!("Found {} nodes", nodes.len());
-//!
-//! // Subscribe to changes
-//! let mut stream = store.observe("node_states", Query::all()).await?;
-//! while let Some(event) = stream.recv().await {
-//!     println!("Change: {:?}", event);
-//! }
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! ## REST API
-//!
-//! The `external-api` feature provides HTTP endpoints for querying CAP data:
-//!
-//! ```rust,no_run
-//! use peat_persistence::external::Server;
-//! use peat_persistence::backends::DittoStore;
-//! use peat_protocol::sync::ditto::DittoBackend;
-//! use std::sync::Arc;
-//!
-//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! let backend = Arc::new(DittoBackend::new());
-//! let store = Arc::new(DittoStore::new(backend));
-//!
-//! let server = Server::new(store)
-//!     .bind("0.0.0.0:8080")
-//!     .await?;
-//!
-//! server.serve().await?;
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! ## REST Endpoints
+//! Consumers pass an `Arc<dyn DataStore>` to `external::Server`:
 //!
 //! - `GET /api/v1/health` - Health check
 //! - `GET /api/v1/collections/:name` - Query collection

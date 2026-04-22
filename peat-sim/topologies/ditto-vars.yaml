@@ -1,5 +1,0 @@
-# Ditto configuration for peat-sim topologies.
-# Replace these values with your own credentials from the Ditto portal (https://portal.ditto.live).
-DITTO_APP_ID: "00000000-0000-0000-0000-000000000000"
-DITTO_OFFLINE_TOKEN: "REPLACE_WITH_YOUR_OFFLINE_TOKEN"
-DITTO_SHARED_KEY: "REPLACE_WITH_YOUR_SHARED_KEY"

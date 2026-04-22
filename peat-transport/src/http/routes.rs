@@ -172,11 +172,11 @@ mod tests {
     fn test_health_response_serialization() {
         let response = HealthResponse {
             status: "healthy".to_string(),
-            backend: "Ditto".to_string(),
+            backend: "Automerge+Iroh".to_string(),
         };
         let json = serde_json::to_string(&response).unwrap();
         assert!(json.contains("healthy"));
-        assert!(json.contains("Ditto"));
+        assert!(json.contains("Automerge+Iroh"));
     }
 
     #[test]

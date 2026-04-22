@@ -11,7 +11,7 @@ Peer discovery layer for the Peat Protocol mesh intelligence system.
 - **mDNS Discovery**: Zero-configuration local network peer discovery using multicast DNS
 - **Static Configuration**: Pre-configured peer lists for EMCON (Emission Control) operations
 - **Hybrid Discovery**: Combine multiple discovery strategies simultaneously
-- **Backend Agnostic**: Works with any CRDT/networking backend (Ditto, Automerge+Iroh, etc.)
+- **Backend Agnostic**: Works with any CRDT/networking backend implementing the workspace sync traits (today: Automerge + Iroh)
 - **Event-Driven**: Subscribe to peer found/lost/updated events
 
 ## Usage

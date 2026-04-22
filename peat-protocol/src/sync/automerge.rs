@@ -3242,7 +3242,7 @@ impl DataSyncBackend for AutomergeIrohBackend {
         // Require shared_key for peer authentication
         let shared_key = config.shared_key.as_ref().ok_or_else(|| {
             Error::config_error(
-                "AutomergeIroh backend requires PEAT_SECRET_KEY (or DITTO_SHARED_KEY) for peer authentication",
+                "AutomergeIroh backend requires PEAT_SECRET_KEY for peer authentication",
                 Some("shared_key".to_string()),
             )
         })?;

@@ -702,18 +702,35 @@ async fn test_tombstone_batch_exchange_on_connect() {
     backend_a.sync_engine().start_sync().await.unwrap();
     backend_b.sync_engine().start_sync().await.unwrap();
 
-    // Wait for connection and tombstone batch exchange
+    // Wait for connection and tombstone batch exchange. Poll with a
+    // deadline rather than a fixed sleep — macOS loopback QUIC handshake
+    // runs ~3–5× slower than Linux CI, and raw sleeps flake when the
+    // machine is busy. Linux sees completion well under 8s; give Darwin
+    // a generous ceiling.
+    #[cfg(target_os = "linux")]
+    let deadline = Duration::from_secs(15);
+    #[cfg(not(target_os = "linux"))]
+    let deadline = Duration::from_secs(60);
     println!("  Waiting for connection and tombstone batch exchange...");
-    tokio::time::sleep(Duration::from_secs(8)).await;
-
-    // Check if tombstones were exchanged
-    let tombstones_on_b = store_b.get_all_tombstones().unwrap();
-    println!("  Node B received {} tombstones", tombstones_on_b.len());
-
-    // Verify specific tombstones
-    let has_doc1 = store_b.has_tombstone("tracks", "old-doc-1").unwrap();
-    let has_doc2 = store_b.has_tombstone("alerts", "old-doc-2").unwrap();
-    let has_doc3 = store_b.has_tombstone("nodes", "old-doc-3").unwrap();
+    let started = std::time::Instant::now();
+    let (tombstones_on_b, has_doc1, has_doc2, has_doc3) = loop {
+        let ts = store_b.get_all_tombstones().unwrap();
+        let d1 = store_b.has_tombstone("tracks", "old-doc-1").unwrap();
+        let d2 = store_b.has_tombstone("alerts", "old-doc-2").unwrap();
+        let d3 = store_b.has_tombstone("nodes", "old-doc-3").unwrap();
+        if !ts.is_empty() && d1 && d2 && d3 {
+            break (ts, d1, d2, d3);
+        }
+        if started.elapsed() >= deadline {
+            break (ts, d1, d2, d3);
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    };
+    println!(
+        "  Node B received {} tombstones after {:?}",
+        tombstones_on_b.len(),
+        started.elapsed()
+    );
 
     println!(
         "  Tombstone 1 (tracks:old-doc-1): {}",

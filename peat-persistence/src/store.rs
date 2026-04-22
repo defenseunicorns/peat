@@ -9,11 +9,8 @@ use tokio::sync::mpsc;
 /// Core trait for CAP data persistence
 ///
 /// This trait provides a backend-agnostic interface for storing and querying
-/// Peat protocol data. Implementations can use various storage backends:
-/// - Ditto SDK (current implementation)
-/// - Automerge + Iroh (planned)
-/// - SQLite (for testing)
-/// - PostgreSQL (for centralized C2)
+/// Peat protocol data. Concrete backends implement this trait; the crate
+/// itself ships only the abstraction.
 ///
 /// # Example
 ///
@@ -256,7 +253,7 @@ pub enum ChangeEvent {
 /// Information about the storage backend
 #[derive(Debug, Clone)]
 pub struct StoreInfo {
-    /// Backend name (e.g., "Ditto", "Automerge", "SQLite")
+    /// Backend name (e.g., "Automerge", "SQLite")
     pub name: String,
     /// Backend version
     pub version: String,

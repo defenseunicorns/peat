@@ -93,21 +93,18 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full five-layer breakdo
 | `peat-persistence` | Storage backends (Redb, SQLite) |
 | `peat-discovery` | Peer discovery (mDNS, static, hybrid) |
 | `peat-ffi` | Mobile bindings (Kotlin/Swift via UniFFI + JNI) |
-| `peat-inference` | Edge AI/ML pipeline (ONNX Runtime, YOLOv8, GStreamer) |
 | `peat-tak-bridge` | TAK/ATAK CoT interoperability bridge |
-| `peat-sim` | Network simulator |
 | `peat-ble-test` | BLE integration test harness (Pi-to-Android) |
 
 ## Feature Flags
 
 | Feature | Description |
 |---------|-------------|
-| `automerge-backend` | Automerge CRDT backend (pure Rust, open-source) |
-| `ditto-backend` (default) | Ditto CRDT backend (proprietary, production-grade) |
+| `automerge-backend` (default) | Automerge CRDT backend with Iroh QUIC transport (pure Rust, Apache-2.0/MIT) |
 | `lite-transport` | Embedded node transport via peat-lite |
 | `bluetooth` | BLE mesh transport via peat-btle |
 
-The **Automerge backend** is the open-source default for community use.
+Peat uses **Automerge + Iroh** as its CRDT and transport stack. An earlier Ditto-based backend was removed; historical context is preserved in [ADR-011](docs/adr/011-ditto-vs-automerge-iroh.md).
 
 ## Deployment
 
@@ -125,7 +122,7 @@ make build-atak-plugin                    # ATAK plugin APK
 | Layer | Technology |
 |-------|------------|
 | Language | Rust (2021 edition) |
-| CRDT Engine | Automerge + Iroh (open-source) / Ditto SDK (proprietary) |
+| CRDT Engine | Automerge + Iroh (open-source) |
 | Transport | QUIC (Iroh), BLE (BlueZ/CoreBluetooth/NimBLE), UDP, HTTP (Axum) |
 | Security | Ed25519 identity, X25519 key exchange, ChaCha20-Poly1305, HKDF |
 | Serialization | Protobuf (prost) + Serde |
@@ -191,20 +188,11 @@ See [ADR-006](docs/adr/006-security-authentication-authorization.md) for the ful
 
 ## FAQs
 
-### What's the difference between the Ditto and Automerge+Iroh backends?
+### What CRDT and transport stack does Peat use?
 
-Peat supports two complete backend strategies — these are full stacks for storage, sync, and transport, not interchangeable components.
+Peat uses **Automerge + Iroh**: Automerge CRDTs (MIT, ~90% columnar compression) for conflict-free state replication plus Iroh QUIC transport (Apache 2.0) with native multi-path, connection migration, and stream multiplexing. This pure-OSS stack can be tuned for contested networks with 20-30% packet loss.
 
-**Ditto (Commercial, All-In-One):** Proprietary CRDT engine with built-in RocksDB persistence, integrated Bluetooth/WiFi/TCP transport, and automatic mesh discovery. Zero networking code to write — plug and play. Tradeoffs: vendor licensing, TCP-only (no QUIC multi-path), ~60% wire compression, no source access.
-
-**Automerge + Iroh (Pure Open Source):** Automerge CRDTs (MIT, ~90% columnar compression) plus Iroh QUIC transport (Apache 2.0) with native multi-path, connection migration, and stream multiplexing. Full source control — can optimize for contested networks with 20-30% packet loss. Tradeoffs: requires implementing discovery plugins, repository wrappers, and a query engine (~16-20 weeks of integration work).
-
-| Scenario | Recommendation |
-|----------|---------------|
-| Government/DoD with licensing approval | Ditto — zero networking complexity |
-| Open-source requirement | Automerge+Iroh — full Apache 2.0 |
-| Tactical multi-path networks (radio + satellite) | Automerge+Iroh — QUIC multi-path vs TCP single-path |
-| Commercial product with licensing budget | Ditto — faster time-to-market |
+An earlier Ditto-based backend was evaluated and later removed in favor of a single open-source stack. [ADR-011](docs/adr/011-ditto-vs-automerge-iroh.md) preserves the historical comparison.
 
 ### How much effort does it take to integrate?
 

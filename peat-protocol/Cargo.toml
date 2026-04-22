@@ -11,8 +11,6 @@ repository.workspace = true
 peat-schema = { path = "../peat-schema" }
 peat-mesh = { workspace = true }
 
-# Ditto is optional - only needed for DittoBackend (not for CoT/FFI)
-dittolive-ditto = { workspace = true, optional = true }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -67,9 +65,7 @@ log = { version = "0.4", optional = true }  # Logging for lite transport
 peat-btle = { workspace = true, optional = true }
 
 [features]
-default = ["ditto-backend"]
-# Ditto backend - requires dittolive-ditto SDK (not available on Android)
-ditto-backend = ["dittolive-ditto"]
+default = ["automerge-backend"]
 # Automerge/Iroh backend - pure Rust, works on Android
 automerge-backend = ["automerge", "iroh", "iroh-blobs", "redb", "lru", "toml", "mdns-sd", "rand", "futures-lite", "negentropy", "peat-mesh/automerge-backend"]
 # Peat-Lite transport - UDP-based communication with embedded devices (ADR-035)
@@ -82,11 +78,7 @@ proptest = { workspace = true }
 criterion = { workspace = true }
 tokio = { workspace = true, features = ["test-util"] }
 tempfile = "3.13"
-serial_test = "3.1"  # Force serial execution of Ditto-based E2E tests
-
-[[bench]]
-name = "backend_comparison"
-harness = false
+serial_test = "3.1"  # Serialize tests sharing global state (iroh endpoints)
 
 [[bench]]
 name = "cap_benchmarks"

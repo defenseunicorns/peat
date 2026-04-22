@@ -4,6 +4,11 @@
 **GitHub Issues**: [View All Epics](https://github.com/defenseunicorns/peat/labels/epic)
 **Timeline Visualization**: [Issue #118](https://github.com/defenseunicorns/peat/issues/118)
 
+> **Note (April 2026):** The Ditto backend has since been removed from the
+> workspace. Peat now ships with a single Automerge + Iroh stack. Sections
+> below that discuss Ditto/Automerge backend selection reflect planning
+> context at the time of writing and are retained for historical traceability.
+
 ---
 
 ## 🎯 Executive Summary

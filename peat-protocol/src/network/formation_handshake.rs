@@ -37,7 +37,7 @@
 #[cfg(feature = "automerge-backend")]
 use crate::security::{
     FormationAuthResult, FormationChallenge, FormationChallengeResponse, FormationKey,
-    FORMATION_RESPONSE_SIZE,
+    FORMATION_CHALLENGE_SIZE, FORMATION_RESPONSE_SIZE,
 };
 #[cfg(feature = "automerge-backend")]
 use anyhow::{Context, Result};
@@ -94,18 +94,35 @@ pub async fn perform_initiator_handshake(
     send.write_all(formation_id_bytes).await?;
     send.flush().await?;
 
-    // Step 2: Receive challenge from responder
-    let mut challenge_buf = vec![0u8; 256];
-    let n = tokio::time::timeout(
+    // Step 2: Receive challenge from responder.
+    //
+    // Use read_exact for each framed segment — a single recv.read() may return
+    // short of the full buffer when QUIC splits the payload across STREAM
+    // frames (readily observable on macOS loopback).
+    let mut id_len_buf = [0u8; 2];
+    tokio::time::timeout(
         Duration::from_secs(HANDSHAKE_TIMEOUT_SECS),
-        recv.read(&mut challenge_buf),
+        recv.read_exact(&mut id_len_buf),
     )
     .await
-    .context("Challenge receive timeout")?
-    .context("Failed to read challenge")?
-    .ok_or_else(|| anyhow::anyhow!("Connection closed before challenge received"))?;
+    .context("Challenge length receive timeout")?
+    .context("Failed to read challenge length")?;
+    let id_len = u16::from_le_bytes(id_len_buf) as usize;
 
-    let challenge = FormationChallenge::from_bytes(&challenge_buf[..n])
+    let mut body_buf = vec![0u8; id_len + FORMATION_CHALLENGE_SIZE];
+    tokio::time::timeout(
+        Duration::from_secs(HANDSHAKE_TIMEOUT_SECS),
+        recv.read_exact(&mut body_buf),
+    )
+    .await
+    .context("Challenge body receive timeout")?
+    .context("Failed to read challenge body")?;
+
+    let mut challenge_buf = Vec::with_capacity(2 + body_buf.len());
+    challenge_buf.extend_from_slice(&id_len_buf);
+    challenge_buf.extend_from_slice(&body_buf);
+
+    let challenge = FormationChallenge::from_bytes(&challenge_buf)
         .map_err(|e| anyhow::anyhow!("Invalid challenge: {}", e))?;
 
     // Verify formation ID matches
@@ -308,6 +325,11 @@ mod tests {
 
         // Wait for responder
         let responder_result = responder_task.await.unwrap();
+
+        // Close both transports so the next test starts with a clean iroh
+        // state (macOS loopback is sensitive to endpoint churn across tests).
+        let _ = initiator.close().await;
+        let _ = responder.close().await;
 
         // Always return (initiator_result, responder_result) regardless of which transport
         // was the initiator. Tests expect the first element to be from the initiator.

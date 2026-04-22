@@ -1,4 +1,4 @@
-.PHONY: help clean clean-ditto build test test-unit test-integration test-e2e test-fast fmt clippy check pre-commit ci \
+.PHONY: help clean build test test-unit test-integration test-e2e test-fast fmt clippy check pre-commit ci \
        build-ble-test-app deploy-ble-test-app ble-test ble-test-logs clean-ble-test \
        build-dual-test-peer deploy-dual-test-peer start-dual-test-peer stop-dual-test-peer \
        dual-transport-test dual-test-peer-logs \
@@ -105,7 +105,7 @@ build-docker:
 
 # test-fast: Quickest feedback loop for development (~30s)
 # Use this during active development for rapid iteration
-test-fast: clean-ditto
+test-fast:
 	@echo "Running unit tests (fast mode)..."
 	@if command -v cargo-nextest >/dev/null 2>&1; then \
 		if [ -f .env ]; then \
@@ -123,7 +123,7 @@ test-fast: clean-ditto
 	fi
 
 # test-unit: Unit tests only with nextest (~30s)
-test-unit: clean-ditto
+test-unit:
 	@echo "Running unit tests..."
 	@if command -v cargo-nextest >/dev/null 2>&1; then \
 		if [ -f .env ]; then \
@@ -141,7 +141,7 @@ test-unit: clean-ditto
 	fi
 
 # test-integration: Integration tests excluding E2E (~2 min)
-test-integration: clean-ditto
+test-integration:
 	@echo "Running integration tests (excluding E2E)..."
 	@if command -v cargo-nextest >/dev/null 2>&1; then \
 		if [ -f .env ]; then \
@@ -159,11 +159,10 @@ test-integration: clean-ditto
 	fi
 
 # test-e2e: E2E tests only (~5 min)
-test-e2e: clean-ditto
+test-e2e:
 	@echo "Running E2E tests..."
 	@if [ ! -f .env ]; then \
-		echo "⚠️  Warning: .env file not found. Ditto tests may be skipped."; \
-		echo "   Create .env with DITTO_APP_ID, DITTO_OFFLINE_TOKEN, DITTO_SHARED_KEY"; \
+		echo "ℹ️  No .env file found; tests needing PEAT_APP_ID / PEAT_SECRET_KEY may be skipped."; \
 	fi
 	@if command -v cargo-nextest >/dev/null 2>&1; then \
 		if [ -f .env ]; then \
@@ -181,7 +180,7 @@ test-e2e: clean-ditto
 	fi
 
 # test: Run all tests (unit + integration + E2E)
-test: clean-ditto
+test:
 	@echo "Running all tests..."
 	@if command -v cargo-nextest >/dev/null 2>&1; then \
 		if [ -f .env ]; then \
@@ -213,29 +212,23 @@ clippy:
 check: fmt clippy test
 	@echo "✅ All checks passed!"
 
-pre-commit: clean-ditto
+pre-commit:
 	@echo "Running pre-commit checks..."
 	@cargo fmt --all
-	@cargo clippy --all-targets --all-features --workspace --exclude peat-ffi --exclude peat-inference -- -D warnings
-	@cargo clippy --all-targets --workspace -p peat-inference -- -D warnings
+	@cargo clippy --all-targets --all-features --workspace --exclude peat-ffi -- -D warnings
 	@$(MAKE) test-unit
 	@echo "✅ Pre-commit checks passed!"
 
-ci: clean-ditto
+ci:
 	@echo "Running CI pipeline..."
 	@cargo fmt --all -- --check
-	@cargo clippy --all-targets --all-features --workspace --exclude peat-ffi --exclude peat-inference -- -D warnings
-	@cargo clippy --all-targets --workspace -p peat-inference -- -D warnings
+	@cargo clippy --all-targets --all-features --workspace --exclude peat-ffi -- -D warnings
 	@$(MAKE) test-integration
 	@echo "✅ CI pipeline passed!"
 
-clean: clean-ditto
+clean:
 	@echo "Cleaning build artifacts..."
 	cargo clean
-
-clean-ditto:
-	@find . -type d -name ".ditto*" -exec rm -rf {} + 2>/dev/null || true
-	@rm -rf /tmp/peat-persistence-test-* 2>/dev/null || true
 
 clean-labs:
 	@echo "Cleaning up all containerlab topologies..."

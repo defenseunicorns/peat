@@ -41,7 +41,7 @@ You have two options:
 peat is a tactical mesh protocol workspace comprising 10 crates. The following areas are particularly security-sensitive:
 
 - **Protocol security**: Formation keys, membership certificates, and channel encryption govern mesh access control. Weaknesses here could allow unauthorized nodes to join a formation or eavesdrop on traffic.
-- **CRDT sync integrity**: Automerge and Ditto backends replicate state across peers. Malicious or malformed CRDT operations could corrupt shared state or cause divergence.
+- **CRDT sync integrity**: The Automerge backend replicates state across peers. Malicious or malformed CRDT operations could corrupt shared state or cause divergence.
 - **Transport security**: QUIC/Iroh, BLE, and UDP bypass channels carry mesh traffic. TLS configuration, connection establishment, and stream multiplexing must enforce secure defaults across all transports.
 - **FFI boundary**: peat-ffi exposes mobile bindings. Memory safety, input validation, and error handling at the FFI layer are critical to prevent undefined behavior in host applications.
 - **TAK bridge**: CoT protocol translation bridges tactical data between peat and TAK ecosystems. Malformed or spoofed CoT messages could inject false situational awareness data.

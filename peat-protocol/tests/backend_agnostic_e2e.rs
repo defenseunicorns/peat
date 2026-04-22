@@ -1,20 +1,20 @@
 //! Backend-Agnostic E2E Tests
 //!
-//! These tests validate that both DittoBackend and AutomergeIrohBackend can run
-//! through the same test infrastructure and demonstrate identical CRDT semantics.
+//! These tests validate that AutomergeIrohBackend runs through the shared test
+//! infrastructure and demonstrates correct CRDT semantics.
 //!
 //! # Test Strategy
 //!
-//! - Each test has two variants: one for Ditto, one for Automerge+Iroh
-//! - Tests use the same test logic via shared helper functions
+//! - Tests use shared helper functions for identical test logic
 //! - Validates that DataSyncBackend trait abstraction works correctly
 //!
 //! # What This Proves
 //!
-//! 1. **Trait Abstraction Works**: Both backends implement DataSyncBackend
-//! 2. **E2EHarness Compatibility**: Both can be created via E2EHarness
-//! 3. **Basic CRDT Operations**: Document upsert/query work identically
-//! 4. **Test Infrastructure Parity**: Same test patterns for both backends
+//! 1. **Trait Abstraction Works**: AutomergeIrohBackend implements DataSyncBackend
+//! 2. **E2EHarness Compatibility**: Backends can be created via E2EHarness
+//! 3. **Basic CRDT Operations**: Document upsert/query work as expected
+
+#![cfg(feature = "automerge-backend")]
 
 use peat_protocol::sync::{DataSyncBackend, Document, Value};
 use peat_protocol::testing::E2EHarness;
@@ -23,70 +23,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 // ============================================================================
-// Ditto Backend Tests
-// ============================================================================
-
-/// Test basic document operations with Ditto backend
-#[tokio::test]
-async fn test_ditto_basic_document_operations() {
-    dotenvy::dotenv().ok();
-
-    let ditto_app_id = match std::env::var("PEAT_APP_ID").or_else(|_| std::env::var("DITTO_APP_ID"))
-    {
-        Ok(id) if !id.is_empty() => id,
-        _ => {
-            eprintln!("PEAT_APP_ID not set — skipping E2E test");
-            return;
-        }
-    };
-    let _ = ditto_app_id;
-
-    println!("=== Backend Agnostic E2E: Ditto Basic Operations ===");
-
-    let mut harness = E2EHarness::new("ditto_basic_ops");
-    let backend = harness.create_ditto_backend().await.unwrap();
-
-    run_basic_document_operations_test(backend, "Ditto").await;
-}
-
-/// Test two-instance sync with Ditto backend
-#[tokio::test]
-async fn test_ditto_two_instance_sync() {
-    dotenvy::dotenv().ok();
-
-    let ditto_app_id = match std::env::var("PEAT_APP_ID").or_else(|_| std::env::var("DITTO_APP_ID"))
-    {
-        Ok(id) if !id.is_empty() => id,
-        _ => {
-            eprintln!("PEAT_APP_ID not set — skipping E2E test");
-            return;
-        }
-    };
-    let _ = ditto_app_id;
-
-    println!("=== Backend Agnostic E2E: Ditto Two-Instance Sync ===");
-
-    let mut harness = E2EHarness::new("ditto_two_sync");
-
-    // Create two backends with explicit TCP ports
-    let backend1 = harness
-        .create_ditto_backend_with_tcp(Some(19101), None)
-        .await
-        .unwrap();
-    let backend2 = harness
-        .create_ditto_backend_with_tcp(Some(19102), Some("127.0.0.1:19101".to_string()))
-        .await
-        .unwrap();
-
-    run_two_instance_sync_test(backend1, backend2, "Ditto").await;
-}
-
-// ============================================================================
 // Automerge+Iroh Backend Tests
 // ============================================================================
 
 /// Test basic document operations with Automerge+Iroh backend
-#[cfg(feature = "automerge-backend")]
 #[tokio::test]
 async fn test_automerge_basic_document_operations() {
     println!("=== Backend Agnostic E2E: Automerge+Iroh Basic Operations ===");
@@ -98,7 +38,6 @@ async fn test_automerge_basic_document_operations() {
 }
 
 /// Test two-instance sync with Automerge+Iroh backend
-#[cfg(feature = "automerge-backend")]
 #[tokio::test]
 async fn test_automerge_two_instance_sync() {
     println!("=== Backend Agnostic E2E: Automerge+Iroh Two-Instance Sync ===");
@@ -118,7 +57,7 @@ async fn test_automerge_two_instance_sync() {
         .await
         .unwrap();
 
-    // Explicitly connect the peers for Automerge (unlike Ditto which has automatic discovery)
+    // Explicitly connect the peers for Automerge.
     // Create PeerInfo for backend2 with its actual endpoint_id
     println!("  Connecting Automerge peers...");
     let transport1 = backend1.transport();
@@ -313,44 +252,7 @@ async fn run_two_instance_sync_test<B: DataSyncBackend>(
 // Three-Node Mesh Sync Tests
 // ============================================================================
 
-/// Test three-node mesh sync with Ditto backend
-#[tokio::test]
-async fn test_ditto_three_node_mesh() {
-    dotenvy::dotenv().ok();
-
-    let ditto_app_id = match std::env::var("PEAT_APP_ID").or_else(|_| std::env::var("DITTO_APP_ID"))
-    {
-        Ok(id) if !id.is_empty() => id,
-        _ => {
-            eprintln!("PEAT_APP_ID not set — skipping E2E test");
-            return;
-        }
-    };
-    let _ = ditto_app_id;
-
-    println!("=== Backend Agnostic E2E: Ditto Three-Node Mesh ===");
-
-    let mut harness = E2EHarness::new("ditto_three_mesh");
-
-    // Create three backends with explicit TCP ports
-    let backend1 = harness
-        .create_ditto_backend_with_tcp(Some(19111), None)
-        .await
-        .unwrap();
-    let backend2 = harness
-        .create_ditto_backend_with_tcp(Some(19112), Some("127.0.0.1:19111".to_string()))
-        .await
-        .unwrap();
-    let backend3 = harness
-        .create_ditto_backend_with_tcp(Some(19113), Some("127.0.0.1:19111".to_string()))
-        .await
-        .unwrap();
-
-    run_three_node_mesh_test(backend1, backend2, backend3, "Ditto").await;
-}
-
 /// Test three-node mesh sync with Automerge+Iroh backend
-#[cfg(feature = "automerge-backend")]
 #[tokio::test]
 async fn test_automerge_three_node_mesh() {
     println!("=== Backend Agnostic E2E: Automerge+Iroh Three-Node Mesh ===");
@@ -565,39 +467,7 @@ async fn run_three_node_mesh_test<B: DataSyncBackend>(
 // Concurrent Update Conflict Resolution Tests
 // ============================================================================
 
-/// Test concurrent updates with Ditto backend
-#[tokio::test]
-async fn test_ditto_concurrent_updates() {
-    dotenvy::dotenv().ok();
-
-    let ditto_app_id = match std::env::var("PEAT_APP_ID").or_else(|_| std::env::var("DITTO_APP_ID"))
-    {
-        Ok(id) if !id.is_empty() => id,
-        _ => {
-            eprintln!("PEAT_APP_ID not set — skipping E2E test");
-            return;
-        }
-    };
-    let _ = ditto_app_id;
-
-    println!("=== Backend Agnostic E2E: Ditto Concurrent Updates ===");
-
-    let mut harness = E2EHarness::new("ditto_concurrent");
-
-    let backend1 = harness
-        .create_ditto_backend_with_tcp(Some(19121), None)
-        .await
-        .unwrap();
-    let backend2 = harness
-        .create_ditto_backend_with_tcp(Some(19122), Some("127.0.0.1:19121".to_string()))
-        .await
-        .unwrap();
-
-    run_concurrent_updates_test(backend1, backend2, "Ditto").await;
-}
-
 /// Test concurrent updates with Automerge+Iroh backend
-#[cfg(feature = "automerge-backend")]
 #[tokio::test]
 async fn test_automerge_concurrent_updates() {
     println!("=== Backend Agnostic E2E: Automerge+Iroh Concurrent Updates ===");
@@ -783,7 +653,6 @@ async fn run_concurrent_updates_test<B: DataSyncBackend>(
 /// This validates the FormationKey authentication:
 /// - Peers with different secret keys should be rejected
 /// - Connection should fail or be closed after handshake failure
-#[cfg(feature = "automerge-backend")]
 #[tokio::test]
 async fn test_automerge_different_credentials_rejected() {
     use peat_protocol::network::IrohTransport;
@@ -884,7 +753,6 @@ async fn test_automerge_different_credentials_rejected() {
 /// Test that AutomergeIroh backends with SAME credentials CAN connect
 ///
 /// This is the positive case - confirming authentication works when credentials match
-#[cfg(feature = "automerge-backend")]
 #[tokio::test]
 async fn test_automerge_same_credentials_accepted() {
     use peat_protocol::network::IrohTransport;

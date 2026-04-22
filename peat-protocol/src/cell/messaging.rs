@@ -401,7 +401,7 @@ impl CellMessageBus {
         queue.push_back(message.clone());
         // Sort by priority (highest first)
         let mut vec: Vec<_> = queue.drain(..).collect();
-        vec.sort_by(|a, b| b.priority.cmp(&a.priority));
+        vec.sort_by_key(|m| std::cmp::Reverse(m.priority));
         queue.extend(vec);
 
         // Track for retransmission

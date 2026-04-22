@@ -251,10 +251,8 @@ impl CotEvent {
                         _ => {}
                     }
                 }
-                Ok(Event::Text(ref e)) => {
-                    if in_remarks {
-                        remarks_text.push_str(&e.unescape().unwrap_or_default());
-                    }
+                Ok(Event::Text(ref e)) if in_remarks => {
+                    remarks_text.push_str(&e.unescape().unwrap_or_default());
                 }
                 Ok(Event::End(ref e)) => match e.name().as_ref() {
                     b"detail" => in_detail = false,

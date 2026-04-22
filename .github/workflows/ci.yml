@@ -53,11 +53,8 @@ jobs:
           cache-on-failure: true
           shared-key: clippy
 
-      # Exclude peat-ffi: its cdylib conflicts with dittoffi symbols during linking
-      # Exclude peat-inference: has platform-specific features (GStreamer, CUDA) requiring system libs
-      - run: cargo clippy --all-targets --all-features --workspace --exclude peat-ffi --exclude peat-inference -- -D warnings
-      # Run clippy on peat-inference without optional features (no GStreamer/CUDA deps)
-      - run: cargo clippy -p peat-inference --all-targets -- -D warnings
+      # Exclude peat-ffi: UniFFI-generated cdylib has its own lint baseline
+      - run: cargo clippy --all-targets --all-features --workspace --exclude peat-ffi -- -D warnings
 
   # ============================================
   # Unit & Integration Tests (excludes E2E, ~5 min)
@@ -90,10 +87,8 @@ jobs:
         env:
           PEAT_APP_ID: ${{ secrets.PEAT_APP_ID }}
           PEAT_SHARED_KEY: ${{ secrets.PEAT_SHARED_KEY }}
-          PEAT_OFFLINE_TOKEN: ${{ secrets.PEAT_OFFLINE_TOKEN }}
         run: |
-          cargo nextest run --all-features --workspace --exclude peat-ffi --exclude peat-inference -E 'not test(e2e)'
-          cargo nextest run -p peat-inference -E 'not test(e2e)'
+          cargo nextest run --all-features --workspace --exclude peat-ffi -E 'not test(e2e)'
 
   # ============================================
   # E2E Tests (parallel job, ~3 min)
@@ -126,9 +121,8 @@ jobs:
         env:
           PEAT_APP_ID: ${{ secrets.PEAT_APP_ID }}
           PEAT_SHARED_KEY: ${{ secrets.PEAT_SHARED_KEY }}
-          PEAT_OFFLINE_TOKEN: ${{ secrets.PEAT_OFFLINE_TOKEN }}
         run: |
-          cargo nextest run --all-features --workspace --exclude peat-ffi --exclude peat-inference -E 'test(e2e)'
+          cargo nextest run --all-features --workspace --exclude peat-ffi -E 'test(e2e)'
 
   # ============================================
   # Documentation Build (#702)
@@ -142,7 +136,7 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler mold clang libdbus-1-dev
       - name: Build docs
-        run: cargo doc --no-deps --workspace --exclude peat-ffi --exclude peat-inference
+        run: cargo doc --no-deps --workspace --exclude peat-ffi
         env:
           RUSTDOCFLAGS: "-D warnings"
 
@@ -166,7 +160,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler mold clang libdbus-1-dev
       - uses: Swatinem/rust-cache@v2
       - name: Check
-        run: cargo check --workspace --exclude peat-ffi --exclude peat-inference ${{ matrix.features }}
+        run: cargo check --workspace --exclude peat-ffi ${{ matrix.features }}
 
   # ============================================
   # Security Audit

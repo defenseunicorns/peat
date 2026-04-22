@@ -37,7 +37,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 ///
 /// This is a thin wrapper that delegates to AutomergeStore methods while implementing
 /// the backend-agnostic trait. This enables:
-/// - Easy backend switching (swap with DittoSummaryStorage)
+/// - Easy backend switching (alternate SummaryStorage implementations)
 /// - Testing with mock storage implementations
 /// - Clean separation between protocol logic and storage backend
 ///

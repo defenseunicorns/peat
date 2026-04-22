@@ -2,15 +2,19 @@
 
 ## Overview
 
-DittoStore now supports storage and retrieval of hierarchical aggregation summaries (SquadSummary, PlatoonSummary) to enable Mode 3 (CAP Differential) testing.
+The Peat storage layer supports storage and retrieval of hierarchical
+aggregation summaries (SquadSummary, PlatoonSummary) to enable Mode 3 (CAP
+Differential) testing. The examples below use the current Automerge + Iroh
+backed `PeatStore`; an earlier revision exposed the same API as `DittoStore`
+against the now-removed Ditto backend.
 
 ## API
 
 ### Squad Summaries
 
 ```rust
-use cap_protocol::storage::DittoStore;
-use cap_schema::hierarchy::v1::SquadSummary;
+use peat_protocol::storage::PeatStore;
+use peat_schema::hierarchy::v1::SquadSummary;
 
 // Store a squad summary
 let summary: SquadSummary = /* ... */;
@@ -27,7 +31,7 @@ match retrieved {
 ### Platoon Summaries
 
 ```rust
-use cap_schema::hierarchy::v1::PlatoonSummary;
+use peat_schema::hierarchy::v1::PlatoonSummary;
 
 // Store a platoon summary
 let summary: PlatoonSummary = /* ... */;
@@ -60,8 +64,8 @@ let retrieved = store.get_platoon_summary("platoon-1").await?;
 For Mode 3 testing, use StateAggregator to create summaries, then store them:
 
 ```rust
-use cap_protocol::hierarchy::StateAggregator;
-use cap_protocol::storage::DittoStore;
+use peat_protocol::hierarchy::StateAggregator;
+use peat_protocol::storage::PeatStore;
 
 // 1. Aggregate squad state from member NodeStates
 let squad_summary = StateAggregator::aggregate_squad(
@@ -73,7 +77,7 @@ let squad_summary = StateAggregator::aggregate_squad(
 // 2. Store the aggregated summary
 store.upsert_squad_summary("squad-alpha", &squad_summary).await?;
 
-// 3. Leader publishes summary (via Ditto sync)
+// 3. Leader publishes summary (via CRDT sync)
 // Platoon leader can now query squad_summaries collection
 
 // 4. Platoon leader retrieves squad summaries
@@ -93,7 +97,7 @@ store.upsert_platoon_summary("platoon-1", &platoon_summary).await?;
 
 ## Testing
 
-See `peat-protocol/src/storage/ditto_store.rs`:
+See the storage module tests in `peat-protocol/src/storage/`:
 - `test_squad_summary_storage()` - Example squad summary test
 - `test_platoon_summary_storage()` - Example platoon summary test
 

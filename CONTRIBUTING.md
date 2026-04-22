@@ -29,19 +29,16 @@ Thank you for your interest in contributing to Peat. This document covers develo
 | `peat-persistence` | Storage abstraction (Redb, SQLite) |
 | `peat-discovery` | Peer discovery (mDNS, static, hybrid) |
 | `peat-ffi` | Mobile bindings (Kotlin/Swift via UniFFI + JNI) |
-| `peat-sim` | Network simulator |
-| `peat-inference` | Edge AI/ML pipeline |
 | `peat-tak-bridge` | TAK/ATAK CoT interoperability bridge |
 | `peat-ble-test` | BLE integration test harness |
 
 ### Feature Flags
 
-The `peat-protocol` crate uses feature flags for backend selection:
+The `peat-protocol` crate uses feature flags for optional transports and bindings:
 
 | Feature | Description |
 |---------|-------------|
-| `ditto-backend` (default) | Ditto CRDT backend (proprietary) |
-| `automerge-backend` | Automerge CRDT backend (open-source) |
+| `automerge-backend` (default) | Automerge CRDT backend with Iroh QUIC transport |
 | `lite-transport` | Embedded node transport via peat-lite |
 | `bluetooth` | BLE mesh transport via peat-btle |
 
@@ -49,8 +46,7 @@ The `peat-protocol` crate uses feature flags for backend selection:
 
 ```bash
 make build                  # full workspace
-cargo build                 # default features
-cargo build --features automerge-backend  # Automerge backend
+cargo build                 # default features (Automerge + Iroh)
 ```
 
 ## Testing
@@ -68,8 +64,8 @@ Before submitting a PR, ensure all of the following pass locally:
 
 ```bash
 cargo fmt --check
-cargo clippy --all-targets --workspace --exclude peat-ffi --exclude peat-inference -- -D warnings
-cargo test --workspace --exclude peat-ffi --exclude peat-inference
+cargo clippy --all-targets --workspace --exclude peat-ffi -- -D warnings
+cargo test --workspace --exclude peat-ffi
 ```
 
 The CI pipeline runs these same checks on every PR.

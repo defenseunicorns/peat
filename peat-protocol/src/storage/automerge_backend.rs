@@ -49,15 +49,15 @@
 //! cells.upsert("cell-1", cell_state.encode_to_vec())?;
 //! ```
 //!
-//! ## Backend comparison
+//! ## Backend features
 //!
-//! | Feature              | DittoBackend         | AutomergeBackend (Phase 1) | AutomergeBackend (Phase 2) |
-//! |----------------------|----------------------|----------------------------|----------------------------|
-//! | CRDT Support         | ✅ (built-in)        | ❌ (blob storage)          | ✅ (field-level)           |
-//! | Persistence          | ✅ (SQLite)          | ✅ (RocksDB)               | ✅ (RocksDB)               |
-//! | Network Sync         | ✅ (multi-transport) | ⏭ (Phase 4: Iroh)         | ⏭ (Phase 4: Iroh)         |
-//! | License              | Proprietary          | MIT/Apache 2.0             | MIT/Apache 2.0             |
-//! | Backend-agnostic API | ✅                   | ✅                         | ✅                         |
+//! | Feature              | AutomergeBackend (Phase 1) | AutomergeBackend (Phase 2) |
+//! |----------------------|----------------------------|----------------------------|
+//! | CRDT Support         | ❌ (blob storage)          | ✅ (field-level)           |
+//! | Persistence          | ✅ (RocksDB)               | ✅ (RocksDB)               |
+//! | Network Sync         | ⏭ (Phase 4: Iroh)         | ⏭ (Phase 4: Iroh)         |
+//! | License              | MIT/Apache 2.0             | MIT/Apache 2.0             |
+//! | Backend-agnostic API | ✅                         | ✅                         |
 
 #[cfg(feature = "automerge-backend")]
 use super::automerge_command_storage::AutomergeCommandStorage;
