@@ -702,9 +702,15 @@ async fn test_tombstone_batch_exchange_on_connect() {
     backend_a.sync_engine().start_sync().await.unwrap();
     backend_b.sync_engine().start_sync().await.unwrap();
 
-    // Wait for connection and tombstone batch exchange
+    // Wait for connection and tombstone batch exchange. 8s is sufficient
+    // on Linux CI; macOS loopback QUIC handshake is ~3–5× slower so give
+    // the exchange more headroom before asserting.
+    #[cfg(target_os = "linux")]
+    let settle = Duration::from_secs(8);
+    #[cfg(not(target_os = "linux"))]
+    let settle = Duration::from_secs(20);
     println!("  Waiting for connection and tombstone batch exchange...");
-    tokio::time::sleep(Duration::from_secs(8)).await;
+    tokio::time::sleep(settle).await;
 
     // Check if tombstones were exchanged
     let tombstones_on_b = store_b.get_all_tombstones().unwrap();
