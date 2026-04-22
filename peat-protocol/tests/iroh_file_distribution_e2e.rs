@@ -63,7 +63,8 @@ async fn test_iroh_file_distribution_basic() {
     println!("=== E2E: IrohFileDistribution Basic ===");
 
     let temp = TempDir::new().unwrap();
-    let addr: SocketAddr = "127.0.0.1:19201".parse().unwrap();
+    // Ephemeral port to avoid CI-runner port conflicts.
+    let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
 
     println!("  Creating integrated stores...");
     let (blob_store, doc_store) = create_integrated_stores(addr, temp.path()).await;
@@ -125,7 +126,8 @@ async fn test_distribution_document_stored() {
     println!("=== E2E: Distribution Document Storage ===");
 
     let temp = TempDir::new().unwrap();
-    let addr: SocketAddr = "127.0.0.1:19202".parse().unwrap();
+    // Ephemeral port to avoid CI-runner port conflicts.
+    let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
 
     println!("  Creating integrated stores...");
     let (blob_store, doc_store) = create_integrated_stores(addr, temp.path()).await;
@@ -177,7 +179,8 @@ async fn test_cancel_distribution() {
     println!("=== E2E: Cancel Distribution ===");
 
     let temp = TempDir::new().unwrap();
-    let addr: SocketAddr = "127.0.0.1:19203".parse().unwrap();
+    // Ephemeral port to avoid CI-runner port conflicts.
+    let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
 
     println!("  Creating integrated stores...");
     let (blob_store, doc_store) = create_integrated_stores(addr, temp.path()).await;
@@ -234,7 +237,8 @@ async fn test_distribution_formation_scope() {
     println!("=== E2E: Distribution with Formation Scope ===");
 
     let temp = TempDir::new().unwrap();
-    let addr: SocketAddr = "127.0.0.1:19204".parse().unwrap();
+    // Ephemeral port to avoid CI-runner port conflicts.
+    let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
 
     println!("  Creating integrated stores...");
     let (blob_store, doc_store) = create_integrated_stores(addr, temp.path()).await;

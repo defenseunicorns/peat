@@ -39,7 +39,7 @@ end = "2027-12-31"
 
 [[trusted.ahash]]
 criteria = "safe-to-deploy"
-user-id = 25353 # Tom Kaitchuck (tkaitchuck)
+user-id = 25353
 start = "2019-02-28"
 end = "2027-03-26"
 
@@ -189,7 +189,7 @@ end = "2027-03-26"
 
 [[trusted.atomic_refcell]]
 criteria = "safe-to-deploy"
-user-id = 4143 # Bobby Holley (bholley)
+user-id = 4143
 start = "2019-09-17"
 end = "2027-03-26"
 
@@ -297,7 +297,7 @@ end = "2027-03-26"
 
 [[trusted.bindgen]]
 criteria = "safe-to-deploy"
-user-id = 3788 # Emilio Cobos Álvarez (emilio)
+user-id = 3788
 start = "2019-02-23"
 end = "2027-03-26"
 
@@ -363,7 +363,7 @@ end = "2027-03-26"
 
 [[trusted.byteorder-lite]]
 criteria = "safe-to-deploy"
-user-id = 5862 # Jonathan Behrens (fintelia)
+user-id = 5862
 start = "2024-04-07"
 end = "2027-03-26"
 
@@ -393,7 +393,7 @@ end = "2027-03-26"
 
 [[trusted.cfg-expr]]
 criteria = "safe-to-deploy"
-user-id = 52553 # embark-studios
+user-id = 52553
 start = "2020-01-09"
 end = "2027-03-26"
 
@@ -441,7 +441,7 @@ end = "2027-03-26"
 
 [[trusted.clang-sys]]
 criteria = "safe-to-deploy"
-user-id = 2922 # Kyle Mayes (KyleMayes)
+user-id = 2922
 start = "2019-07-28"
 end = "2027-03-26"
 
@@ -669,7 +669,7 @@ end = "2027-03-26"
 
 [[trusted.dashmap]]
 criteria = "safe-to-deploy"
-user-id = 19646 # Joel Wejdenstål (xacrimon)
+user-id = 19646
 start = "2019-08-25"
 end = "2027-03-26"
 
@@ -753,13 +753,13 @@ end = "2027-12-31"
 
 [[trusted.dittolive-ditto]]
 criteria = "safe-to-deploy"
-user-id = 135487 # dittotester
+user-id = 135487
 start = "2021-11-19"
 end = "2027-03-26"
 
 [[trusted.dittolive-ditto-sys]]
 criteria = "safe-to-deploy"
-user-id = 135487 # dittotester
+user-id = 135487
 start = "2021-11-05"
 end = "2027-03-26"
 
@@ -813,13 +813,13 @@ end = "2027-03-26"
 
 [[trusted.enumflags2]]
 criteria = "safe-to-deploy"
-user-id = 38769 # Maja Kądziołka (meithecatte)
+user-id = 38769
 start = "2019-04-02"
 end = "2027-03-26"
 
 [[trusted.enumflags2_derive]]
 criteria = "safe-to-deploy"
-user-id = 38769 # Maja Kądziołka (meithecatte)
+user-id = 38769
 start = "2019-10-04"
 end = "2027-03-26"
 
@@ -843,31 +843,31 @@ end = "2027-03-26"
 
 [[trusted.ext-trait]]
 criteria = "safe-to-deploy"
-user-id = 27661 # Daniel Henry-Mantilla (danielhenrymantilla)
+user-id = 27661
 start = "2021-10-23"
 end = "2027-03-26"
 
 [[trusted.ext-trait-proc_macros]]
 criteria = "safe-to-deploy"
-user-id = 27661 # Daniel Henry-Mantilla (danielhenrymantilla)
+user-id = 27661
 start = "2021-10-23"
 end = "2027-03-26"
 
 [[trusted.extension-traits]]
 criteria = "safe-to-deploy"
-user-id = 27661 # Daniel Henry-Mantilla (danielhenrymantilla)
+user-id = 27661
 start = "2022-01-18"
 end = "2027-03-26"
 
 [[trusted.extern-c]]
 criteria = "safe-to-deploy"
-user-id = 27661 # Daniel Henry-Mantilla (danielhenrymantilla)
+user-id = 27661
 start = "2023-09-05"
 end = "2027-03-26"
 
 [[trusted.find_cuda_helper]]
 criteria = "safe-to-deploy"
-user-id = 100633 # Riccardo D'Ambrosio (RDambrosio016)
+user-id = 100633
 start = "2021-11-22"
 end = "2027-03-26"
 
@@ -1029,25 +1029,25 @@ end = "2027-12-31"
 
 [[trusted.gio-sys]]
 criteria = "safe-to-deploy"
-user-id = 3623 # Sebastian Dröge (sdroege)
+user-id = 3623
 start = "2020-09-16"
 end = "2027-03-26"
 
 [[trusted.glib]]
 criteria = "safe-to-deploy"
-user-id = 3623 # Sebastian Dröge (sdroege)
+user-id = 3623
 start = "2020-02-14"
 end = "2027-03-26"
 
 [[trusted.glib-macros]]
 criteria = "safe-to-deploy"
-user-id = 3623 # Sebastian Dröge (sdroege)
+user-id = 3623
 start = "2021-07-08"
 end = "2027-03-26"
 
 [[trusted.glib-sys]]
 criteria = "safe-to-deploy"
-user-id = 3623 # Sebastian Dröge (sdroege)
+user-id = 3623
 start = "2020-09-16"
 end = "2027-03-26"
 
@@ -1065,7 +1065,7 @@ end = "2027-03-26"
 
 [[trusted.gobject-sys]]
 criteria = "safe-to-deploy"
-user-id = 3623 # Sebastian Dröge (sdroege)
+user-id = 3623
 start = "2022-01-15"
 end = "2027-03-26"
 
@@ -1077,49 +1077,49 @@ end = "2027-03-26"
 
 [[trusted.gstreamer]]
 criteria = "safe-to-deploy"
-user-id = 3623 # Sebastian Dröge (sdroege)
+user-id = 3623
 start = "2019-06-24"
 end = "2027-03-26"
 
 [[trusted.gstreamer-app]]
 criteria = "safe-to-deploy"
-user-id = 3623 # Sebastian Dröge (sdroege)
+user-id = 3623
 start = "2019-06-24"
 end = "2027-03-26"
 
 [[trusted.gstreamer-app-sys]]
 criteria = "safe-to-deploy"
-user-id = 3623 # Sebastian Dröge (sdroege)
+user-id = 3623
 start = "2019-06-24"
 end = "2027-03-26"
 
 [[trusted.gstreamer-base]]
 criteria = "safe-to-deploy"
-user-id = 3623 # Sebastian Dröge (sdroege)
+user-id = 3623
 start = "2019-06-24"
 end = "2027-03-26"
 
 [[trusted.gstreamer-base-sys]]
 criteria = "safe-to-deploy"
-user-id = 3623 # Sebastian Dröge (sdroege)
+user-id = 3623
 start = "2019-06-24"
 end = "2027-03-26"
 
 [[trusted.gstreamer-sys]]
 criteria = "safe-to-deploy"
-user-id = 3623 # Sebastian Dröge (sdroege)
+user-id = 3623
 start = "2019-06-24"
 end = "2027-03-26"
 
 [[trusted.gstreamer-video]]
 criteria = "safe-to-deploy"
-user-id = 3623 # Sebastian Dröge (sdroege)
+user-id = 3623
 start = "2019-06-24"
 end = "2027-03-26"
 
 [[trusted.gstreamer-video-sys]]
 criteria = "safe-to-deploy"
-user-id = 3623 # Sebastian Dröge (sdroege)
+user-id = 3623
 start = "2019-06-24"
 end = "2027-03-26"
 
@@ -1269,7 +1269,7 @@ end = "2027-03-26"
 
 [[trusted.image]]
 criteria = "safe-to-deploy"
-user-id = 11453 # Aurelia Molzer (HeroicKatora)
+user-id = 11453
 start = "2019-04-13"
 end = "2027-03-26"
 
@@ -1515,7 +1515,7 @@ end = "2027-03-26"
 
 [[trusted.libloading]]
 criteria = "safe-to-deploy"
-user-id = 726 # Simonas Kazlauskas (nagisa)
+user-id = 726
 start = "2019-06-01"
 end = "2027-03-26"
 
@@ -1545,13 +1545,13 @@ end = "2027-03-26"
 
 [[trusted.llama-cpp-2]]
 criteria = "safe-to-deploy"
-user-id = 184528 # Marcus Dunn (MarcusDunn)
+user-id = 184528
 start = "2024-01-02"
 end = "2027-03-26"
 
 [[trusted.llama-cpp-sys-2]]
 criteria = "safe-to-deploy"
-user-id = 184528 # Marcus Dunn (MarcusDunn)
+user-id = 184528
 start = "2024-01-02"
 end = "2027-03-26"
 
@@ -1593,13 +1593,13 @@ end = "2027-03-26"
 
 [[trusted.macro_rules_attribute]]
 criteria = "safe-to-deploy"
-user-id = 27661 # Daniel Henry-Mantilla (danielhenrymantilla)
+user-id = 27661
 start = "2019-09-05"
 end = "2027-03-26"
 
 [[trusted.macro_rules_attribute-proc_macro]]
 criteria = "safe-to-deploy"
-user-id = 27661 # Daniel Henry-Mantilla (danielhenrymantilla)
+user-id = 27661
 start = "2019-09-05"
 end = "2027-03-26"
 
@@ -1611,7 +1611,7 @@ end = "2027-03-26"
 
 [[trusted.matrixmultiply]]
 criteria = "safe-to-deploy"
-user-id = 356 # bluss (bluss)
+user-id = 356
 start = "2019-09-20"
 end = "2027-03-26"
 
@@ -1659,13 +1659,13 @@ end = "2027-03-26"
 
 [[trusted.moxcms]]
 criteria = "safe-to-deploy"
-user-id = 266802 # Radzivon Bartoshyk (awxkee)
+user-id = 266802
 start = "2025-02-26"
 end = "2027-03-26"
 
 [[trusted.muldiv]]
 criteria = "safe-to-deploy"
-user-id = 3623 # Sebastian Dröge (sdroege)
+user-id = 3623
 start = "2019-12-29"
 end = "2027-03-26"
 
@@ -1719,13 +1719,13 @@ end = "2027-03-26"
 
 [[trusted.ndarray]]
 criteria = "safe-to-deploy"
-user-id = 356 # bluss (bluss)
+user-id = 356
 start = "2019-09-23"
 end = "2027-03-26"
 
 [[trusted.ndarray]]
 criteria = "safe-to-deploy"
-user-id = 303992 # akern40
+user-id = 303992
 start = "2025-10-14"
 end = "2027-03-26"
 
@@ -1785,7 +1785,7 @@ end = "2027-03-26"
 
 [[trusted.never-say-never]]
 criteria = "safe-to-deploy"
-user-id = 27661 # Daniel Henry-Mantilla (danielhenrymantilla)
+user-id = 27661
 start = "2022-01-19"
 end = "2027-03-26"
 
@@ -1935,19 +1935,19 @@ end = "2027-03-26"
 
 [[trusted.option-operations]]
 criteria = "safe-to-deploy"
-user-id = 118316 # François Laignel (fengalin)
+user-id = 118316
 start = "2021-10-07"
 end = "2027-03-26"
 
 [[trusted.ort]]
 criteria = "safe-to-deploy"
-user-id = 152041 # decahedron1
+user-id = 152041
 start = "2022-11-26"
 end = "2027-03-26"
 
 [[trusted.ort-sys]]
 criteria = "safe-to-deploy"
-user-id = 152041 # decahedron1
+user-id = 152041
 start = "2023-11-12"
 end = "2027-03-26"
 
@@ -2061,7 +2061,7 @@ end = "2027-03-26"
 
 [[trusted.png]]
 criteria = "safe-to-deploy"
-user-id = 11453 # Aurelia Molzer (HeroicKatora)
+user-id = 11453
 start = "2019-04-24"
 end = "2027-03-26"
 
@@ -2187,7 +2187,7 @@ end = "2027-03-26"
 
 [[trusted.pxfm]]
 criteria = "safe-to-deploy"
-user-id = 266802 # Radzivon Bartoshyk (awxkee)
+user-id = 266802
 start = "2025-06-22"
 end = "2027-03-26"
 
@@ -2227,6 +2227,12 @@ user-id = 12177 # David Rheinsberg (dvdhrm)
 start = "2019-03-01"
 end = "2027-03-26"
 
+[[trusted.rand]]
+criteria = "safe-to-deploy"
+user-id = 1234 # Diggory Hardy (dhardy)
+start = "2019-06-06"
+end = "2027-04-22"
+
 [[trusted.rand_xorshift]]
 criteria = "safe-to-deploy"
 user-id = 1234 # Diggory Hardy (dhardy)
@@ -2241,7 +2247,7 @@ end = "2027-03-26"
 
 [[trusted.rawpointer]]
 criteria = "safe-to-deploy"
-user-id = 356 # bluss (bluss)
+user-id = 356
 start = "2019-09-08"
 end = "2027-03-26"
 
@@ -2415,13 +2421,13 @@ end = "2027-03-26"
 
 [[trusted.safer-ffi]]
 criteria = "safe-to-deploy"
-user-id = 27661 # Daniel Henry-Mantilla (danielhenrymantilla)
+user-id = 27661
 start = "2020-05-29"
 end = "2027-03-26"
 
 [[trusted.safer_ffi-proc_macros]]
 criteria = "safe-to-deploy"
-user-id = 27661 # Daniel Henry-Mantilla (danielhenrymantilla)
+user-id = 27661
 start = "2023-03-14"
 end = "2027-03-26"
 
@@ -2457,7 +2463,7 @@ end = "2027-03-26"
 
 [[trusted.schemars]]
 criteria = "safe-to-deploy"
-user-id = 55662 # Graham Esau (GREsau)
+user-id = 55662
 start = "2019-08-08"
 end = "2027-03-26"
 
@@ -2529,7 +2535,7 @@ end = "2027-03-26"
 
 [[trusted.serde-transcode]]
 criteria = "safe-to-deploy"
-user-id = 5 # Steven Fackler (sfackler)
+user-id = 5
 start = "2021-07-10"
 end = "2027-03-26"
 
@@ -2601,7 +2607,7 @@ end = "2027-03-26"
 
 [[trusted.sha2-const-stable]]
 criteria = "safe-to-deploy"
-user-id = 150368 # cavemanloverboy (cavemanloverboy)
+user-id = 150368
 start = "2024-01-18"
 end = "2027-03-26"
 
@@ -2709,19 +2715,19 @@ end = "2027-03-26"
 
 [[trusted.stabby]]
 criteria = "safe-to-deploy"
-user-id = 46317 # Pierre Avital (p-avital)
+user-id = 46317
 start = "2023-03-24"
 end = "2027-03-26"
 
 [[trusted.stabby-abi]]
 criteria = "safe-to-deploy"
-user-id = 46317 # Pierre Avital (p-avital)
+user-id = 46317
 start = "2023-03-24"
 end = "2027-03-26"
 
 [[trusted.stabby-macros]]
 criteria = "safe-to-deploy"
-user-id = 46317 # Pierre Avital (p-avital)
+user-id = 46317
 start = "2023-03-24"
 end = "2027-03-26"
 
@@ -2787,7 +2793,7 @@ end = "2027-03-26"
 
 [[trusted.system-deps]]
 criteria = "safe-to-deploy"
-user-id = 52034 # Guillaume Desmottes (gdesmott)
+user-id = 52034
 start = "2020-06-19"
 end = "2027-03-26"
 
@@ -2853,7 +2859,7 @@ end = "2027-03-26"
 
 [[trusted.to_method]]
 criteria = "safe-to-deploy"
-user-id = 24494 # whentze
+user-id = 24494
 start = "2021-04-25"
 end = "2027-03-26"
 
@@ -3033,7 +3039,7 @@ end = "2027-03-26"
 
 [[trusted.uninit]]
 criteria = "safe-to-deploy"
-user-id = 27661 # Daniel Henry-Mantilla (danielhenrymantilla)
+user-id = 27661
 start = "2019-08-28"
 end = "2027-03-26"
 
@@ -3051,7 +3057,7 @@ end = "2027-03-26"
 
 [[trusted.unwind_safe]]
 criteria = "safe-to-deploy"
-user-id = 27661 # Daniel Henry-Mantilla (danielhenrymantilla)
+user-id = 27661
 start = "2021-03-05"
 end = "2027-03-26"
 
@@ -3075,7 +3081,7 @@ end = "2027-03-26"
 
 [[trusted.version-compare]]
 criteria = "safe-to-deploy"
-user-id = 3827 # Tim Visée (timvisee)
+user-id = 3827
 start = "2019-04-09"
 end = "2027-03-26"
 
@@ -3333,13 +3339,13 @@ end = "2027-03-26"
 
 [[trusted.with_builtin_macros]]
 criteria = "safe-to-deploy"
-user-id = 27661 # Daniel Henry-Mantilla (danielhenrymantilla)
+user-id = 27661
 start = "2020-11-02"
 end = "2027-03-26"
 
 [[trusted.with_builtin_macros-proc_macros]]
 criteria = "safe-to-deploy"
-user-id = 27661 # Daniel Henry-Mantilla (danielhenrymantilla)
+user-id = 27661
 start = "2020-11-02"
 end = "2027-03-26"
 
@@ -3459,12 +3465,12 @@ end = "2027-03-26"
 
 [[trusted.zune-core]]
 criteria = "safe-to-deploy"
-user-id = 159371 # Caleb Etemesi (etemesi254)
+user-id = 159371
 start = "2023-02-25"
 end = "2027-03-26"
 
 [[trusted.zune-jpeg]]
 criteria = "safe-to-deploy"
-user-id = 159371 # Caleb Etemesi (etemesi254)
+user-id = 159371
 start = "2022-05-09"
 end = "2027-03-26"
