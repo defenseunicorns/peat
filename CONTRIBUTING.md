@@ -29,8 +29,6 @@ Thank you for your interest in contributing to Peat. This document covers develo
 | `peat-persistence` | Storage abstraction (Redb, SQLite) |
 | `peat-discovery` | Peer discovery (mDNS, static, hybrid) |
 | `peat-ffi` | Mobile bindings (Kotlin/Swift via UniFFI + JNI) |
-| `peat-sim` | Network simulator |
-| `peat-inference` | Edge AI/ML pipeline |
 | `peat-tak-bridge` | TAK/ATAK CoT interoperability bridge |
 | `peat-ble-test` | BLE integration test harness |
 
@@ -66,8 +64,8 @@ Before submitting a PR, ensure all of the following pass locally:
 
 ```bash
 cargo fmt --check
-cargo clippy --all-targets --workspace --exclude peat-ffi --exclude peat-inference -- -D warnings
-cargo test --workspace --exclude peat-ffi --exclude peat-inference
+cargo clippy --all-targets --workspace --exclude peat-ffi -- -D warnings
+cargo test --workspace --exclude peat-ffi
 ```
 
 The CI pipeline runs these same checks on every PR.

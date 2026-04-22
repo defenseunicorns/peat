@@ -215,16 +215,14 @@ check: fmt clippy test
 pre-commit:
 	@echo "Running pre-commit checks..."
 	@cargo fmt --all
-	@cargo clippy --all-targets --all-features --workspace --exclude peat-ffi --exclude peat-inference -- -D warnings
-	@cargo clippy --all-targets --workspace -p peat-inference -- -D warnings
+	@cargo clippy --all-targets --all-features --workspace --exclude peat-ffi -- -D warnings
 	@$(MAKE) test-unit
 	@echo "✅ Pre-commit checks passed!"
 
 ci:
 	@echo "Running CI pipeline..."
 	@cargo fmt --all -- --check
-	@cargo clippy --all-targets --all-features --workspace --exclude peat-ffi --exclude peat-inference -- -D warnings
-	@cargo clippy --all-targets --workspace -p peat-inference -- -D warnings
+	@cargo clippy --all-targets --all-features --workspace --exclude peat-ffi -- -D warnings
 	@$(MAKE) test-integration
 	@echo "✅ CI pipeline passed!"
 

@@ -28,9 +28,7 @@ peat/
 ├── peat-persistence/          # Storage backends
 ├── peat-discovery/            # Peer discovery (mDNS, static)
 ├── peat-ffi/                  # Mobile bindings (UniFFI)
-├── peat-inference/            # Edge AI/ML pipeline
 ├── peat-tak-bridge/           # TAK/CoT bridge
-├── peat-sim/                  # Network simulator
 ├── peat-ble-test/             # BLE integration test harness
 │
 ├── docs/                      # Architecture & project docs

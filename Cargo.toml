@@ -7,7 +7,6 @@ members = [
     "peat-persistence",
     "peat-discovery",
     "peat-ffi",
-    "peat-inference",
     "peat-tak-bridge",
     "peat-ble-test",
 ]
