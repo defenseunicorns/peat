@@ -80,40 +80,50 @@ One branch, one PR. Make the release changes on a branch named `chore/release-<v
 
 ## Publish
 
-**Publish order matters** because `peat-protocol` depends on `peat-schema` by version: `peat-schema` must be on crates.io before `peat-protocol` can be published.
+The release is driven by `.github/workflows/release.yml`. Push a tag matching `v*` and the workflow runs CI → tag validation → `peat-schema` publish → wait for index → `peat-protocol` publish → GitHub Release (CHANGELOG-extracted notes, auto-flagged as pre-release for `-rc.*` / `-alpha.*` / `-beta.*`).
+
+**Publish order is enforced by the workflow.** It is worth knowing why: `peat-protocol` depends on `peat-schema` by version, so `peat-schema` must be on crates.io before `peat-protocol` can be published. The workflow publishes schema first, polls the crates.io API until the new version is indexed (up to 5 minutes), then publishes protocol.
+
+### Prerequisites (one-time)
+
+- `CARGO_REGISTRY_TOKEN` repository secret configured with publish-new-crates scope (the first release establishes the crates on crates.io; later releases only need publish-update scope).
+
+### Cutting a release
 
 From `main` at the merged release commit:
 
-1. **Tag the release:**
-   ```bash
-   git tag v0.9.0-rc.1 <merge-commit>
-   git push origin v0.9.0-rc.1
-   ```
+```bash
+git tag v0.9.0-rc.1 <merge-commit-sha>
+git push origin v0.9.0-rc.1
+```
 
-2. **Publish `peat-schema` first:**
-   ```bash
-   cd peat-schema
-   cargo publish
-   cd ..
-   ```
+Then watch the workflow at `gh run watch` or in the Actions tab. On success, the crates appear on crates.io and the GitHub Release lands automatically.
 
-3. **Wait for the crates.io index to propagate** (usually 30–60 seconds). Verify with:
-   ```bash
-   curl -s https://crates.io/api/v1/crates/peat-schema | \
-     python3 -c "import sys,json;d=json.load(sys.stdin);print([v['num'] for v in d['versions'][:3]])"
-   ```
-   The target version should be in the list.
+### Manual publish (fallback)
 
-4. **Publish `peat-protocol`:**
-   ```bash
-   cd peat-protocol
-   cargo publish
-   cd ..
-   ```
+If the automated release workflow is unavailable, the same steps can be run by hand. Requires a crates.io token on the local machine (`cargo login`).
 
-5. **Create the GitHub release** with the CHANGELOG entry as the body. Either:
-   - via `gh release create v0.9.0-rc.1 --notes-file <(awk '/^## \[0.9.0-rc.1\]/{found=1;next} /^## \[/{if(found)exit} found{print}' CHANGELOG.md)`
-   - or in the GitHub UI from the new tag.
+```bash
+# 1. Tag the release and push
+git tag v0.9.0-rc.1 <merge-commit>
+git push origin v0.9.0-rc.1
+
+# 2. Publish peat-schema
+cd peat-schema && cargo publish && cd ..
+
+# 3. Wait ~60 seconds, then verify
+curl -s https://crates.io/api/v1/crates/peat-schema | \
+  python3 -c "import sys,json;d=json.load(sys.stdin);print([v['num'] for v in d['versions'][:3]])"
+
+# 4. Publish peat-protocol
+cd peat-protocol && cargo publish && cd ..
+
+# 5. Create the GitHub release
+gh release create v0.9.0-rc.1 --prerelease \
+  --notes-file <(awk '/^## \[0.9.0-rc.1\]/{found=1;next} /^## \[/{if(found)exit} found{print}' CHANGELOG.md)
+```
+
+Drop `--prerelease` for a stable cut.
 
 ## After publish
 
