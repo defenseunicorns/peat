@@ -5,6 +5,9 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
+  # Allow the release workflow (.github/workflows/release.yml) to reuse this
+  # pipeline as a gate before publishing to crates.io.
+  workflow_call:
 
 permissions:
   contents: read

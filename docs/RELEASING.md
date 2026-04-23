@@ -88,6 +88,15 @@ The release is driven by `.github/workflows/release.yml`. Push a tag matching `v
 
 - `CARGO_REGISTRY_TOKEN` repository secret configured with publish-new-crates scope (the first release establishes the crates on crates.io; later releases only need publish-update scope).
 
+### How release.yml and ci.yml are coupled
+
+`release.yml` reuses `ci.yml` via `uses: ./.github/workflows/ci.yml`. Two constraints must hold for this to work, and both are easy to regress on:
+
+1. **`ci.yml` must declare `workflow_call:`** under its `on:` block. Without it, GitHub refuses to parse `release.yml` and no tag-triggered run fires (see peat#792 for the symptom).
+2. **Secrets must be inherited explicitly.** Reusable workflows do not receive the caller's secrets by default. `release.yml` sets `secrets: inherit` on the `ci:` job so the nested `test` / `test-e2e` jobs still see `PEAT_APP_ID` and `PEAT_SHARED_KEY`.
+
+Anyone modifying either file should keep both constraints in mind — adding a new secret consumed by CI, or splitting CI into separate workflows, will require updates on both sides.
+
 ### Cutting a release
 
 From `main` at the merged release commit:
