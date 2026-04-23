@@ -30,15 +30,22 @@ url = "https://raw.githubusercontent.com/mozilla/supply-chain/main/audits.toml"
 [policy.peat-schema]
 audit-as-crates-io = true
 
+[policy.peat-protocol]
+audit-as-crates-io = true
+
 [[exemptions.cc]]
 version = "1.2.57"
 criteria = "safe-to-deploy"
 
-# First-party workspace crate. audit-as-crates-io pulls it into the vet
-# graph as a normal crates.io dep; the exemption records that we (as the
-# publisher) are the trust root for this version. A future CI pass can
-# replace this with a proper `cargo vet certify` audit if desired.
+# First-party workspace crates. audit-as-crates-io pulls them into the vet
+# graph as normal crates.io deps; the exemptions record that we (as the
+# publisher) are the trust root for these versions. A future CI pass can
+# replace these with proper `cargo vet certify` audits if desired.
 [[exemptions.peat-schema]]
+version = "0.9.0-rc.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.peat-protocol]]
 version = "0.9.0-rc.1"
 criteria = "safe-to-deploy"
 
