@@ -16,6 +16,18 @@ url = "https://raw.githubusercontent.com/divviup/libprio-rs/main/supply-chain/au
 [imports.mozilla]
 url = "https://raw.githubusercontent.com/mozilla/supply-chain/main/audits.toml"
 
+# First-party workspace crates that also publish to crates.io.
+# cargo-vet would otherwise flag them as "non-crates.io-fetched packages match
+# published crates.io versions" because the local path dep and the published
+# artifact resolve to the same version. Setting audit-as-crates-io = true tells
+# vet to audit the local copy as if it were the crates.io version (which is
+# accurate — we are the publisher).
+[policy.peat-schema]
+audit-as-crates-io = true
+
+[policy.peat-protocol]
+audit-as-crates-io = true
+
 [[exemptions.cc]]
 version = "1.2.57"
 criteria = "safe-to-deploy"
