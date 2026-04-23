@@ -16,7 +16,12 @@
 //! consumers can depend on `peat-protocol` alone:
 //!
 //! ```toml
-//! peat-protocol = "0.9"
+//! # During an rc window, Cargo does not pick pre-release versions by default
+//! # — use the exact pin:
+//! peat-protocol = "=0.9.0-rc.1"
+//!
+//! # Once 0.9.0 stable is published, the normal caret selector is fine:
+//! # peat-protocol = "0.9"
 //! ```
 //!
 //! ## Architecture

@@ -60,4 +60,7 @@ This release aligns with:
 
 - `peat-mesh` 0.9.0-rc.1 on crates.io
 - `peat-node`, `peat-registry`, `peat-gateway` pinned to
-  `peat-mesh = "=0.9.0-rc.1"` (validation PRs open)
+  `peat-mesh = "=0.9.0-rc.1"` — see
+  [peat-node#21](https://github.com/defenseunicorns/peat-node/pull/21),
+  [peat-registry#128](https://github.com/defenseunicorns/peat-registry/pull/128),
+  [peat-gateway#86](https://github.com/defenseunicorns/peat-gateway/pull/86)

@@ -25,6 +25,17 @@ The workspace uses a single version (`[workspace.package].version`) for all publ
 
 Pre-1.0, minor bumps may contain breaking changes per Rust ecosystem convention.
 
+### Two distribution channels, independent cadences
+
+The Peat workspace publishes to two separate ecosystems with their own version streams:
+
+| Channel | Artifact | Versioned by |
+|---------|----------|--------------|
+| crates.io | `peat-protocol`, `peat-schema` | `[workspace.package].version` in `/Cargo.toml` |
+| Maven Central | `peat-ffi` AAR | `peat-ffi/android/build.gradle.kts` (independent of the workspace version) |
+
+These are deliberately decoupled. Rust SDK consumers and Android integrators usually do not overlap, and the FFI surface matures on a different cadence from the protocol. When in doubt, bump each channel only when its own artifact changes, and call out the relationship in CHANGELOG entries if a coordinated bump is needed.
+
 ## Pre-flight checklist
 
 Before starting a release PR:
@@ -118,8 +129,10 @@ When a release candidate has soaked sufficiently and no regressions have surface
 2. Bump `peat-mesh` workspace dep from `=<version>-rc.N` to the stable caret range (`"<major>.<minor>"`)
 3. Bump workspace version from `<version>-rc.N` to `<version>`
 4. Bump the `peat-schema` path-dep version in `peat-protocol/Cargo.toml` the same way
-5. Update `CHANGELOG.md` with a new `## [<version>]` heading
-6. Follow the Publish section above (tag, publish `peat-schema`, publish `peat-protocol`, GitHub release)
+5. **Re-audit the re-exported surface.** `peat-protocol` re-exports `peat_mesh` and `peat_schema`, so the full public API of both is part of `peat-protocol`'s own semver contract. Before relaxing the `peat-mesh` pin from exact (`=<version>-rc.N`) to caret (`"<major>.<minor>"`), scan the `peat-mesh` changelog for any breaking changes that would leak through the re-export and require a `peat-protocol` major bump. If in doubt, keep the exact pin.
+6. Also update `peat-protocol/src/lib.rs` — the docstring example should show the stable caret selector (`"0.9"`) instead of the exact rc pin, since Cargo resolves pre-release versions by default only under an exact requirement.
+7. Update `CHANGELOG.md` with a new `## [<version>]` heading
+8. Follow the Publish section above (tag, publish `peat-schema`, publish `peat-protocol`, GitHub release)
 
 Only promote to stable after:
 - All downstream repos have been on the rc for long enough to surface issues
