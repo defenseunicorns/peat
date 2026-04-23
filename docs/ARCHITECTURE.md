@@ -183,7 +183,7 @@ pub trait Transport: Send + Sync {
 
 | Crate | Purpose |
 |-------|---------|
-| `peat-tak-bridge` | Bidirectional TAK Server <-> Peat bridge |
+| `examples/peat-tak-bridge` | Bidirectional TAK Server <-> Peat bridge |
 | `peat-inference` | Edge ML inference (YOLOv8, object tracking) |
 | `peat-sim` | Network simulation and validation |
 

@@ -153,7 +153,7 @@ Bindings for Swift (iOS), Kotlin (Android), Python, and more.
 #### Layer 5: Application
 
 Domain-specific integration:
-- **peat-tak-bridge**: TAK/ATAK interoperability via CoT translation
+- **examples/peat-tak-bridge**: TAK/ATAK interoperability via CoT translation
 - Custom integrations per deployment
 
 ---
