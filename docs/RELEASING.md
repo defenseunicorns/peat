@@ -88,6 +88,15 @@ The release is driven by `.github/workflows/release.yml`. Push a tag matching `v
 
 - `CARGO_REGISTRY_TOKEN` repository secret configured with publish-new-crates scope (the first release establishes the crates on crates.io; later releases only need publish-update scope).
 
+### Idempotent steps
+
+The release workflow is designed to be re-runnable. Each step that mutates crates.io or GitHub state first checks whether the mutation has already happened:
+
+- **Publish steps** consult the crates.io sparse index (`https://index.crates.io/pe/at/<crate>`) for the target version. If the version is already there, `cargo publish` is skipped. The sparse index is preferred over the v1 API because it is what cargo uses during dependency resolution — appearance on the sparse index is the authoritative "fully published" signal. The v1 API sits behind a longer-lived CDN cache that can mask a fresh publish for minutes.
+- **GitHub Release step** uses `gh release edit` if a release for the tag already exists; otherwise `gh release create`.
+
+This means that if any step fails partway through (e.g. runner flake during index polling), re-running the failed job (or re-pushing the tag after a fix) resumes cleanly instead of tripping on "already published" errors.
+
 ### How release.yml and ci.yml are coupled
 
 `release.yml` reuses `ci.yml` via `uses: ./.github/workflows/ci.yml`. Two constraints must hold for this to work, and both are easy to regress on:
