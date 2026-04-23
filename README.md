@@ -29,15 +29,101 @@ Peat organizes diverse systems through three phases:
 
 ## Ecosystem
 
-| Crate | What it connects | Links |
+| Crate | What it provides | Links |
 |-------|-----------------|-------|
-| **peat** | Protocol workspace: cells, hierarchy, sync, security, TAK bridge, edge AI, Android FFI | [Maven Central](https://central.sonatype.com/artifact/com.defenseunicorns/peat-ffi) · [repo](https://github.com/defenseunicorns/peat) |
-| **peat-mesh** | P2P topology, QUIC/Iroh transport, Automerge CRDT sync, certificate enrollment | [crates.io](https://crates.io/crates/peat-mesh) · [repo](https://github.com/defenseunicorns/peat-mesh) |
-| **peat-btle** | BLE mesh for Android, iOS, Linux, macOS, ESP32 — short-range device-to-device | [crates.io](https://crates.io/crates/peat-btle) · [Maven Central](https://central.sonatype.com/artifact/com.defenseunicorns/peat-btle) · [repo](https://github.com/defenseunicorns/peat-btle) |
-| **peat-lite** | Embedded wire protocol for microcontrollers (256KB RAM, `no_std`) | [crates.io](https://crates.io/crates/peat-lite) · [Maven Central](https://central.sonatype.com/artifact/com.defenseunicorns/peat-lite) · [repo](https://github.com/defenseunicorns/peat-lite) |
-| **peat-gateway** | Multi-tenant control plane: enrollment, CDC, OIDC, envelope encryption | [repo](https://github.com/defenseunicorns/peat-gateway) |
+| **peat-protocol** | **The SDK entry point.** Protocol facade — cells, hierarchy, sync, security, capabilities. Re-exports `peat-mesh` and `peat-schema` so one dep covers the stack. | [crates.io](https://crates.io/crates/peat-protocol) · [repo](https://github.com/defenseunicorns/peat) |
+| **peat-schema** | Wire format (Protobuf): beacons, missions, capabilities, CoT, AI. Pulled in transitively by `peat-protocol`; depend on directly only if you need the types without the protocol. | [crates.io](https://crates.io/crates/peat-schema) · [repo](https://github.com/defenseunicorns/peat) |
+| **peat-mesh** | P2P topology, QUIC/Iroh transport, Automerge CRDT sync, certificate enrollment. Pulled in transitively by `peat-protocol`. | [crates.io](https://crates.io/crates/peat-mesh) · [repo](https://github.com/defenseunicorns/peat-mesh) |
+| **peat-btle** | BLE mesh for Android, iOS, Linux, macOS, ESP32 — short-range device-to-device. Enable via the `bluetooth` feature. | [crates.io](https://crates.io/crates/peat-btle) · [Maven Central](https://central.sonatype.com/artifact/com.defenseunicorns/peat-btle) · [repo](https://github.com/defenseunicorns/peat-btle) |
+| **peat-lite** | Embedded wire protocol for microcontrollers (256KB RAM, `no_std`). Enable via the `lite-transport` feature. | [crates.io](https://crates.io/crates/peat-lite) · [Maven Central](https://central.sonatype.com/artifact/com.defenseunicorns/peat-lite) · [repo](https://github.com/defenseunicorns/peat-lite) |
+| **peat-ffi** | Mobile bindings (Kotlin / Swift via UniFFI + JNI). Use when you need to consume Peat from Android / iOS rather than Rust. | [Maven Central](https://central.sonatype.com/artifact/com.defenseunicorns/peat-ffi) · [repo](https://github.com/defenseunicorns/peat) |
+| **peat-gateway** | Multi-tenant control plane: enrollment, CDC, OIDC, envelope encryption. Server-side, not part of the embedded SDK surface. | [repo](https://github.com/defenseunicorns/peat-gateway) |
 
-## Quick Start
+## Integrate Peat
+
+You depend on **one crate** — `peat-protocol`. It re-exports `peat-mesh` and `peat-schema` so the rest of the stack comes along automatically.
+
+### Add the dep
+
+```toml
+# Cargo.toml
+[dependencies]
+# During the rc window, use the exact-version pin — Cargo does not
+# select pre-release versions by default with the caret form.
+peat-protocol = "=0.9.0-rc.1"
+
+# Once 0.9.0 stable is published, the normal selector works:
+# peat-protocol = "0.9"
+```
+
+### Pick the features you need
+
+| Building this | Enable |
+|---------------|--------|
+| Default mesh (Automerge CRDT + Iroh QUIC) | nothing — `automerge-backend` is on by default |
+| BLE mesh (Android/iOS/Linux/ESP32) | `bluetooth` |
+| Embedded / size-constrained UDP gateway to microcontrollers | `lite-transport` |
+| Lite/embedded only (no Automerge backend) | `default-features = false, features = ["lite-transport"]` |
+
+```toml
+# Example: add BLE on top of the default mesh stack
+peat-protocol = { version = "=0.9.0-rc.1", features = ["bluetooth"] }
+```
+
+### Minimum working example
+
+The example also requires `anyhow = "1"`, `tempfile = "3"`, and a Tokio runtime (`tokio = { version = "1", features = ["full"] }`).
+
+```rust
+use std::net::SocketAddr;
+use std::sync::Arc;
+use peat_protocol::network::IrohTransport;
+use peat_protocol::storage::{AutomergeBackend, AutomergeStore};
+use peat_protocol::storage::capabilities::SyncCapable;
+use tempfile::TempDir;
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let dir = TempDir::new()?;
+    let bind: SocketAddr = "0.0.0.0:0".parse()?;
+
+    // Open a CRDT store and a P2P transport in parallel.
+    let (store, transport) = tokio::join!(
+        tokio::task::spawn_blocking({
+            let path = dir.path().to_path_buf();
+            move || AutomergeStore::open(&path)
+        }),
+        IrohTransport::from_seed_at_addr("my-node-seed", bind),
+    );
+
+    // `store??` unwraps two layers: the outer Result is from
+    // spawn_blocking (JoinError), the inner one is from AutomergeStore::open.
+    let store = Arc::new(store??);
+    let transport = Arc::new(transport?);
+
+    // Wire them together and start syncing with peers.
+    let backend = AutomergeBackend::with_transport(store, transport);
+    backend.start_sync()?;
+
+    // ...your app code: subscribe to documents, advertise capabilities,
+    //    join cells, etc. See the Developer Guide for the full surface.
+    Ok(())
+}
+```
+
+### Three integration depths
+
+Most adopters fit one of three patterns:
+
+- **Shallow (REST/HTTP, ~500–1000 LOC).** Use Peat's HTTP transport layer as a bridge. Encode/decode via CoT protocol adapters. Works from any language with an HTTP client. Latency ~500ms+. Example: TAK Server sending track updates to Peat's REST endpoint.
+- **Medium (library, ~2000–5000 LOC).** What this section is about — link `peat-protocol` directly, or `peat-ffi` from Kotlin/Swift/C. Subscribe to CRDT collections directly, participate in cell formation. Latency <50ms.
+- **Deep (transport layer, ~5000+ LOC).** Implement a custom transport or embed Peat's cell formation logic. Direct access to CRDT document operations. Latency <5ms. Example: a ROS2 DDS bridge with Peat as the coordination transport.
+
+For deeper guidance see the [Developer Guide](docs/guides/developer/DEVELOPER_GUIDE.md).
+
+## Develop on Peat
+
+If you're working **on** the protocol itself rather than integrating it, this is the workflow:
 
 ```bash
 git clone https://github.com/defenseunicorns/peat.git
@@ -104,7 +190,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full five-layer breakdo
 | `lite-transport` | Embedded node transport via peat-lite |
 | `bluetooth` | BLE mesh transport via peat-btle |
 
-Peat uses **Automerge + Iroh** as its CRDT and transport stack. An earlier Ditto-based backend was removed; historical context is preserved in [ADR-011](docs/adr/011-ditto-vs-automerge-iroh.md).
+Peat uses **Automerge + Iroh** as its CRDT and transport stack — pure Rust, Apache-2.0 / MIT, with native multi-path and connection migration. See [ADR-011](docs/adr/011-ditto-vs-automerge-iroh.md) for the design rationale.
 
 ## Deployment
 
@@ -190,19 +276,11 @@ See [ADR-006](docs/adr/006-security-authentication-authorization.md) for the ful
 
 ### What CRDT and transport stack does Peat use?
 
-Peat uses **Automerge + Iroh**: Automerge CRDTs (MIT, ~90% columnar compression) for conflict-free state replication plus Iroh QUIC transport (Apache 2.0) with native multi-path, connection migration, and stream multiplexing. This pure-OSS stack can be tuned for contested networks with 20-30% packet loss.
-
-An earlier Ditto-based backend was evaluated and later removed in favor of a single open-source stack. [ADR-011](docs/adr/011-ditto-vs-automerge-iroh.md) preserves the historical comparison.
+Peat uses **Automerge + Iroh**: Automerge CRDTs (MIT, ~90% columnar compression) for conflict-free state replication plus Iroh QUIC transport (Apache 2.0) with native multi-path, connection migration, and stream multiplexing. This pure-OSS stack can be tuned for contested networks with 20-30% packet loss. See [ADR-011](docs/adr/011-ditto-vs-automerge-iroh.md) for the design rationale.
 
 ### How much effort does it take to integrate?
 
-Three integration depths, depending on how tightly you want to couple:
-
-**Shallow (REST/HTTP, ~500-1000 LOC).** Use Peat's HTTP transport layer as a bridge. Encode/decode via CoT protocol adapters. Works from any language with an HTTP client. Latency ~500ms+. Example: TAK Server sending track updates to Peat's REST endpoint.
-
-**Medium (Protobuf + Library, ~2000-5000 LOC).** Link against `peat-protocol` as a Rust library or use `peat-ffi` bindings (Kotlin, Swift, C). Subscribe to CRDT collections directly. Latency <50ms. Example: Android app using UniFFI bindings to participate in cell formation.
-
-**Deep (Transport Layer, ~5000+ LOC).** Implement a custom transport or embed Peat's cell formation logic. Direct access to CRDT document operations. Latency <5ms. Example: ROS2 DDS bridge with Peat as the coordination transport.
+See [Three integration depths](#three-integration-depths) above for the shallow/medium/deep breakdown. The library-level path (medium) is what most adopters land on; it is the workflow [Integrate Peat](#integrate-peat) walks through end to end.
 
 ### How would adopting Peat change my current work?
 
@@ -236,7 +314,7 @@ That's it. Capability advertisement, cell formation, leader election, hierarchic
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Development setup and build workflow |
 | [Architecture](docs/ARCHITECTURE.md) | Five-layer architecture overview |
 | [ADR Index](docs/adr/) | 53 Architecture Decision Records |
-| [Protocol Specs](docs/spec/) | IETF-style protocol specifications |
+| [Protocol Specs](spec/) | Protocol specification drafts and Protobuf schemas |
 | [Developer Guide](docs/guides/developer/DEVELOPER_GUIDE.md) | API reference, extending Peat |
 | [Operator Guide](docs/guides/operator/OPERATOR_GUIDE.md) | Deployment, configuration, monitoring |
 | [Whitepaper](docs/whitepaper/) | Technical whitepaper |
