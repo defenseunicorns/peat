@@ -7,9 +7,12 @@ members = [
     "peat-persistence",
     "peat-discovery",
     "peat-ffi",
-    "peat-tak-bridge",
-    "peat-ble-test",
+    "examples/peat-tak-bridge",
+    "examples/peat-ble-test",
 ]
+# New `examples/*` Rust crates: add to `members` if they share this
+# workspace's toolchain/lockfile, or to `exclude` if they need their own
+# (e.g. embedded ESP32 via xtensa-esp-none-elf).
 exclude = ["examples/m5stack-core2-peat"]
 
 # For local development, uncomment to use local checkouts:

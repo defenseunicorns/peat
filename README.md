@@ -93,8 +93,8 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full five-layer breakdo
 | `peat-persistence` | Storage backends (Redb, SQLite) |
 | `peat-discovery` | Peer discovery (mDNS, static, hybrid) |
 | `peat-ffi` | Mobile bindings (Kotlin/Swift via UniFFI + JNI) |
-| `peat-tak-bridge` | TAK/ATAK CoT interoperability bridge |
-| `peat-ble-test` | BLE integration test harness (Pi-to-Android) |
+| `examples/peat-tak-bridge` | TAK/ATAK CoT interoperability bridge |
+| `examples/peat-ble-test` | BLE integration test harness (Pi-to-Android) |
 
 ## Feature Flags
 

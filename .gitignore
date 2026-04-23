@@ -44,6 +44,9 @@ build/
 *.aab
 local.properties
 
+# Xcode user state
+**/xcuserdata/
+
 # Shadow simulator
 shadow.data/
 

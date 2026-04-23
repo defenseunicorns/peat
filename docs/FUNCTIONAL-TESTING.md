@@ -227,7 +227,7 @@ Create a test client that implements the same phases as the Android `TestRunner.
 - Print a summary line: `RESULT: N/N PASSED`
 - Exit with code 0 on success, 1 on failure
 
-**Reference implementation**: `android-ble-test/app/src/main/java/com/defenseunicorns/peat/test/TestRunner.kt`
+**Reference implementation**: `examples/android-ble-test/app/src/main/java/com/defenseunicorns/peat/test/TestRunner.kt`
 
 **Platform-specific concerns:**
 
@@ -446,7 +446,7 @@ For non-GitHub workflows, the same gate can be enforced by scripting: check that
 | `peat-ffi/examples/iroh_test_peer.rs` | Legacy QUIC-only test peer (kept for reference) |
 | `peat-ffi/Cargo.toml` | Example + feature definitions |
 | `peat-ffi/src/lib.rs` | JNI bindings (connectPeerJni, etc.) |
-| `android-ble-test/.../test/TestRunner.kt` | Android 11-phase test orchestrator |
-| `android-ble-test/.../test/MainActivity.kt` | Android UI + auto-run support |
-| `android-ble-test/.../test/BleGattClient.kt` | Android BLE scan + GATT client |
-| `android-ble-test/.../atak/peat/PeatJni.kt` | JNI declarations |
+| `examples/android-ble-test/.../test/TestRunner.kt` | Android 11-phase test orchestrator |
+| `examples/android-ble-test/.../test/MainActivity.kt` | Android UI + auto-run support |
+| `examples/android-ble-test/.../test/BleGattClient.kt` | Android BLE scan + GATT client |
+| `examples/android-ble-test/.../atak/peat/PeatJni.kt` | JNI declarations |

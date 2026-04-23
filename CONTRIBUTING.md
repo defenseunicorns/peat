@@ -29,8 +29,8 @@ Thank you for your interest in contributing to Peat. This document covers develo
 | `peat-persistence` | Storage abstraction (Redb, SQLite) |
 | `peat-discovery` | Peer discovery (mDNS, static, hybrid) |
 | `peat-ffi` | Mobile bindings (Kotlin/Swift via UniFFI + JNI) |
-| `peat-tak-bridge` | TAK/ATAK CoT interoperability bridge |
-| `peat-ble-test` | BLE integration test harness |
+| `examples/peat-tak-bridge` | TAK/ATAK CoT interoperability bridge |
+| `examples/peat-ble-test` | BLE integration test harness |
 
 ### Feature Flags
 
