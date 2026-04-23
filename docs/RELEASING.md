@@ -88,6 +88,15 @@ The release is driven by `.github/workflows/release.yml`. Push a tag matching `v
 
 - `CARGO_REGISTRY_TOKEN` repository secret configured with publish-new-crates scope (the first release establishes the crates on crates.io; later releases only need publish-update scope).
 
+### Idempotent steps
+
+The release workflow is designed to be re-runnable. Each step that mutates crates.io or GitHub state first checks whether the mutation has already happened:
+
+- **Publish steps** consult the crates.io sparse index (`https://index.crates.io/pe/at/<crate>`) for the target version. If the version is already there, `cargo publish` is skipped. The sparse index is preferred over the v1 API because it is what cargo uses during dependency resolution — appearance on the sparse index is the authoritative "fully published" signal. The v1 API sits behind a longer-lived CDN cache that can mask a fresh publish for minutes.
+- **GitHub Release step** uses `gh release edit` if a release for the tag already exists; otherwise `gh release create`.
+
+This means that if any step fails partway through (e.g. runner flake during index polling), re-running the failed job (or re-pushing the tag after a fix) resumes cleanly instead of tripping on "already published" errors.
+
 ### How release.yml and ci.yml are coupled
 
 `release.yml` reuses `ci.yml` via `uses: ./.github/workflows/ci.yml`. Two constraints must hold for this to work, and both are easy to regress on:
@@ -137,6 +146,10 @@ Drop `--prerelease` for a stable cut.
 ## After publish
 
 - [ ] Confirm both crates render correctly on crates.io (titles, descriptions, READMEs)
+- [ ] For any crate being published for the **first time**, add two entries to `supply-chain/config.toml`:
+  - `[policy.<name>]` with `audit-as-crates-io = true` — declares the crate overlap (must come **after** first publish; declaring before publish causes `Cannot fetch crate information`)
+  - `[[exemptions.<name>]]` with the published `version` and `criteria = "safe-to-deploy"` — records that we (as the publisher) are the trust root for this version. Alternative: run `cargo vet certify` to record a proper audit instead of an exemption.
+  Both entries together are required; the policy alone leaves cargo-vet asking for audits (see peat#794 for context).
 - [ ] Open bump PRs in downstream repos (`peat-sim`, `peat-atak-plugin`, any future SDK consumer) to pin the new `peat-protocol` version
 - [ ] Watch for any missing field / metadata issues reported by docs.rs — fix in a follow-up patch release if needed
 

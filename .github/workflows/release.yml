@@ -69,32 +69,73 @@ jobs:
         # some BLE-adjacent deps) to link.
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler mold clang libdbus-1-dev
 
-      - name: Publish peat-schema
-        working-directory: peat-schema
-        run: cargo publish
+      # Each publish step is idempotent: if the version is already on the
+      # crates.io sparse index (what cargo itself reads), the publish is
+      # skipped. This lets us re-run the job safely after any intermediate
+      # failure without hitting "crate already uploaded" errors.
+      #
+      # The sparse index (index.crates.io) is preferred over the v1 API
+      # because it is what cargo uses during dependency resolution, so
+      # appearance on the sparse index is the authoritative "fully
+      # published" signal. The v1 API sits behind a longer-lived CDN cache
+      # that can mask a fresh publish for minutes.
+      - name: Publish peat-schema (idempotent) and wait for index
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          UA="peat-release (github.com/defenseunicorns/peat)"
+          INDEX_URL="https://index.crates.io/pe/at/peat-schema"
+
+          is_indexed() {
+            curl -sfL -H "User-Agent: $UA" "$INDEX_URL" 2>/dev/null \
+              | jq -e --arg v "$VERSION" 'select(.vers == $v)' > /dev/null 2>&1
+          }
+
+          if is_indexed; then
+            echo "peat-schema $VERSION already on crates.io, skipping publish"
+          else
+            (cd peat-schema && cargo publish)
+            for i in $(seq 1 60); do
+              if is_indexed; then
+                echo "peat-schema $VERSION is indexed after $((i * 5))s"
+                exit 0
+              fi
+              echo "Waiting for peat-schema $VERSION to be indexed... ($((i * 5))s elapsed)"
+              sleep 5
+            done
+            echo "::error::peat-schema $VERSION did not appear on the crates.io sparse index within 5 minutes"
+            exit 1
+          fi
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
-      - name: Wait for peat-schema to appear on crates.io index
+      - name: Publish peat-protocol (idempotent) and wait for index
         run: |
+          set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
-          # Poll the crates.io API for up to 5 minutes. Index propagation is
-          # usually well under 60 seconds but can be slower under load.
-          for i in $(seq 1 60); do
-            if curl -sfL "https://crates.io/api/v1/crates/peat-schema" \
-                 | jq -e --arg v "$VERSION" '.versions[] | select(.num == $v)' > /dev/null; then
-              echo "peat-schema $VERSION is indexed"
-              exit 0
-            fi
-            echo "Waiting for peat-schema $VERSION to be indexed... ($((i * 5))s elapsed)"
-            sleep 5
-          done
-          echo "::error::peat-schema $VERSION did not appear on the crates.io index within 5 minutes"
-          exit 1
+          UA="peat-release (github.com/defenseunicorns/peat)"
+          INDEX_URL="https://index.crates.io/pe/at/peat-protocol"
 
-      - name: Publish peat-protocol
-        working-directory: peat-protocol
-        run: cargo publish
+          is_indexed() {
+            curl -sfL -H "User-Agent: $UA" "$INDEX_URL" 2>/dev/null \
+              | jq -e --arg v "$VERSION" 'select(.vers == $v)' > /dev/null 2>&1
+          }
+
+          if is_indexed; then
+            echo "peat-protocol $VERSION already on crates.io, skipping publish"
+          else
+            (cd peat-protocol && cargo publish)
+            for i in $(seq 1 60); do
+              if is_indexed; then
+                echo "peat-protocol $VERSION is indexed after $((i * 5))s"
+                exit 0
+              fi
+              echo "Waiting for peat-protocol $VERSION to be indexed... ($((i * 5))s elapsed)"
+              sleep 5
+            done
+            echo "::error::peat-protocol $VERSION did not appear on the crates.io sparse index within 5 minutes"
+            exit 1
+          fi
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
@@ -119,18 +160,31 @@ jobs:
             echo "$NOTES" > /tmp/release-notes.md
             echo "fallback=false" >> "$GITHUB_OUTPUT"
           fi
-      - name: Create GitHub Release
+      - name: Create or update GitHub Release
         run: |
+          set -euo pipefail
           # Mark pre-releases (rc, alpha, beta) distinctly so they don't show
           # up as the "Latest" release on the repo landing page.
           PRERELEASE_FLAG=""
           case "$GITHUB_REF_NAME" in
             *-rc.*|*-alpha.*|*-beta.*) PRERELEASE_FLAG="--prerelease" ;;
           esac
+
           if [ "${{ steps.changelog.outputs.fallback }}" = "true" ]; then
-            gh release create "$GITHUB_REF_NAME" --generate-notes $PRERELEASE_FLAG
+            NOTES_ARG="--generate-notes"
           else
-            gh release create "$GITHUB_REF_NAME" --notes-file /tmp/release-notes.md $PRERELEASE_FLAG
+            NOTES_ARG="--notes-file /tmp/release-notes.md"
+          fi
+
+          # Idempotent: if a release for this tag already exists (e.g. from a
+          # prior failed-but-partial run), update its body/flags instead of
+          # failing with "release already exists".
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists, updating..."
+            gh release edit "$GITHUB_REF_NAME" $PRERELEASE_FLAG \
+              $(if [ "${{ steps.changelog.outputs.fallback }}" != "true" ]; then echo "--notes-file /tmp/release-notes.md"; fi)
+          else
+            gh release create "$GITHUB_REF_NAME" $NOTES_ARG $PRERELEASE_FLAG
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
