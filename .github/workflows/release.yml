@@ -62,8 +62,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install protoc
-        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Install system dependencies
+        # Match ci.yml — `.cargo/config.toml` forces `-fuse-ld=mold` for the
+        # x86_64-unknown-linux-gnu target, so `cargo publish`'s verify step
+        # needs mold, clang, and the dbus headers (pulled transitively by
+        # some BLE-adjacent deps) to link.
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler mold clang libdbus-1-dev
 
       - name: Publish peat-schema
         working-directory: peat-schema
