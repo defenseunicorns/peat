@@ -22,10 +22,12 @@ url = "https://raw.githubusercontent.com/mozilla/supply-chain/main/audits.toml"
 # artifact resolve to the same version. Setting audit-as-crates-io = true tells
 # vet to audit the local copy as if it were the crates.io version (which is
 # accurate — we are the publisher).
+#
+# Add an entry here only AFTER the crate's first publish — `audit-as-crates-io
+# = true` makes vet attempt to fetch the crate from crates.io, which fails with
+# "Cannot fetch crate information" if the crate is not yet published.
+# peat-protocol's entry should land in a follow-up PR after its first release.
 [policy.peat-schema]
-audit-as-crates-io = true
-
-[policy.peat-protocol]
 audit-as-crates-io = true
 
 [[exemptions.cc]]

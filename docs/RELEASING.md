@@ -146,6 +146,7 @@ Drop `--prerelease` for a stable cut.
 ## After publish
 
 - [ ] Confirm both crates render correctly on crates.io (titles, descriptions, READMEs)
+- [ ] For any crate being published for the **first time**, add a `policy.<name>.audit-as-crates-io = true` entry to `supply-chain/config.toml`. cargo-vet detects the overlap between the local path dep and the now-published crate and errors until this is declared. This step must come after the first publish — adding the policy before publish causes `Cannot fetch crate information` (see peat#794 for context).
 - [ ] Open bump PRs in downstream repos (`peat-sim`, `peat-atak-plugin`, any future SDK consumer) to pin the new `peat-protocol` version
 - [ ] Watch for any missing field / metadata issues reported by docs.rs — fix in a follow-up patch release if needed
 
