@@ -1,6 +1,12 @@
 # Peat Protocol Specifications
 
-**Status**: Draft
+> **Heads-up.** The current normative drafts and Protobuf schemas live in
+> [`/spec/`](../../spec/) (IRTF DINRG submission set). The documents in
+> *this* directory are an earlier internal specification format kept for
+> historical reference and will likely be reorganized or removed when
+> the IRTF draft set fully supersedes them.
+
+**Status**: Draft (legacy format)
 **Target**: IETF Informational RFC
 **Version**: 0.1.0
 

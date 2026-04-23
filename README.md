@@ -72,6 +72,8 @@ peat-protocol = { version = "=0.9.0-rc.1", features = ["bluetooth"] }
 
 ### Minimum working example
 
+The example also requires `anyhow = "1"`, `tempfile = "3"`, and a Tokio runtime (`tokio = { version = "1", features = ["full"] }`).
+
 ```rust
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -94,6 +96,8 @@ async fn main() -> anyhow::Result<()> {
         IrohTransport::from_seed_at_addr("my-node-seed", bind),
     );
 
+    // `store??` unwraps two layers: the outer Result is from
+    // spawn_blocking (JoinError), the inner one is from AutomergeStore::open.
     let store = Arc::new(store??);
     let transport = Arc::new(transport?);
 
