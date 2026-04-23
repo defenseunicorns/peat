@@ -5,10 +5,16 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "Peat Coordination Protocol — hierarchical capability composition over CRDTs for heterogeneous mesh networks"
+homepage = "https://github.com/defenseunicorns/peat"
+documentation = "https://docs.rs/peat-protocol"
+keywords = ["peat", "protocol", "mesh", "crdt", "coordination"]
+categories = ["network-programming"]
 
 [dependencies]
-# CAP dependencies
-peat-schema = { path = "../peat-schema" }
+# Peat facade: peat-protocol re-exports peat-schema and peat-mesh so
+# downstream consumers can depend on peat-protocol alone.
+peat-schema = { path = "../peat-schema", version = "=0.9.0-rc.1" }
 peat-mesh = { workspace = true }
 
 tokio = { workspace = true }

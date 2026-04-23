@@ -5,6 +5,11 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "Wire format (Protobuf) definitions for the Peat Coordination Protocol"
+homepage = "https://github.com/defenseunicorns/peat"
+documentation = "https://docs.rs/peat-schema"
+keywords = ["peat", "protobuf", "protocol", "mesh", "crdt"]
+categories = ["network-programming", "data-structures"]
 
 [dependencies]
 # Protobuf serialization

@@ -22,7 +22,7 @@ exclude = ["examples/m5stack-core2-peat"]
 # peat-btle = { path = "../peat-btle" }
 
 [workspace.package]
-version = "0.1.0"
+version = "0.9.0-rc.1"
 edition = "2021"
 authors = ["Kit Plummer <kitplummer@defenseunicorns.com>"]
 license = "Apache-2.0"

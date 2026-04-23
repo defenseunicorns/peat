@@ -6,8 +6,23 @@
 //!
 //! The Peat protocol enables scalable coordination of autonomous nodes through:
 //! - **Three-phase protocol**: Discovery, Cell Formation, Hierarchical Operations
-//! - **CRDT-based state**: Eventual consistency via Ditto SDK
+//! - **CRDT-based state**: Eventual consistency via Automerge over Iroh QUIC
 //! - **Capability composition**: Additive, emergent, redundant, and constraint-based patterns
+//!
+//! ## Facade
+//!
+//! `peat-protocol` is the public entry point to the Peat stack. It re-exports
+//! `peat_schema` (wire types) and `peat_mesh` (P2P plumbing) so downstream
+//! consumers can depend on `peat-protocol` alone:
+//!
+//! ```toml
+//! # During an rc window, Cargo does not pick pre-release versions by default
+//! # — use the exact pin:
+//! peat-protocol = "=0.9.0-rc.1"
+//!
+//! # Once 0.9.0 stable is published, the normal caret selector is fine:
+//! # peat-protocol = "0.9"
+//! ```
 //!
 //! ## Architecture
 //!
@@ -44,6 +59,10 @@ pub mod traits;
 pub mod transport; // Backend-agnostic transport abstraction for mesh topology // Peat-specific adapters for peat-mesh
 
 pub use error::{Error, Result};
+
+// Facade re-exports: downstream consumers depend on peat-protocol alone.
+pub use peat_mesh;
+pub use peat_schema;
 
 /// Protocol version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
