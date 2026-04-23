@@ -7,8 +7,8 @@ members = [
     "peat-persistence",
     "peat-discovery",
     "peat-ffi",
-    "peat-tak-bridge",
-    "peat-ble-test",
+    "examples/peat-tak-bridge",
+    "examples/peat-ble-test",
 ]
 exclude = ["examples/m5stack-core2-peat"]
 

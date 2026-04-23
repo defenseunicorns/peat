@@ -28,15 +28,21 @@ peat/
 ├── peat-persistence/          # Storage backends
 ├── peat-discovery/            # Peer discovery (mDNS, static)
 ├── peat-ffi/                  # Mobile bindings (UniFFI)
-├── peat-tak-bridge/           # TAK/CoT bridge
-├── peat-ble-test/             # BLE integration test harness
+│
+├── examples/                  # Example applications & demos
+│   ├── peat-tak-bridge/       # TAK/CoT bridge service
+│   ├── peat-ble-test/         # BLE integration test harness
+│   ├── android-ble-test/      # Android BLE demo
+│   ├── kotlin-test/           # Kotlin bindings demo
+│   ├── ios-demo/              # iOS demo app
+│   ├── android-peat-demo/     # Android Peat demo
+│   └── m5stack-core2-peat/    # ESP32 embedded example
 │
 ├── docs/                      # Architecture & project docs
 │   ├── adr/                  # Architecture Decision Records
 │   ├── guides/               # Developer & operator guides
 │   └── spec/                 # Protocol specification
-├── .github/workflows/         # CI/CD pipelines
-└── examples/                  # Embedded examples (ESP32)
+└── .github/workflows/         # CI/CD pipelines
 ```
 
 ## Prerequisites

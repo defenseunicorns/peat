@@ -620,19 +620,19 @@ build-ble-test-app: build-android
 	@echo "╔════════════════════════════════════════════════════════════╗"
 	@echo "║  Building Android BLE Test App                            ║"
 	@echo "╚════════════════════════════════════════════════════════════╝"
-	@mkdir -p android-ble-test/app/src/main/jniLibs/arm64-v8a
+	@mkdir -p examples/android-ble-test/app/src/main/jniLibs/arm64-v8a
 	cp atak-plugin/app/libs/arm64-v8a/libpeat_ffi.so \
-		android-ble-test/app/src/main/jniLibs/arm64-v8a/
+		examples/android-ble-test/app/src/main/jniLibs/arm64-v8a/
 	@echo "✓ Copied libpeat_ffi.so to android-ble-test jniLibs"
-	cd android-ble-test && ./gradlew assembleDebug
+	cd examples/android-ble-test && ./gradlew assembleDebug
 	@echo "✓ BLE test APK built:"
-	@ls -la android-ble-test/app/build/outputs/apk/debug/app-debug.apk
+	@ls -la examples/android-ble-test/app/build/outputs/apk/debug/app-debug.apk
 
 # Deploy BLE test APK to connected Android device
 deploy-ble-test-app:
 	@echo "Deploying BLE test app to Android device..."
 	@adb devices | grep -q 'device$$' || { echo "Error: No Android device connected"; exit 1; }
-	adb install -r android-ble-test/app/build/outputs/apk/debug/app-debug.apk
+	adb install -r examples/android-ble-test/app/build/outputs/apk/debug/app-debug.apk
 	@echo "✓ Deployed to device"
 	@echo "Launch with: adb shell am start -n com.defenseunicorns.peat.test/.MainActivity"
 
@@ -661,8 +661,8 @@ ble-test-logs:
 # Clean BLE test artifacts
 clean-ble-test: stop-dual-test-peer
 	@echo "Cleaning BLE test artifacts..."
-	@rm -rf android-ble-test/app/build
-	@rm -rf android-ble-test/app/src/main/jniLibs/arm64-v8a/libpeat_ffi.so
+	@rm -rf examples/android-ble-test/app/build
+	@rm -rf examples/android-ble-test/app/src/main/jniLibs/arm64-v8a/libpeat_ffi.so
 	@echo "✓ BLE test artifacts cleaned"
 
 # ============================================
