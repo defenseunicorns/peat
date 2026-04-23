@@ -157,7 +157,6 @@ peat/
 │       ├── peat-mesh/       # Mesh management
 │       └── ...
 ├── tools/                   # Utilities and testing tools
-├── labs/                    # Experiments
 └── governance/              # Project governance
 ```
 

@@ -839,7 +839,3 @@ functional-k8s:
 e11-modes:
 	@echo "Running E11 mode testing (legacy)..."
 	@cd peat-sim && ./test-all-modes-report.sh
-
-e12-comprehensive:
-	@echo "Running E12 comprehensive validation (legacy)..."
-	@cd labs/e12-comprehensive-empirical-validation/scripts && ./run-comprehensive-suite.sh

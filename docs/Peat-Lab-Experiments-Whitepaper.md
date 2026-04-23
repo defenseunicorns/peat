@@ -398,14 +398,14 @@ Initial E12 measurements showed Ditto P90 latency of 3,128ms. Investigation reve
 - `peat-sim/automerge-flat-mesh-*` - AutomergeIroh backend results
 - `peat-sim/peat-flat-mesh-*` - Ditto backend results
 - `peat-sim/peat-hierarchical-*` - Hierarchical mode results
-- `labs/e11-*/test-bandwidth-suite-*` - E11 bandwidth results
-- `labs/e12-*/e12-comprehensive-results-*` - E12 results
-- `labs/e12-*/e13v2-p2p-mesh-*` - E13v2 validation
+- `labs/e11-*/test-bandwidth-suite-*` - E11 bandwidth results (archived, no longer in-tree)
+- `labs/e12-*/e12-comprehensive-results-*` - E12 results (archived, no longer in-tree)
+- `labs/e12-*/e13v2-p2p-mesh-*` - E13v2 validation (archived, no longer in-tree)
 
 **Analysis Scripts:**
 - `peat-sim/analyze_metrics.py` - Metrics aggregation
 - `peat-sim/analyze-three-way-comparison.py` - Architecture comparison
-- `labs/e12-*/scripts/analyze-comprehensive-results.py` - E12 analysis
+- `labs/e12-*/scripts/analyze-comprehensive-results.py` - E12 analysis (archived, no longer in-tree)
 
 ## Appendix C: Reproduction Instructions
 
