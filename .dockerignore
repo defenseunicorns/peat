@@ -1,7 +1,6 @@
 target/
 hive-sim-results/
 hive-sim/.generated/
-labs/
 .git/
 *.log
 *.jsonl

@@ -40,7 +40,6 @@ spec/
 | Protocol Buffer schemas | `spec/proto/` | **Normative** - wire format definition |
 | Reference implementation | `reference/` | **Informative** - one valid implementation |
 | Architecture decisions | `docs/adr/` | **Informative** - design rationale |
-| Experiments | `labs/` | **Informative** - research and validation |
 
 ## Versioning
 
