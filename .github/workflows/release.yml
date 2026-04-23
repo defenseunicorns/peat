@@ -32,6 +32,10 @@ jobs:
   ci:
     name: CI
     uses: ./.github/workflows/ci.yml
+    # Secrets do not propagate to reusable workflows automatically. The called
+    # CI workflow's test and test-e2e jobs consume PEAT_APP_ID / PEAT_SHARED_KEY,
+    # so we inherit the caller's full secret set.
+    secrets: inherit
 
   validate-tag:
     name: Validate tag matches workspace version
