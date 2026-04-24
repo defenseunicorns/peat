@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/defenseunicorns/peat/main/assets/peat-wordmark.png" alt="PEAT" width="420">
+</p>
+
 # peat-schema
 
 Protocol Buffer message definitions for the Capability Aggregation Protocol (CAP).
