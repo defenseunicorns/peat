@@ -988,6 +988,15 @@ fn main() -> anyhow::Result<()> {
     let mut current_activity = imu::Activity::Standing;
     let mut fall_detected = false;
 
+    // IMU read-failure tracking. On the M5Stack Core2 the AXP2101 power
+    // mgmt and the MPU6886 share an I2C bus; an interrupted transaction
+    // can leave reads silently returning None for an indefinite stretch,
+    // which presents as the activity badge "stuck" on its last value.
+    // Track consecutive failures and re-init the chip after a short
+    // streak so we self-recover instead of staying frozen.
+    let mut imu_consecutive_fails: u32 = 0;
+    const IMU_REINIT_THRESHOLD: u32 = 10; // ~1 s of failures at 10 Hz poll
+
     // Alert state
     let mut alert_active = false;
     let mut vibration_on = false;
@@ -1024,6 +1033,13 @@ fn main() -> anyhow::Result<()> {
             last_imu_read = current_time;
 
             if let Some(accel) = imu::read_accel(&mut i2c) {
+                if imu_consecutive_fails > 0 {
+                    info!(
+                        "IMU: read recovered after {} failures",
+                        imu_consecutive_fails
+                    );
+                    imu_consecutive_fails = 0;
+                }
                 let activity = imu_state.update(&accel, now_ms());
 
                 // Periodic accel snapshot (~every 2 s) regardless of activity
@@ -1074,6 +1090,32 @@ fn main() -> anyhow::Result<()> {
                 // Reset fall detection when activity returns to normal
                 if fall_detected && activity != imu::Activity::PossibleFall {
                     fall_detected = false;
+                }
+            } else {
+                // IMU read returned None (likely an I2C bus glitch from
+                // contention with AXP2101 battery reads). Without the
+                // recovery below we'd silently fall through every IMU
+                // tick from now on — the badge would stay on its last
+                // classification ("stuck on STAND/PRONE") with no log
+                // trail showing why.
+                imu_consecutive_fails += 1;
+                if imu_consecutive_fails == 1 {
+                    warn!("IMU: read returned None (first failure)");
+                } else if imu_consecutive_fails == IMU_REINIT_THRESHOLD {
+                    warn!(
+                        "IMU: {} consecutive failed reads, attempting re-init",
+                        imu_consecutive_fails
+                    );
+                    if imu::init(&mut i2c) {
+                        info!("IMU: re-initialized successfully");
+                        imu_consecutive_fails = 0;
+                    } else {
+                        warn!("IMU: re-init failed; will retry on next failure streak");
+                        // Reset counter so the next IMU_REINIT_THRESHOLD
+                        // failures trigger another attempt rather than
+                        // logging a re-init every single tick forever.
+                        imu_consecutive_fails = 0;
+                    }
                 }
             }
         }
