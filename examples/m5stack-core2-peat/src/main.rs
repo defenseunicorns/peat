@@ -48,17 +48,37 @@ use peat_btle::{MeshGenesis, NodeId};
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 
-/// Shared mesh genesis for WEARTAK encrypted mesh. Matches the
-/// `SHARED_GENESIS_BASE64` constant baked into the WearTAK-CIV app
-/// (app/src/main/java/com/aitech/weartak_civ/service/PeatBtleService.kt).
-/// All nodes — WearOS watch, ATAK plugin, and this M5Stack — must use the
-/// same blob for encrypted sync to interop.
-const SHARED_GENESIS_BASE64: &str =
-    "BwBXRUFSVEFL4O7thA03dXXBNkT+gG22aTRGICECcX5RHtOgIdLBrb7tU7LTxkFLCLP+De21IALSXAbi6ZR/c3VXW9lKWacbM0YqfK9n5JXqob7/stIM63nBMLzJiFTGl9E6wcF8Gz0gUerY2JsBAAAA";
+/// Shared mesh genesis for the WEARTAK encrypted mesh. The decoded blob
+/// contains `MeshGenesis::encryption_secret()` — i.e. it IS the mesh's
+/// long-term root secret. The compile-time fallback below is the demo
+/// genesis matching `wearos-tak-civ/.../PeatBtleService.kt`; for any
+/// non-demo build, override at compile time with
+///   `PEAT_GENESIS_BASE64=<base64> cargo build ...`
+/// so the secret lives in the build environment, not in repo history.
+///
+/// **WARNING:** this fallback genesis is for demo/badge use only. Do not
+/// reuse it for any real deployment — the secret is in repo history
+/// forever, and key rotation would require both a history rewrite and
+/// re-distribution to every node. ADR-044 is the planned path for
+/// real (MLS-based) group key distribution.
+const SHARED_GENESIS_BASE64: &str = match option_env!("PEAT_GENESIS_BASE64") {
+    Some(v) => v,
+    None => "BwBXRUFSVEFL4O7thA03dXXBNkT+gG22aTRGICECcX5RHtOgIdLBrb7tU7LTxkFLCLP+De21IALSXAbi6ZR/c3VXW9lKWacbM0YqfK9n5JXqob7/stIM63nBMLzJiFTGl9E6wcF8Gz0gUerY2JsBAAAA",
+};
 
 // NVS storage
 const NVS_NAMESPACE: &str = "peat";
 const NVS_KEY_COUNTER: &str = "counter";
+
+/// Re-broadcast merged state to every active connection on each received
+/// document (multi-hop relay). False here so the M5Stack's small-mesh
+/// behavior matches what's been validated under sustained load — the
+/// fanout was the worst offender for NimBLE TX queue flooding before the
+/// peripheral-only switch. The 5 s periodic gossip handles convergence
+/// for 1-hop topologies with no relay needed; for the 48-node demo flip
+/// this to true (and re-validate watchdog behavior) so an N-hop chain
+/// converges in ~one round-trip per hop instead of N × 5 s.
+const MULTIHOP_FORWARD: bool = false;
 
 // FT6336U Touch controller on M5Stack Core2
 const FT6336U_ADDR: u8 = 0x38;
@@ -564,10 +584,15 @@ where
         .map(|p| p.node_id.as_u32())
         .collect();
 
-    // Convert activity to u8 for comparison
+    // Convert activity to u8 for diff comparison only — the same mapping
+    // is sent to peers via mesh.update_health_full() so it must avoid
+    // colliding with the legacy enum (0=Stationary, 1=Walking, 2=Running,
+    // 3=PossibleFall) on un-updated decoders. Prone uses 4 — un-updated
+    // peers see "unknown" and skip rendering rather than mis-rendering as
+    // Walking. Standing keeps 0 (semantically aligned with Stationary).
     let activity_u8 = match activity {
         imu::Activity::Standing => 0,
-        imu::Activity::Prone => 1,
+        imu::Activity::Prone => 4,
         imu::Activity::PossibleFall => 3,
     };
 
@@ -1172,13 +1197,21 @@ fn main() -> anyhow::Result<()> {
         }
         last_button = button;
 
-        // Drain at most one pending document per main-loop tick. Each
-        // iteration does a NVS save + gossip_document fanout, both of
-        // which spend time deep in ESP-IDF/NimBLE; processing the whole
-        // queue in a single tick can starve IDLE1 long enough to trip
-        // the task watchdog on CPU 1. The remaining queue gets picked
-        // up next tick (50 ms later).
-        if let Some(data) = nimble::take_pending_document() {
+        // Drain at most DOC_DRAIN_PER_TICK pending documents per main-loop
+        // tick. Each iteration does an NVS save plus (under MULTIHOP_FORWARD)
+        // a gossip_document fanout, both of which spend time deep in
+        // ESP-IDF/NimBLE; processing the whole queue in one tick can starve
+        // IDLE long enough to trip the task watchdog. Two-per-tick keeps the
+        // bound well under the 60 s WDT budget while halving the worst-case
+        // ack-burst feedback latency for emergency-broadcast scenarios. Any
+        // remaining queue gets picked up on the next tick (50 ms later).
+        const DOC_DRAIN_PER_TICK: u8 = 2;
+        let mut drained = 0u8;
+        while drained < DOC_DRAIN_PER_TICK {
+            let Some(data) = nimble::take_pending_document() else {
+                break;
+            };
+            drained += 1;
             info!("");
             info!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
             info!("!!! RECEIVED {} BYTES FROM BLE !!!", data.len());
@@ -1276,15 +1309,19 @@ fn main() -> anyhow::Result<()> {
                         error!("Failed to save merged doc: {:?}", e);
                     }
 
-                    // Skip post-merge multi-hop forward: it fans a
-                    // gossip_document out to every active connection on every
-                    // received doc, and during a sync burst that flooded
-                    // NimBLE's queue badly enough to starve IDLE1 on CPU 1
-                    // and trip the task watchdog (which manifested as the UI
-                    // freezing on its last activity classification). The
-                    // periodic 5 s gossip below propagates state for a
-                    // small mesh; revisit if multi-hop is needed for the
-                    // 48-node demo.
+                    // Post-merge multi-hop forward, gated on MULTIHOP_FORWARD.
+                    // Disabled for the small-mesh demo: the per-doc fanout
+                    // floods NimBLE's TX queue and previously starved IDLE1
+                    // on CPU 1 enough to trip the task watchdog. The 5 s
+                    // periodic gossip is sufficient for 1-hop topologies.
+                    // Re-enable for the 48-node demo so an N-hop chain
+                    // converges in roughly one round-trip per hop instead
+                    // of N × 5 s.
+                    if MULTIHOP_FORWARD {
+                        let encoded = mesh.build_document();
+                        let sent = nimble::gossip_document(&encoded);
+                        info!(">>> Forwarded merged doc to {} peers (multi-hop)", sent);
+                    }
                     needs_redraw = true;
                     print_status(&mesh, connected, "Merged");
                 } else {
@@ -1331,10 +1368,20 @@ fn main() -> anyhow::Result<()> {
             if let Some(mv) = axp_read_battery_voltage(&mut i2c) {
                 let pct = battery_percent_from_voltage(mv);
                 battery_pct = Some(pct);
-                // Convert activity to u8: 0=standing, 1=prone, 3=fall (2 was Running, retired)
+                // Wire-format activity code sent to peers via
+                // mesh.update_health_full(). Avoid colliding with the
+                // legacy enum (0=Stationary, 1=Walking, 2=Running,
+                // 3=PossibleFall) so un-updated peers don't mis-render
+                // Prone as Walking. Prone uses 4; old peers fall through
+                // to "unknown" instead of a wrong label.
+                //   0 = Standing       (legacy: Stationary — semantic match)
+                //   1 = (legacy Walking — no longer emitted)
+                //   2 = (legacy Running — no longer emitted)
+                //   3 = PossibleFall   (unchanged)
+                //   4 = Prone          (new — no legacy collision)
                 let activity_u8 = match current_activity {
                     imu::Activity::Standing => 0,
-                    imu::Activity::Prone => 1,
+                    imu::Activity::Prone => 4,
                     imu::Activity::PossibleFall => 3,
                 };
                 mesh.update_health_full(pct, activity_u8);
