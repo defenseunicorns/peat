@@ -86,7 +86,6 @@ peat-btle = { workspace = true, features = ["android"], optional = true }
 
 [dev-dependencies]
 env_logger = "0.11"
-image = "0.25"
 
 [build-dependencies]
 uniffi = { version = "0.28", features = ["build"] }

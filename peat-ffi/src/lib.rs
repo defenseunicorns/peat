@@ -417,7 +417,7 @@ pub struct PeatNode {
     /// None when blob transfer is disabled — this is the common case for
     /// sim nodes that don't need to serve or fetch binary payloads.
     /// Constructed via PeatNode::enable_blob_transfer() after node creation.
-#[cfg(feature = "sync")]
+    #[cfg(feature = "sync")]
     blob_store: std::sync::RwLock<Option<Arc<NetworkedIrohBlobStore>>>,
 }
 
@@ -929,7 +929,11 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<PeatNode>, PeatError> {
         })?;
 
         #[cfg(target_os = "android")]
-        android_log(&format!("[MEM] After store open: {} kB (store {}ms)", get_rss_kb(), store_elapsed));
+        android_log(&format!(
+            "[MEM] After store open: {} kB (store {}ms)",
+            get_rss_kb(),
+            store_elapsed
+        ));
 
         let (transport_inner, transport_elapsed) = transport_result;
         let transport = transport_inner.map_err(|e| PeatError::ConnectionError {
@@ -937,7 +941,11 @@ pub fn create_node(config: NodeConfig) -> Result<Arc<PeatNode>, PeatError> {
         })?;
 
         #[cfg(target_os = "android")]
-        android_log(&format!("[MEM] After iroh transport: {} kB (transport {}ms)", get_rss_kb(), transport_elapsed));
+        android_log(&format!(
+            "[MEM] After iroh transport: {} kB (transport {}ms)",
+            get_rss_kb(),
+            transport_elapsed
+        ));
 
         Ok::<_, PeatError>((
             Arc::new(store),
@@ -1826,11 +1834,7 @@ impl PeatNode {
 
     /// Add a known blob peer by hex EndpointId and socket address.
     /// Uses peat-mesh's `add_peer_from_hex` so no iroh types cross into peat-ffi.
-    pub fn blob_add_peer(
-        &self,
-        peer_id_hex: &str,
-        address: &str,
-    ) -> Result<(), PeatError> {
+    pub fn blob_add_peer(&self, peer_id_hex: &str, address: &str) -> Result<(), PeatError> {
         let store_guard = self.blob_store.read().map_err(|_| PeatError::SyncError {
             msg: "blob_store lock poisoned".to_string(),
         })?;
@@ -1877,7 +1881,9 @@ impl PeatNode {
         let token = self
             .runtime
             .block_on(async move {
-                store_clone.create_blob_from_bytes(&data_vec, metadata).await
+                store_clone
+                    .create_blob_from_bytes(&data_vec, metadata)
+                    .await
             })
             .map_err(|e| PeatError::StorageError {
                 msg: format!("blob put failed: {}", e),
@@ -2229,40 +2235,24 @@ mod tests {
         use super::*;
 
         /// Generate a synthetic test JPEG with a color gradient and a label.
-        /// Returns valid JPEG bytes that any image decoder can display.
+        /// Synthetic "JPEG-like" payload for blob-transfer tests. Starts with
+        /// the SOI marker (FF D8) and ends with EOI (FF D9) so the test
+        /// assertions (`bytes[0]==0xFF`, `bytes[1]==0xD8`, `len > 100`,
+        /// `len < 80_000`) all hold; the bytes in between are deterministic
+        /// per (label, hue_shift) so each call produces a distinct blob
+        /// hash. The blob-transfer path under test is byte-agnostic — using
+        /// real JPEG encoding would pull the `image` crate's ~40 transitive
+        /// dependencies into the workspace just for a synthetic test
+        /// payload, which trips cargo-vet for no functional benefit.
         fn generate_test_image(label: &str, width: u32, height: u32, hue_shift: u8) -> Vec<u8> {
-            use image::{ImageBuffer, Rgb, ImageEncoder};
-            use std::io::Cursor;
-
-            let img = ImageBuffer::from_fn(width, height, |x, y| {
-                let r = ((x as f32 / width as f32) * 255.0) as u8;
-                let g = ((y as f32 / height as f32) * 200.0) as u8;
-                let b = hue_shift;
-                Rgb([r.wrapping_add(hue_shift), g, b])
-            });
-
-            // Burn the label into the top-left pixels as a simple marker
-            // (not real text rendering — just modulates pixel values so the
-            // label is visible in a hex dump or image viewer as a pattern)
-            let mut img = img;
-            for (i, ch) in label.bytes().enumerate() {
-                let x = (i as u32 * 2) % width;
-                let y = 2;
-                if x < width && y < height {
-                    img.put_pixel(x, y, Rgb([ch, ch, ch]));
-                }
-            }
-
-            let mut buf = Cursor::new(Vec::new());
-            image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buf, 75)
-                .write_image(
-                    img.as_raw(),
-                    width,
-                    height,
-                    image::ExtendedColorType::Rgb8,
-                )
-                .expect("JPEG encode");
-            buf.into_inner()
+            let body_len = (width as usize * height as usize) / 4;
+            let mut buf = Vec::with_capacity(body_len + label.len() + 8);
+            buf.extend_from_slice(&[0xFF, 0xD8]); // SOI
+            buf.extend_from_slice(label.as_bytes());
+            buf.push(hue_shift);
+            buf.extend(std::iter::repeat(hue_shift.wrapping_mul(3)).take(body_len));
+            buf.extend_from_slice(&[0xFF, 0xD9]); // EOI
+            buf
         }
 
         fn test_node_config(storage_path: &str) -> NodeConfig {
@@ -2301,10 +2291,7 @@ mod tests {
             );
 
             let retrieved = node.blob_get(&hash).expect("blob_get failed");
-            assert_eq!(
-                retrieved, test_data,
-                "retrieved bytes must match original"
-            );
+            assert_eq!(retrieved, test_data, "retrieved bytes must match original");
         }
 
         #[test]
@@ -2380,9 +2367,7 @@ mod tests {
 
             // Put blob on A
             let test_data = b"cross-node image chip test payload 1234567890";
-            let hash = node_a
-                .blob_put(test_data, "image/jpeg")
-                .expect("put on A");
+            let hash = node_a.blob_put(test_data, "image/jpeg").expect("put on A");
 
             // Fetch from B — should pull from A via iroh-blobs downloader
             let retrieved = node_b.blob_get(&hash).expect("get from B");
@@ -2451,15 +2436,23 @@ mod tests {
             let sim_clone = Arc::clone(&sim);
             let tablet_clone = Arc::clone(&tablet);
             tablet.runtime.block_on(async {
-                tablet_clone.iroh_transport.connect_peer(
-                    &peat_protocol::network::PeerInfo {
+                tablet_clone
+                    .iroh_transport
+                    .connect_peer(&peat_protocol::network::PeerInfo {
                         name: "sim".to_string(),
                         node_id: sim_sync_id,
-                        addresses: vec![sim_clone.iroh_transport.endpoint_addr()
-                            .addrs.iter().next().map(|a| format!("{}", a)).unwrap_or_default()],
+                        addresses: vec![sim_clone
+                            .iroh_transport
+                            .endpoint_addr()
+                            .addrs
+                            .iter()
+                            .next()
+                            .map(|a| format!("{}", a))
+                            .unwrap_or_default()],
                         relay_url: None,
-                    },
-                ).await.ok();
+                    })
+                    .await
+                    .ok();
             });
 
             // 1. Sim creates an image chip blob
@@ -2504,17 +2497,14 @@ mod tests {
 
             // 4. Tablet reads the tracks collection
             let tablet_tracks = tablet_clone.storage_backend.collection("tracks");
-            let track_doc = tablet_tracks
-                .scan()
-                .expect("tablet scan tracks");
+            let track_doc = tablet_tracks.scan().expect("tablet scan tracks");
 
             // The track may or may not have synced in 2s — this is the
             // realistic case. If it synced, validate the full chain.
             // If not, the blob transfer tests above already prove the
             // primitive works; this test extends coverage to the doc layer.
             if let Some((_id, data)) = track_doc.into_iter().find(|(id, _)| id == "red-track-1") {
-                let parsed: serde_json::Value =
-                    serde_json::from_slice(&data).expect("valid JSON");
+                let parsed: serde_json::Value = serde_json::from_slice(&data).expect("valid JSON");
                 assert_eq!(parsed["source_platform"], "LightFish-3");
                 assert_eq!(parsed["classification"], "a-h-S");
                 assert_eq!(parsed["attributes"]["callsign"], "SKUNK-1");
@@ -2578,8 +2568,14 @@ mod tests {
 
             // Generate 4 keyframe images (matching the demo's progression stages)
             let images = vec![
-                ("distant", generate_test_image("SKUNK-1 DISTANT", 160, 120, 40)),
-                ("approach", generate_test_image("SKUNK-1 APPROACH", 160, 120, 80)),
+                (
+                    "distant",
+                    generate_test_image("SKUNK-1 DISTANT", 160, 120, 40),
+                ),
+                (
+                    "approach",
+                    generate_test_image("SKUNK-1 APPROACH", 160, 120, 80),
+                ),
                 ("close", generate_test_image("SKUNK-1 CLOSE", 160, 120, 160)),
                 ("id", generate_test_image("SKUNK-1 ID", 160, 120, 220)),
             ];
@@ -2602,12 +2598,14 @@ mod tests {
             for (label, jpeg_bytes) in &images {
                 let hash = node_a
                     .blob_put(jpeg_bytes, "image/jpeg")
-                    .expect(&format!("put {}", label));
+                    .unwrap_or_else(|e| panic!("put {label}: {e}"));
                 hashes.push((label.to_string(), hash));
             }
 
             for (label, hash) in &hashes {
-                let fetched = node_b.blob_get(hash).expect(&format!("get {}", label));
+                let fetched = node_b
+                    .blob_get(hash)
+                    .unwrap_or_else(|e| panic!("get {label}: {e}"));
                 let original = &images.iter().find(|(l, _)| l == label).unwrap().1;
                 assert_eq!(
                     fetched.len(),
@@ -2627,7 +2625,6 @@ mod tests {
                 images.iter().map(|(_, b)| b.len()).sum::<usize>()
             );
         }
-
     }
 }
 
@@ -3799,10 +3796,7 @@ fn dispatch_document_change(collection: &str, doc_id: &str) {
         Ok(e) => e,
         Err(e) => {
             #[cfg(target_os = "android")]
-            android_log(&format!(
-                "dispatch_document_change: attach failed: {:?}",
-                e
-            ));
+            android_log(&format!("dispatch_document_change: attach failed: {:?}", e));
             return;
         }
     };
@@ -3902,13 +3896,8 @@ pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_enableBlobTran
     } else {
         env.get_string(&bind_addr).ok().map(|s| s.into())
     };
-    let bind: Option<std::net::SocketAddr> = addr_str.and_then(|s| {
-        if s.is_empty() {
-            None
-        } else {
-            s.parse().ok()
-        }
-    });
+    let bind: Option<std::net::SocketAddr> =
+        addr_str.and_then(|s| if s.is_empty() { None } else { s.parse().ok() });
 
     let result = match node.enable_blob_transfer(bind) {
         Ok(()) => 1,
@@ -4078,7 +4067,11 @@ pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_blobExistsLoca
         }
     };
 
-    let result = if node.blob_exists_locally(&hash) { 1 } else { 0 };
+    let result = if node.blob_exists_locally(&hash) {
+        1
+    } else {
+        0
+    };
     std::mem::forget(node);
     result
 }
@@ -4261,8 +4254,7 @@ pub extern "system" fn Java_com_defenseunicorns_atak_peat_PeatJni_nativeInit(
         NativeMethod {
             name: "enableBlobTransferJni".into(),
             sig: "(JLjava/lang/String;)Z".into(),
-            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_enableBlobTransferJni
-                as *mut c_void,
+            fn_ptr: Java_com_defenseunicorns_atak_peat_PeatJni_enableBlobTransferJni as *mut c_void,
         },
         #[cfg(feature = "sync")]
         NativeMethod {
