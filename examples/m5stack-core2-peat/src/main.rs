@@ -66,6 +66,14 @@ const SHARED_GENESIS_BASE64: &str = match option_env!("PEAT_GENESIS_BASE64") {
     None => "BwBXRUFSVEFL4O7thA03dXXBNkT+gG22aTRGICECcX5RHtOgIdLBrb7tU7LTxkFLCLP+De21IALSXAbi6ZR/c3VXW9lKWacbM0YqfK9n5JXqob7/stIM63nBMLzJiFTGl9E6wcF8Gz0gUerY2JsBAAAA",
 };
 
+/// True when the build is using the embedded demo-only genesis (no
+/// `PEAT_GENESIS_BASE64` env var was set at compile time). Surfaces in a
+/// runtime `warn!` at boot so a misconfigured non-demo build is visible
+/// in serial — the compile-time comment alone isn't enough; that's
+/// exactly the failure mode where a real secret can ship on a fielded
+/// node without anyone noticing.
+const USING_FALLBACK_GENESIS: bool = option_env!("PEAT_GENESIS_BASE64").is_none();
+
 // NVS storage
 const NVS_NAMESPACE: &str = "peat";
 const NVS_KEY_COUNTER: &str = "counter";
@@ -906,6 +914,13 @@ fn main() -> anyhow::Result<()> {
     // Uses the same shared WEARTAK genesis as the WearOS watch and ATAK plugin
     // so encrypted sync documents decode on this node.
     info!("Initializing PeatMesh...");
+    if USING_FALLBACK_GENESIS {
+        warn!(
+            "PEAT GENESIS: using embedded DEMO/badge fallback (PEAT_GENESIS_BASE64 \
+             was not set at build time). Do NOT ship this build to a non-demo \
+             deployment — the secret is in repo history forever. See ADR-044."
+        );
+    }
     let genesis_bytes = BASE64_STANDARD
         .decode(SHARED_GENESIS_BASE64)
         .expect("SHARED_GENESIS_BASE64 must be valid base64");
@@ -997,6 +1012,15 @@ fn main() -> anyhow::Result<()> {
     let mut imu_consecutive_fails: u32 = 0;
     const IMU_REINIT_THRESHOLD: u32 = 10; // ~1 s of failures at 10 Hz poll
 
+    // Counter-of-counters: how many re-init attempts in a row have failed
+    // OR succeeded but left the bus broken (next read also fails). After
+    // IMU_REINIT_GIVEUP_STREAK consecutive cycles we escalate to error!
+    // once so the operator sees that the bus is permanently broken,
+    // rather than spamming a warn! every ~1 s forever.
+    let mut imu_reinit_failure_streak: u32 = 0;
+    let mut imu_reinit_giveup_logged = false;
+    const IMU_REINIT_GIVEUP_STREAK: u32 = 5;
+
     // Alert state
     let mut alert_active = false;
     let mut vibration_on = false;
@@ -1039,6 +1063,8 @@ fn main() -> anyhow::Result<()> {
                         imu_consecutive_fails
                     );
                     imu_consecutive_fails = 0;
+                    imu_reinit_failure_streak = 0;
+                    imu_reinit_giveup_logged = false;
                 }
                 let activity = imu_state.update(&accel, now_ms());
 
@@ -1102,20 +1128,38 @@ fn main() -> anyhow::Result<()> {
                 if imu_consecutive_fails == 1 {
                     warn!("IMU: read returned None (first failure)");
                 } else if imu_consecutive_fails == IMU_REINIT_THRESHOLD {
-                    warn!(
-                        "IMU: {} consecutive failed reads, attempting re-init",
-                        imu_consecutive_fails
-                    );
-                    if imu::init(&mut i2c) {
-                        info!("IMU: re-initialized successfully");
-                        imu_consecutive_fails = 0;
-                    } else {
-                        warn!("IMU: re-init failed; will retry on next failure streak");
-                        // Reset counter so the next IMU_REINIT_THRESHOLD
-                        // failures trigger another attempt rather than
-                        // logging a re-init every single tick forever.
-                        imu_consecutive_fails = 0;
+                    if !imu_reinit_giveup_logged {
+                        warn!(
+                            "IMU: {} consecutive failed reads, attempting re-init (streak {})",
+                            imu_consecutive_fails, imu_reinit_failure_streak
+                        );
                     }
+                    let reinit_ok = imu::init(&mut i2c);
+                    if reinit_ok {
+                        info!("IMU: re-initialized successfully");
+                        imu_reinit_failure_streak = 0;
+                        imu_reinit_giveup_logged = false;
+                    } else {
+                        imu_reinit_failure_streak += 1;
+                        if imu_reinit_failure_streak >= IMU_REINIT_GIVEUP_STREAK
+                            && !imu_reinit_giveup_logged
+                        {
+                            error!(
+                                "IMU: {} consecutive re-init attempts have failed — \
+                                 bus is likely permanently broken until next reboot. \
+                                 Subsequent attempts will be silent.",
+                                imu_reinit_failure_streak
+                            );
+                            imu_reinit_giveup_logged = true;
+                        } else if !imu_reinit_giveup_logged {
+                            warn!("IMU: re-init failed; will retry on next failure streak");
+                        }
+                    }
+                    // Reset the read-failure counter either way: on success
+                    // the next read should succeed; on failure we want the
+                    // next IMU_REINIT_THRESHOLD reads to trigger another
+                    // attempt rather than logging every single tick.
+                    imu_consecutive_fails = 0;
                 }
             }
         }
