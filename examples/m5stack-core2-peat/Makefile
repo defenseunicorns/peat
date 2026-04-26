@@ -8,9 +8,9 @@
 #   make clean      - Clean build artifacts
 
 # Device serial ports (update if your devices differ)
-DEV1 := /dev/cu.usbserial-02036C1A
-DEV2 := /dev/cu.usbserial-5A490605921
-DEV3 := /dev/cu.usbserial-5A490607481
+DEV1 := /dev/ttyACM0
+DEV2 := /dev/ttyACM1
+DEV3 := /dev/ttyACM2
 
 TARGET := target/xtensa-esp32-espidf/release/m5stack-core2-peat
 

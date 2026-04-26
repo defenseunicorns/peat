@@ -22,13 +22,16 @@ log = "0.4"
 # Error handling
 anyhow = "1.0"
 
+# Base64 — for decoding the shared mesh genesis blob
+base64 = "0.22"
+
 # Display
 display-interface-spi = "0.5"
 mipidsi = "0.8"
 embedded-graphics = "0.8"
 
 # Peat libraries (external repo - radicle)
-peat-btle = { path = "../../../revolve/peat-btle", default-features = false, features = ["esp32"] }
+peat-btle = { path = "../../../peat-btle", default-features = false, features = ["esp32"] }
 
 [build-dependencies]
 embuild = "0.33"

@@ -7,7 +7,7 @@
 
 use core::ffi::{c_int, c_void};
 use core::ptr;
-use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU32, Ordering};
 use std::sync::Mutex;
 
 use esp_idf_svc::sys::*;
@@ -116,6 +116,37 @@ static OUR_MAC: Mutex<[u8; 6]> = Mutex::new([0u8; 6]);
 const MAX_TRACKED_PEERS: usize = 8;
 static PEER_SYNC_TIMES: Mutex<[([u8; 6], u32); MAX_TRACKED_PEERS]> = Mutex::new([([0u8; 6], 0); MAX_TRACKED_PEERS]);
 
+/// Timestamp of the last *failed* connection attempt to a peer (unix-ish secs).
+/// Used to back off from peers that keep disconnecting mid-handshake so the
+/// BLE host task doesn't thrash churning through discovery+disconnect loops
+/// (which starves IDLE0 on CPU 0 and trips the task watchdog).
+static PEER_FAIL_TIMES: Mutex<[([u8; 6], u32); MAX_TRACKED_PEERS]> =
+    Mutex::new([([0u8; 6], 0); MAX_TRACKED_PEERS]);
+
+/// Seconds to skip a peer after a failed/incomplete sync attempt.
+const PEER_FAIL_BACKOFF_SECS: u32 = 15;
+
+/// Wall-clock seconds after ANY failed disconnect during which we won't
+/// initiate a new outbound connection. Per-MAC backoff is fooled by
+/// peers that rotate their random address (which is normal BLE privacy
+/// behavior on most phones / watches), so we additionally throttle the
+/// global connect rate. Each rejected connect attempt → discovery error
+/// → disconnect cycle queues a chunk of NimBLE cleanup work, and a tight
+/// stream of those eventually blocks the host task long enough to trip
+/// the task watchdog.
+const GLOBAL_CONNECT_BACKOFF_SECS: u32 = 5;
+static LAST_FAILED_DISCONNECT_SEC: AtomicU32 = AtomicU32::new(0);
+
+/// When true, we never initiate an outbound BLE connection to a peer;
+/// we only accept incoming connections from peers that scan + connect to
+/// our advertisement (the watch and ATAK plugin both do). Removing the
+/// outbound path eliminates the connect/disconnect/discovery-error
+/// thrash that intermittently locked NimBLE's host task in mbuf
+/// cleanup. Peripheral-only is enough for the M5Stack's role (sensor +
+/// display); if multi-hop relay is needed for the 48-node demo, flip
+/// this and re-validate the soak.
+const PERIPHERAL_ONLY: bool = true;
+
 /// Current peer MAC (the one we're connected/connecting to)
 static CURRENT_PEER_MAC: Mutex<[u8; 6]> = Mutex::new([0u8; 6]);
 
@@ -150,6 +181,39 @@ fn get_peer_last_sync(mac: &[u8; 6]) -> u32 {
         for (peer_mac, sync_time) in peers.iter() {
             if peer_mac == mac {
                 return *sync_time;
+            }
+        }
+    }
+    0
+}
+
+/// Record a failed connection attempt to this peer (disconnect before sync
+/// completed, discovery error, etc.). The peer gets skipped on subsequent
+/// scan results until `PEER_FAIL_BACKOFF_SECS` has elapsed.
+fn record_peer_failure(mac: &[u8; 6], timestamp: u32) {
+    if let Ok(mut fails) = PEER_FAIL_TIMES.lock() {
+        let mut oldest_idx = 0;
+        let mut oldest_time = u32::MAX;
+        for (i, (peer_mac, fail_time)) in fails.iter().enumerate() {
+            if peer_mac == mac {
+                fails[i].1 = timestamp;
+                return;
+            }
+            if *fail_time < oldest_time {
+                oldest_time = *fail_time;
+                oldest_idx = i;
+            }
+        }
+        fails[oldest_idx] = (*mac, timestamp);
+    }
+}
+
+/// Get last failure time for a peer (0 if never failed)
+fn get_peer_last_failure(mac: &[u8; 6]) -> u32 {
+    if let Ok(fails) = PEER_FAIL_TIMES.lock() {
+        for (peer_mac, fail_time) in fails.iter() {
+            if peer_mac == mac {
+                return *fail_time;
             }
         }
     }
@@ -291,6 +355,27 @@ unsafe extern "C" fn gap_event_handler(event: *mut ble_gap_event, _arg: *mut c_v
             let disc_handle = disconnect.conn.conn_handle;
             info!("BLE: Disconnected, handle={}", disc_handle);
 
+            // If this disconnect happened before the sync handshake completed,
+            // register the peer for backoff so we don't immediately reconnect
+            // and thrash the BLE host task (see PEER_FAIL_BACKOFF_SECS) — and
+            // also stamp the global rate-limit so a peer rotating its random
+            // address can't bypass per-MAC backoff and re-trigger a churn
+            // cycle on every new advertisement.
+            if !SYNC_COMPLETE.load(Ordering::SeqCst) {
+                let now = esp_idf_svc::sys::esp_timer_get_time() as u32 / 1_000_000;
+                LAST_FAILED_DISCONNECT_SEC.store(now, Ordering::SeqCst);
+                if let Ok(current) = CURRENT_PEER_MAC.lock() {
+                    if *current != [0u8; 6] {
+                        record_peer_failure(&*current, now);
+                        info!(
+                            "BLE: Recorded failed sync for {:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}, {}s peer backoff, {}s global",
+                            current[0], current[1], current[2], current[3], current[4], current[5],
+                            PEER_FAIL_BACKOFF_SECS, GLOBAL_CONNECT_BACKOFF_SECS
+                        );
+                    }
+                }
+            }
+
             // Remove from multi-connection list and track disconnected node ID
             if let Ok(mut conns) = CONNECTIONS.lock() {
                 for conn in conns.iter_mut() {
@@ -334,6 +419,14 @@ unsafe extern "C" fn gap_event_handler(event: *mut ble_gap_event, _arg: *mut c_v
         BLE_GAP_EVENT_DISC => {
             let disc = &event.__bindgen_anon_1.disc;
 
+            // Skip outbound-connect handling entirely in peripheral-only mode.
+            // Peers (watch / ATAK plugin) connect TO us via our advertisement;
+            // we sync via gatt_write_cb (their write to our characteristic)
+            // and notifications, so we don't need to be central.
+            if PERIPHERAL_ONLY {
+                return 0;
+            }
+
             // Check if this device advertises Peat service
             if has_peat_service(disc.data, disc.length_data) {
                 // Get peer MAC address
@@ -343,15 +436,36 @@ unsafe extern "C" fn gap_event_handler(event: *mut ble_gap_event, _arg: *mut c_v
                 let now = esp_idf_svc::sys::esp_timer_get_time() as u32 / 1_000_000;
                 let last_sync = get_peer_last_sync(&peer_mac);
                 let since_sync = now.saturating_sub(last_sync);
+                let last_fail = get_peer_last_failure(&peer_mac);
+                let since_fail = now.saturating_sub(last_fail);
+                let last_global_fail = LAST_FAILED_DISCONNECT_SEC.load(Ordering::SeqCst);
+                let since_global_fail = now.saturating_sub(last_global_fail);
 
-                // 30 second cooldown per peer - prevents thrashing
-                let in_cooldown = last_sync > 0 && since_sync < 30;
+                // 30 second cooldown after successful sync (no need to resync
+                // this peer yet), plus a short per-peer backoff after failed
+                // handshakes, plus a global rate-limit catching peers that
+                // rotate their random address between attempts. All three
+                // together break reconnect thrash that starves the BLE host.
+                let in_sync_cooldown = last_sync > 0 && since_sync < 30;
+                let in_fail_backoff = last_fail > 0 && since_fail < PEER_FAIL_BACKOFF_SECS;
+                let in_global_backoff =
+                    last_global_fail > 0 && since_global_fail < GLOBAL_CONNECT_BACKOFF_SECS;
+                let in_cooldown = in_sync_cooldown || in_fail_backoff || in_global_backoff;
 
                 // Check if already connected to this specific peer
                 let already_connected = is_connected_to_peer(&peer_mac);
 
                 if in_cooldown {
-                    debug!("BLE: Peer in cooldown (synced {}s ago)", since_sync);
+                    if in_global_backoff {
+                        debug!(
+                            "BLE: Global connect-backoff ({}s since last failed disconnect)",
+                            since_global_fail
+                        );
+                    } else if in_fail_backoff {
+                        debug!("BLE: Peer in fail-backoff ({}s since failure)", since_fail);
+                    } else {
+                        debug!("BLE: Peer in cooldown (synced {}s ago)", since_sync);
+                    }
                 } else if already_connected {
                     debug!("BLE: Already connected to this peer");
                 } else if !can_accept_connection() {
@@ -790,22 +904,24 @@ static mut GATT_SVCS: [ble_gatt_svc_def; 2] = unsafe { core::mem::zeroed() };
 static mut GATT_CHARS: [ble_gatt_chr_def; 2] = unsafe { core::mem::zeroed() };
 static mut SVC_UUID: ble_uuid128_t = unsafe { core::mem::zeroed() };
 static mut CHR_UUID: ble_uuid128_t = unsafe { core::mem::zeroed() };
-/// Device name for advertising (e.g., "PEAT_DEMO-12345678")
-static mut DEVICE_NAME: [u8; 20] = [0; 20];
+/// Device name for advertising (e.g., "PEAT_29C916FA-6462A698"). Sized to fit
+/// the longest BLE advertised name we emit: 5 char prefix + 8 char mesh id +
+/// 1 char separator + 8 char node id = 22 bytes. Keep a little headroom.
+static mut DEVICE_NAME: [u8; 32] = [0; 32];
 static mut DEVICE_NAME_LEN: u8 = 0;
 
-/// Initialize NimBLE stack
-pub fn init(node_id: NodeId) -> Result<(), i32> {
+/// Initialize NimBLE stack. `device_name` is copied into a static buffer and
+/// advertised — callers supply `PEAT_<mesh_id>-<node_id>` so peers on the same
+/// mesh can filter discovered devices by the mesh_id tag.
+pub fn init(node_id: NodeId, device_name: &str) -> Result<(), i32> {
     unsafe {
         info!("BLE: Initializing NimBLE");
 
-        // Build device name from node ID (e.g., "PEAT_DEMO-12345678")
-        let name = format!("PEAT_DEMO-{:08X}", node_id.as_u32());
-        let name_bytes = name.as_bytes();
+        let name_bytes = device_name.as_bytes();
         let len = name_bytes.len().min(DEVICE_NAME.len());
         DEVICE_NAME[..len].copy_from_slice(&name_bytes[..len]);
         DEVICE_NAME_LEN = len as u8;
-        info!("BLE: Device name: {}", name);
+        info!("BLE: Device name: {}", device_name);
 
         // Store our MAC for connection arbitration
         let mut mac = [0u8; 6];
@@ -961,6 +1077,13 @@ pub fn start_advertising() -> Result<(), i32> {
 
 /// Start BLE scanning for peers
 pub fn start_scanning() -> Result<(), i32> {
+    // In peripheral-only mode we never connect outbound, so scanning
+    // serves no purpose and just feeds BLE_GAP_EVENT_DISC events into
+    // a handler that early-returns. Skip it entirely so the radio is
+    // free to advertise + service incoming connections.
+    if PERIPHERAL_ONLY {
+        return Ok(());
+    }
     unsafe {
         let mut params: ble_gap_disc_params = core::mem::zeroed();
         params.itvl = 160; // 100ms
