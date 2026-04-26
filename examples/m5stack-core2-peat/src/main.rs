@@ -1001,6 +1001,18 @@ fn main() -> anyhow::Result<()> {
             if let Some(accel) = imu::read_accel(&mut i2c) {
                 let activity = imu_state.update(&accel, now_ms());
 
+                // Periodic accel snapshot (~every 2 s) regardless of activity
+                // change. Lets us validate IMU reads + axis mapping when the
+                // badge looks "stuck" — without this, a steady classification
+                // produces no log line and we can't tell if reads are even
+                // happening or what gravity is on which axis.
+                if loop_count % 40 == 0 {
+                    info!(
+                        "IMU: accel x={:.2} y={:.2} z={:.2} mag={:.2} -> {:?}",
+                        accel.x, accel.y, accel.z, accel.magnitude(), activity
+                    );
+                }
+
                 // Check for activity change
                 if activity != current_activity {
                     info!("Activity: {:?} -> {:?} (accel: x={} y={} z={} mag={})",

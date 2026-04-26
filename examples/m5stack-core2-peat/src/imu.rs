@@ -35,8 +35,13 @@ impl Accel {
     }
 }
 
-/// |accel.z| (in g) above this means the device is lying flat — taken as prone.
-const PRONE_Z_THRESHOLD_G: f32 = 0.7;
+/// Minimum |accel.z| (in g) for a Prone classification. The dominant-axis
+/// check below also requires z to be the largest-magnitude axis, but we
+/// keep an absolute floor so a stationary device with weak/noisy gravity
+/// readings doesn't flip flat just because z is marginally larger than x
+/// and y. 0.5 g picks up any reasonably-flat orientation while staying
+/// above noise.
+const PRONE_Z_MIN_G: f32 = 0.5;
 
 /// High-g threshold for fall-impact detection. Set well above anything a human
 /// can produce handling the device (a device flip briefly crosses 3 g; actual
@@ -96,9 +101,21 @@ impl ImuState {
 
         self.last_classify_ms = now_ms;
 
+        // Orientation: device is "Prone" iff the z-axis is dominant (gravity
+        // mostly aligned with z), i.e. the unit is lying flat. We don't
+        // hardcode "z must be 1 g" because the chip's z mapping vs the
+        // device body isn't the same on every board — checking z against
+        // the larger of |x| and |y| keeps the classifier orientation-
+        // invariant. PRONE_Z_MIN_G is an absolute floor so noisy
+        // near-zero gravity readings don't flip the classification.
+        let ax = accel.x.abs();
+        let ay = accel.y.abs();
+        let az = accel.z.abs();
+        let z_is_dominant = az > ax && az > ay && az > PRONE_Z_MIN_G;
+
         let activity = if confirmed_fall {
             Activity::PossibleFall
-        } else if accel.z.abs() > PRONE_Z_THRESHOLD_G {
+        } else if z_is_dominant {
             Activity::Prone
         } else {
             Activity::Standing
