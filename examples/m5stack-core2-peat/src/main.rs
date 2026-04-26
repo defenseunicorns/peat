@@ -40,13 +40,53 @@ use mipidsi::models::ILI9342CRgb565;
 use mipidsi::options::Orientation;
 use mipidsi::Builder;
 
+use peat_btle::canned_message::CannedMessageDocument;
 use peat_btle::peat_mesh::{PeatMesh, PeatMeshConfig};
 use peat_btle::sync::PeripheralType;
-use peat_btle::NodeId;
+use peat_btle::{MeshGenesis, NodeId};
+
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine;
+
+/// Shared mesh genesis for the WEARTAK encrypted mesh. The decoded blob
+/// contains `MeshGenesis::encryption_secret()` — i.e. it IS the mesh's
+/// long-term root secret. The compile-time fallback below is the demo
+/// genesis matching `wearos-tak-civ/.../PeatBtleService.kt`; for any
+/// non-demo build, override at compile time with
+///   `PEAT_GENESIS_BASE64=<base64> cargo build ...`
+/// so the secret lives in the build environment, not in repo history.
+///
+/// **WARNING:** this fallback genesis is for demo/badge use only. Do not
+/// reuse it for any real deployment — the secret is in repo history
+/// forever, and key rotation would require both a history rewrite and
+/// re-distribution to every node. ADR-044 is the planned path for
+/// real (MLS-based) group key distribution.
+const SHARED_GENESIS_BASE64: &str = match option_env!("PEAT_GENESIS_BASE64") {
+    Some(v) => v,
+    None => "BwBXRUFSVEFL4O7thA03dXXBNkT+gG22aTRGICECcX5RHtOgIdLBrb7tU7LTxkFLCLP+De21IALSXAbi6ZR/c3VXW9lKWacbM0YqfK9n5JXqob7/stIM63nBMLzJiFTGl9E6wcF8Gz0gUerY2JsBAAAA",
+};
+
+/// True when the build is using the embedded demo-only genesis (no
+/// `PEAT_GENESIS_BASE64` env var was set at compile time). Surfaces in a
+/// runtime `warn!` at boot so a misconfigured non-demo build is visible
+/// in serial — the compile-time comment alone isn't enough; that's
+/// exactly the failure mode where a real secret can ship on a fielded
+/// node without anyone noticing.
+const USING_FALLBACK_GENESIS: bool = option_env!("PEAT_GENESIS_BASE64").is_none();
 
 // NVS storage
 const NVS_NAMESPACE: &str = "peat";
 const NVS_KEY_COUNTER: &str = "counter";
+
+/// Re-broadcast merged state to every active connection on each received
+/// document (multi-hop relay). False here so the M5Stack's small-mesh
+/// behavior matches what's been validated under sustained load — the
+/// fanout was the worst offender for NimBLE TX queue flooding before the
+/// peripheral-only switch. The 5 s periodic gossip handles convergence
+/// for 1-hop topologies with no relay needed; for the 48-node demo flip
+/// this to true (and re-validate watchdog behavior) so an N-hop chain
+/// converges in ~one round-trip per hop instead of N × 5 s.
+const MULTIHOP_FORWARD: bool = false;
 
 // FT6336U Touch controller on M5Stack Core2
 const FT6336U_ADDR: u8 = 0x38;
@@ -448,6 +488,7 @@ struct DisplayState {
     connected_peers: Vec<u32>,    // Node IDs of currently connected peers
     acked_peers: Vec<u32>,        // Node IDs that have ACK'd the current emergency
     activity: u8,                 // Activity state (0=Stationary, 1=Walking, 2=Running, 3=Fall)
+    last_canned_msg: Option<(u8, u32, u64)>, // (code, source_node, timestamp)
 }
 
 /// Draw initial static UI elements (call once at startup)
@@ -513,6 +554,20 @@ where
 }
 
 
+/// Draw canned message ticker at bottom of content area
+fn draw_canned_ticker<D>(display: &mut D, msg_name: &str, source_node: u32)
+where
+    D: DrawTarget<Color = Rgb565>,
+{
+    // Ticker bar: y=185-205, just above the button separator
+    let _ = Rectangle::new(Point::new(0, 185), Size::new(320, 20))
+        .into_styled(PrimitiveStyle::with_fill(Rgb565::new(4, 8, 4))) // dark green bg
+        .draw(display);
+    let style = MonoTextStyle::new(&FONT_10X20, Rgb565::YELLOW);
+    let text = format!("{:08X}: {}", source_node, &msg_name[..msg_name.len().min(22)]);
+    let _ = Text::new(&text, Point::new(5, 202), style).draw(display);
+}
+
 /// Update only changed parts of the display (minimizes flicker)
 /// Returns the new display state for comparison on next update
 fn update_display<D>(
@@ -537,11 +592,15 @@ where
         .map(|p| p.node_id.as_u32())
         .collect();
 
-    // Convert activity to u8 for comparison
+    // Convert activity to u8 for diff comparison only — the same mapping
+    // is sent to peers via mesh.update_health_full() so it must avoid
+    // colliding with the legacy enum (0=Stationary, 1=Walking, 2=Running,
+    // 3=PossibleFall) on un-updated decoders. Prone uses 4 — un-updated
+    // peers see "unknown" and skip rendering rather than mis-rendering as
+    // Walking. Standing keeps 0 (semantically aligned with Stationary).
     let activity_u8 = match activity {
-        imu::Activity::Stationary => 0,
-        imu::Activity::Walking => 1,
-        imu::Activity::Running => 2,
+        imu::Activity::Standing => 0,
+        imu::Activity::Prone => 4,
         imu::Activity::PossibleFall => 3,
     };
 
@@ -555,6 +614,12 @@ where
         connected_peers: connected_peers.clone(),
         acked_peers: acked_peers.to_vec(),
         activity: activity_u8,
+        last_canned_msg: {
+            let msgs = mesh.get_all_app_documents_of_type::<CannedMessageDocument>();
+            msgs.iter()
+                .max_by_key(|m| m.timestamp())
+                .map(|m| (m.message_code(), m.source_node(), m.timestamp()))
+        },
     };
 
     // Skip if nothing changed
@@ -583,29 +648,34 @@ where
             .draw(display);
     }
 
-    // Main content area - update if alert state, peers, connections, acks, or activity changed
-    let content_changed = current.alert_active != prev.alert_active
-        || current.peer_ids != prev.peer_ids
-        || current.connected_peers != prev.connected_peers
-        || current.acked_peers != prev.acked_peers
-        || current.activity != prev.activity;
+    // Main content area: split into zones so each one only redraws when its
+    // own state changes. Full-area clears only happen on alert-mode transition.
+    let mode_changed = current.alert_active != prev.alert_active;
 
-    if content_changed {
-        // Clear main content area
-        let _ = Rectangle::new(Point::new(0, 40), Size::new(320, 160))
-            .into_styled(PrimitiveStyle::with_fill(Rgb565::BLACK))
-            .draw(display);
-
-        if current.alert_active {
-            // ALERT MODE - big red box with EMERGENCY and ACK status
+    if current.alert_active {
+        // ALERT MODE — full red-box scene on entry, peer list refresh on ack
+        if mode_changed {
+            let _ = Rectangle::new(Point::new(0, 40), Size::new(320, 160))
+                .into_styled(PrimitiveStyle::with_fill(Rgb565::BLACK))
+                .draw(display);
             let _ = Rectangle::new(Point::new(20, 50), Size::new(280, 150))
                 .into_styled(PrimitiveStyle::with_fill(Rgb565::RED))
                 .draw(display);
             let white_style = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
-            let green_style = MonoTextStyle::new(&FONT_10X20, Rgb565::GREEN);
             let _ = Text::new("EMERGENCY", Point::new(90, 80), white_style).draw(display);
+            let _ = Text::new("Tap ACK to clear", Point::new(70, 185), white_style).draw(display);
+        }
 
-            // Show ACK and connection status for each peer
+        let peers_changed = current.peer_ids != prev.peer_ids
+            || current.connected_peers != prev.connected_peers
+            || current.acked_peers != prev.acked_peers;
+        if mode_changed || peers_changed {
+            // Redraw only the peer-list band inside the red box.
+            let _ = Rectangle::new(Point::new(25, 100), Size::new(270, 80))
+                .into_styled(PrimitiveStyle::with_fill(Rgb565::RED))
+                .draw(display);
+            let white_style = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
+            let green_style = MonoTextStyle::new(&FONT_10X20, Rgb565::GREEN);
             let gray_style = MonoTextStyle::new(&FONT_10X20, Rgb565::CSS_GRAY);
             if !peer_ids.is_empty() {
                 let mut y = 110;
@@ -613,11 +683,11 @@ where
                     let is_connected = current.connected_peers.contains(id);
                     let acked = current.acked_peers.contains(id);
                     let (status, style) = if !is_connected {
-                        (format!("{:08X} [--]", id), gray_style)  // Disconnected
+                        (format!("{:08X} [--]", id), gray_style)
                     } else if acked {
-                        (format!("{:08X} [ACK]", id), green_style)  // Connected + ACK'd
+                        (format!("{:08X} [ACK]", id), green_style)
                     } else {
-                        (format!("{:08X} ...", id), white_style)  // Connected, waiting
+                        (format!("{:08X} ...", id), white_style)
                     };
                     let _ = Text::new(&status, Point::new(70, y), style).draw(display);
                     y += 25;
@@ -625,47 +695,66 @@ where
             } else {
                 let _ = Text::new("No peers known", Point::new(80, 120), white_style).draw(display);
             }
+        }
+    } else {
+        // READY MODE — zoned invalidation. Only the zones whose inputs changed
+        // clear+redraw, so STAND↔PRONE flips don't wipe the peer list etc.
+        let green = MonoTextStyle::new(&FONT_10X20, Rgb565::GREEN);
+        let white = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
+        let gray = MonoTextStyle::new(&FONT_10X20, Rgb565::CSS_GRAY);
+        let yellow = MonoTextStyle::new(&FONT_10X20, Rgb565::YELLOW);
 
-            let _ = Text::new("Tap ACK to clear", Point::new(70, 185), white_style).draw(display);
-        } else {
-            // READY MODE with peer info
-            let green = MonoTextStyle::new(&FONT_10X20, Rgb565::GREEN);
-            let white = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
-            let gray = MonoTextStyle::new(&FONT_10X20, Rgb565::CSS_GRAY);
-            let yellow = MonoTextStyle::new(&FONT_10X20, Rgb565::YELLOW);
+        if mode_changed {
+            // Coming out of alert: wipe once so the zones below paint on a
+            // black canvas instead of on top of the old red box.
+            let _ = Rectangle::new(Point::new(0, 40), Size::new(320, 160))
+                .into_styled(PrimitiveStyle::with_fill(Rgb565::BLACK))
+                .draw(display);
+        }
 
-            // Show local node ID above READY
-            let node_id_str = format!("{:08X}", mesh.node_id().as_u32());
-            let _ = Text::new(&node_id_str, Point::new(110, 55), white).draw(display);
+        // Zone A — callsign + node id (static for the life of the boot).
+        if mode_changed {
+            let node_id_str = format!("{}  {:08X}", mesh.callsign(), mesh.node_id().as_u32());
+            let x = ((320 - (node_id_str.len() as i32) * 10) / 2).max(0);
+            let _ = Text::new(&node_id_str, Point::new(x, 55), white).draw(display);
+        }
+
+        // Zone B — READY + activity badge (y ≈ 80). Flips with orientation.
+        if mode_changed || current.activity != prev.activity {
+            let _ = Rectangle::new(Point::new(0, 62), Size::new(320, 24))
+                .into_styled(PrimitiveStyle::with_fill(Rgb565::BLACK))
+                .draw(display);
             let _ = Text::new("READY", Point::new(125, 80), green).draw(display);
-
-            // Show activity status with color-coded text
             let (activity_str, activity_style) = match activity {
-                imu::Activity::Stationary => ("STILL", gray),
-                imu::Activity::Walking => ("WALK", green),
-                imu::Activity::Running => ("RUN", yellow),
+                imu::Activity::Standing => ("STAND", green),
+                imu::Activity::Prone => ("PRONE", yellow),
                 imu::Activity::PossibleFall => ("FALL!", MonoTextStyle::new(&FONT_10X20, Rgb565::RED)),
             };
             let _ = Text::new(activity_str, Point::new(230, 80), activity_style).draw(display);
+        }
 
-            // Show peer details
+        // Zone C+D — mesh count + peer list (y ≈ 105 to 200). Only peer
+        // membership or connection state drive this; activity flips skip it.
+        let peers_changed = mode_changed
+            || current.peer_ids != prev.peer_ids
+            || current.connected_peers != prev.connected_peers;
+        if peers_changed {
+            let _ = Rectangle::new(Point::new(0, 105), Size::new(320, 95))
+                .into_styled(PrimitiveStyle::with_fill(Rgb565::BLACK))
+                .draw(display);
             if !peer_ids.is_empty() {
-                // Show connected/total count
                 let connected_count = current.connected_peers.len();
                 let total_count = peer_ids.len();
-                let count_str = format!("{}/{} peers:", connected_count, total_count);
-                let _ = Text::new(&count_str, Point::new(100, 120), white).draw(display);
+                let count_str = format!("Mesh: {}/{} peers", connected_count, total_count);
+                let _ = Text::new(&count_str, Point::new(80, 120), white).draw(display);
 
-                // Show up to 3 peer IDs with connection status
                 let mut y = 145;
                 for id in peer_ids.iter().take(3) {
                     let is_connected = current.connected_peers.contains(id);
                     let id_str = format!("{:08X}", id);
                     let style = if is_connected { green } else { gray };
-                    // Center single peer, spread multiple
                     let x = if peer_ids.len() == 1 { 115 } else { 60 };
                     let _ = Text::new(&id_str, Point::new(x, y), style).draw(display);
-                    // Show status indicator
                     let status = if is_connected { " [OK]" } else { " [--]" };
                     let _ = Text::new(status, Point::new(x + 85, y), style).draw(display);
                     y += 25;
@@ -674,7 +763,17 @@ where
                     let _ = Text::new(&format!("+{} more", peer_ids.len() - 3), Point::new(100, y), gray).draw(display);
                 }
             } else {
-                let _ = Text::new("Scanning...", Point::new(100, 130), gray).draw(display);
+                let _ = Text::new("Mesh: no peers", Point::new(85, 130), gray).draw(display);
+            }
+        }
+    }
+
+    // Canned message ticker
+    if current.last_canned_msg != prev.last_canned_msg {
+        if let Some((_code, source, _ts)) = &current.last_canned_msg {
+            let msgs = mesh.get_all_app_documents_of_type::<CannedMessageDocument>();
+            if let Some(latest) = msgs.iter().max_by_key(|m| m.timestamp()) {
+                draw_canned_ticker(display, latest.message_name(), *source);
             }
         }
     }
@@ -811,11 +910,34 @@ fn main() -> anyhow::Result<()> {
     let _ = display.clear(Rgb565::BLUE);
     info!("Display cleared to blue");
 
-    // Initialize PeatMesh for centralized peer management and document sync
+    // Initialize PeatMesh for centralized peer management and document sync.
+    // Uses the same shared WEARTAK genesis as the WearOS watch and ATAK plugin
+    // so encrypted sync documents decode on this node.
     info!("Initializing PeatMesh...");
-    let config = PeatMeshConfig::new(node_id, "ESP32", "DEMO")
+    if USING_FALLBACK_GENESIS {
+        warn!(
+            "PEAT GENESIS: using embedded DEMO/badge fallback (PEAT_GENESIS_BASE64 \
+             was not set at build time). Do NOT ship this build to a non-demo \
+             deployment — the secret is in repo history forever. See ADR-044."
+        );
+    }
+    let genesis_bytes = BASE64_STANDARD
+        .decode(SHARED_GENESIS_BASE64)
+        .expect("SHARED_GENESIS_BASE64 must be valid base64");
+    let genesis = MeshGenesis::decode(&genesis_bytes)
+        .expect("SHARED_GENESIS_BASE64 must decode to a MeshGenesis");
+    info!(
+        "Using SHARED WEARTAK genesis: mesh_id={}",
+        genesis.mesh_id()
+    );
+    // Callsign derives from the low 16 bits of the node id so multiple M5Stacks
+    // on the same mesh still stay distinguishable on a display at a glance.
+    let callsign = format!("SCOUT-{:04X}", node_id.as_u32() as u16);
+    let config = PeatMeshConfig::new(node_id, &callsign, &genesis.mesh_id())
+        .with_encryption(genesis.encryption_secret())
         .with_peripheral_type(PeripheralType::SoldierSensor);
     let mesh = PeatMesh::new(config);
+    mesh.document_registry().try_register::<CannedMessageDocument>();
     info!("PeatMesh created for node {:08X}", node_id.as_u32());
 
     // Initialize NVS store for persistence
@@ -833,9 +955,11 @@ fn main() -> anyhow::Result<()> {
     mesh.clear_emergency();   // Clear document emergency + ACK state
     info!("PeatMesh initialized: {} total taps (events cleared)", mesh.total_count());
 
-    // Initialize BLE
+    // Initialize BLE. The advertised name encodes the mesh_id so WEARTAK peers
+    // recognize this device as part of their mesh during scan/filtering.
     info!("Initializing BLE...");
-    if let Err(e) = nimble::init(node_id) {
+    let ble_device_name = format!("PEAT_{}-{:08X}", genesis.mesh_id(), node_id.as_u32());
+    if let Err(e) = nimble::init(node_id, &ble_device_name) {
         error!("Failed to initialize BLE: {}", e);
         // Continue without BLE for testing
     }
@@ -865,7 +989,7 @@ fn main() -> anyhow::Result<()> {
     update_button_labels(&mut display, false);  // Initial state: ACK greyed out
     let mut display_state = DisplayState::default();
     let acked = get_acked_peers_from_mesh(&mesh);
-    display_state = update_display(&mut display, &mesh, false, battery_pct, "BtnC=EMERG  BtnA=ACK", &display_state, &acked, imu::Activity::Stationary);
+    display_state = update_display(&mut display, &mesh, false, battery_pct, "BtnC=EMERG  BtnA=ACK", &display_state, &acked, imu::Activity::Standing);
     print_status(&mesh, false, "BtnC=EMERG  BtnA=ACK");
 
     // Main loop state
@@ -876,8 +1000,26 @@ fn main() -> anyhow::Result<()> {
     // IMU state
     let mut last_imu_read: u32 = 0;
     const IMU_READ_INTERVAL_MS: u32 = 100;  // Read IMU at 10Hz
-    let mut current_activity = imu::Activity::Stationary;
+    let mut current_activity = imu::Activity::Standing;
     let mut fall_detected = false;
+
+    // IMU read-failure tracking. On the M5Stack Core2 the AXP2101 power
+    // mgmt and the MPU6886 share an I2C bus; an interrupted transaction
+    // can leave reads silently returning None for an indefinite stretch,
+    // which presents as the activity badge "stuck" on its last value.
+    // Track consecutive failures and re-init the chip after a short
+    // streak so we self-recover instead of staying frozen.
+    let mut imu_consecutive_fails: u32 = 0;
+    const IMU_REINIT_THRESHOLD: u32 = 10; // ~1 s of failures at 10 Hz poll
+
+    // Counter-of-counters: how many re-init attempts in a row have failed
+    // OR succeeded but left the bus broken (next read also fails). After
+    // IMU_REINIT_GIVEUP_STREAK consecutive cycles we escalate to error!
+    // once so the operator sees that the bus is permanently broken,
+    // rather than spamming a warn! every ~1 s forever.
+    let mut imu_reinit_failure_streak: u32 = 0;
+    let mut imu_reinit_giveup_logged = false;
+    const IMU_REINIT_GIVEUP_STREAK: u32 = 5;
 
     // Alert state
     let mut alert_active = false;
@@ -915,7 +1057,28 @@ fn main() -> anyhow::Result<()> {
             last_imu_read = current_time;
 
             if let Some(accel) = imu::read_accel(&mut i2c) {
+                if imu_consecutive_fails > 0 {
+                    info!(
+                        "IMU: read recovered after {} failures",
+                        imu_consecutive_fails
+                    );
+                    imu_consecutive_fails = 0;
+                    imu_reinit_failure_streak = 0;
+                    imu_reinit_giveup_logged = false;
+                }
                 let activity = imu_state.update(&accel, now_ms());
+
+                // Periodic accel snapshot (~every 2 s) regardless of activity
+                // change. Lets us validate IMU reads + axis mapping when the
+                // badge looks "stuck" — without this, a steady classification
+                // produces no log line and we can't tell if reads are even
+                // happening or what gravity is on which axis.
+                if loop_count % 40 == 0 {
+                    info!(
+                        "IMU: accel x={:.2} y={:.2} z={:.2} mag={:.2} -> {:?}",
+                        accel.x, accel.y, accel.z, accel.magnitude(), activity
+                    );
+                }
 
                 // Check for activity change
                 if activity != current_activity {
@@ -953,6 +1116,50 @@ fn main() -> anyhow::Result<()> {
                 // Reset fall detection when activity returns to normal
                 if fall_detected && activity != imu::Activity::PossibleFall {
                     fall_detected = false;
+                }
+            } else {
+                // IMU read returned None (likely an I2C bus glitch from
+                // contention with AXP2101 battery reads). Without the
+                // recovery below we'd silently fall through every IMU
+                // tick from now on — the badge would stay on its last
+                // classification ("stuck on STAND/PRONE") with no log
+                // trail showing why.
+                imu_consecutive_fails += 1;
+                if imu_consecutive_fails == 1 {
+                    warn!("IMU: read returned None (first failure)");
+                } else if imu_consecutive_fails == IMU_REINIT_THRESHOLD {
+                    if !imu_reinit_giveup_logged {
+                        warn!(
+                            "IMU: {} consecutive failed reads, attempting re-init (streak {})",
+                            imu_consecutive_fails, imu_reinit_failure_streak
+                        );
+                    }
+                    let reinit_ok = imu::init(&mut i2c);
+                    if reinit_ok {
+                        info!("IMU: re-initialized successfully");
+                        imu_reinit_failure_streak = 0;
+                        imu_reinit_giveup_logged = false;
+                    } else {
+                        imu_reinit_failure_streak += 1;
+                        if imu_reinit_failure_streak >= IMU_REINIT_GIVEUP_STREAK
+                            && !imu_reinit_giveup_logged
+                        {
+                            error!(
+                                "IMU: {} consecutive re-init attempts have failed — \
+                                 bus is likely permanently broken until next reboot. \
+                                 Subsequent attempts will be silent.",
+                                imu_reinit_failure_streak
+                            );
+                            imu_reinit_giveup_logged = true;
+                        } else if !imu_reinit_giveup_logged {
+                            warn!("IMU: re-init failed; will retry on next failure streak");
+                        }
+                    }
+                    // Reset the read-failure counter either way: on success
+                    // the next read should succeed; on failure we want the
+                    // next IMU_REINIT_THRESHOLD reads to trigger another
+                    // attempt rather than logging every single tick.
+                    imu_consecutive_fails = 0;
                 }
             }
         }
@@ -1076,8 +1283,21 @@ fn main() -> anyhow::Result<()> {
         }
         last_button = button;
 
-        // Handle ALL pending documents from BLE (process queue to avoid losing ACKs)
-        while let Some(data) = nimble::take_pending_document() {
+        // Drain at most DOC_DRAIN_PER_TICK pending documents per main-loop
+        // tick. Each iteration does an NVS save plus (under MULTIHOP_FORWARD)
+        // a gossip_document fanout, both of which spend time deep in
+        // ESP-IDF/NimBLE; processing the whole queue in one tick can starve
+        // IDLE long enough to trip the task watchdog. Two-per-tick keeps the
+        // bound well under the 60 s WDT budget while halving the worst-case
+        // ack-burst feedback latency for emergency-broadcast scenarios. Any
+        // remaining queue gets picked up on the next tick (50 ms later).
+        const DOC_DRAIN_PER_TICK: u8 = 2;
+        let mut drained = 0u8;
+        while drained < DOC_DRAIN_PER_TICK {
+            let Some(data) = nimble::take_pending_document() else {
+                break;
+            };
+            drained += 1;
             info!("");
             info!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
             info!("!!! RECEIVED {} BYTES FROM BLE !!!", data.len());
@@ -1175,13 +1395,21 @@ fn main() -> anyhow::Result<()> {
                         error!("Failed to save merged doc: {:?}", e);
                     }
 
-                    // GOSSIP: Forward merged state to ALL other peers (multi-hop!)
-                    let encoded = mesh.build_document();
-                    let sent = nimble::gossip_document(&encoded);
-                    info!(">>> Forwarded merged doc to {} peers (multi-hop)", sent);
-
+                    // Post-merge multi-hop forward, gated on MULTIHOP_FORWARD.
+                    // Disabled for the small-mesh demo: the per-doc fanout
+                    // floods NimBLE's TX queue and previously starved IDLE1
+                    // on CPU 1 enough to trip the task watchdog. The 5 s
+                    // periodic gossip is sufficient for 1-hop topologies.
+                    // Re-enable for the 48-node demo so an N-hop chain
+                    // converges in roughly one round-trip per hop instead
+                    // of N × 5 s.
+                    if MULTIHOP_FORWARD {
+                        let encoded = mesh.build_document();
+                        let sent = nimble::gossip_document(&encoded);
+                        info!(">>> Forwarded merged doc to {} peers (multi-hop)", sent);
+                    }
                     needs_redraw = true;
-                    print_status(&mesh, connected, "Merged & forwarded!");
+                    print_status(&mesh, connected, "Merged");
                 } else {
                     info!("No changes from merge (peer had same or less data)");
                 }
@@ -1226,11 +1454,20 @@ fn main() -> anyhow::Result<()> {
             if let Some(mv) = axp_read_battery_voltage(&mut i2c) {
                 let pct = battery_percent_from_voltage(mv);
                 battery_pct = Some(pct);
-                // Convert activity to u8: 0=still, 1=walking, 2=running, 3=fall
+                // Wire-format activity code sent to peers via
+                // mesh.update_health_full(). Avoid colliding with the
+                // legacy enum (0=Stationary, 1=Walking, 2=Running,
+                // 3=PossibleFall) so un-updated peers don't mis-render
+                // Prone as Walking. Prone uses 4; old peers fall through
+                // to "unknown" instead of a wrong label.
+                //   0 = Standing       (legacy: Stationary — semantic match)
+                //   1 = (legacy Walking — no longer emitted)
+                //   2 = (legacy Running — no longer emitted)
+                //   3 = PossibleFall   (unchanged)
+                //   4 = Prone          (new — no legacy collision)
                 let activity_u8 = match current_activity {
-                    imu::Activity::Stationary => 0,
-                    imu::Activity::Walking => 1,
-                    imu::Activity::Running => 2,
+                    imu::Activity::Standing => 0,
+                    imu::Activity::Prone => 4,
                     imu::Activity::PossibleFall => 3,
                 };
                 mesh.update_health_full(pct, activity_u8);

@@ -3,10 +3,21 @@
 # Rust runtime
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=32768
 
+# Keep the Rust main task pinned to CPU 0 alongside the NimBLE host
+# (CONFIG_BT_NIMBLE_PINNED_TO_CORE_0). NimBLE's internal critical
+# sections aren't designed for cross-core contention — pinning main to
+# CPU 1 caused our gossip_document calls (on CPU 1) to spin on the
+# same hw locks NimBLE was holding on CPU 0, starving IDLE1 and
+# tripping the task watchdog. Co-locating them lets FreeRTOS
+# timeshare the core via preemption, with no spinlock fight. The
+# doc-drain cap (one queued doc per main-loop tick) is what keeps
+# main from monopolizing CPU 0 under sync-burst load.
+CONFIG_ESP_MAIN_TASK_AFFINITY_CPU0=y
+
 # Bluetooth
 CONFIG_BT_ENABLED=y
 CONFIG_BT_NIMBLE_ENABLED=y
-CONFIG_BT_NIMBLE_MAX_CONNECTIONS=4
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=2
 CONFIG_BT_NIMBLE_MAX_BONDS=3
 CONFIG_BT_NIMBLE_MAX_CCCDS=8
 CONFIG_BT_NIMBLE_SVC_GAP_DEVICE_NAME="PEAT-M5Core2"
@@ -39,8 +50,12 @@ CONFIG_ESP32_SPIRAM_SUPPORT=y
 CONFIG_SPIRAM_USE_MALLOC=y
 CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096
 
-# Watchdog
-CONFIG_ESP_TASK_WDT_TIMEOUT_S=30
+# Watchdog. 60 s timeout (up from 30 s) gives headroom for legitimate
+# slow paths (NVS flush during a sync burst, NimBLE disconnect cleanup
+# chains). IDLE0/IDLE1 stay subscribed — when the device truly locks
+# we want a backtrace logged, not silent freeze. Panic stays off so
+# WDT triggers don't reboot the device on a transient stall.
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=60
 
 # Optimize for size
 CONFIG_COMPILER_OPTIMIZATION_SIZE=y

@@ -22,13 +22,28 @@ log = "0.4"
 # Error handling
 anyhow = "1.0"
 
+# Base64 — for decoding the shared mesh genesis blob
+base64 = "0.22"
+
 # Display
 display-interface-spi = "0.5"
 mipidsi = "0.8"
 embedded-graphics = "0.8"
 
-# Peat libraries (external repo - radicle)
-peat-btle = { path = "../../../revolve/peat-btle", default-features = false, features = ["esp32"] }
+# Peat libraries (external repo). Resolved as a sibling-repo path because
+# `peat-btle` is published separately; the relative path expects the
+# layout:
+#
+#   <parent>/peat/                      <- this repo
+#   <parent>/peat/examples/m5stack-core2-peat/
+#   <parent>/peat-btle/                 <- defenseunicorns/peat-btle clone
+#
+# i.e. clone `peat-btle` next to `peat`, not under it. CI doesn't currently
+# cross-check this layout, so a missing checkout fails at build time with
+# "no manifest found at <path>". Until peat-btle is consumed via
+# crates.io / a registry path, treat this as a developer-environment
+# requirement.
+peat-btle = { path = "../../../peat-btle", default-features = false, features = ["esp32"] }
 
 [build-dependencies]
 embuild = "0.33"
