@@ -54,8 +54,21 @@ jobs:
              - Security primitives: Ed25519/X25519/ChaCha20/HMAC-SHA256 — flag any deviation as [BLOCKER]
              - Performance: flag anything likely to increase convergence latency >20% or bandwidth beyond baselines
              - peat-lite: must maintain OTA safety and A/B partition integrity
+             - Implementation idiom: flag code that fights the language rather than working with it
+               (Rust ignoring borrow checker via excessive clone/unwrap; Go swallowing errors or building
+               Java-style hierarchies; TS abusing `any`; Kotlin/Swift ignoring platform conventions).
+               This is NOT formatter/style nitpicking — rustfmt/gofmt/prettier handles that.
+             - Architectural reach: if a change crosses crate boundaries, alters protocol/transport
+               semantics, or sits in ADR territory in a way warranting design discussion, escalate.
           4. Post findings with: gh pr review ${{ github.event.pull_request.number }} --comment --body 'YOUR_REVIEW'
              Start the body with: ## Peat QA Review (SHA: ${{ steps.check.outputs.short_sha }})
-             Use severity tags: [BLOCKER], [WARNING], [SUGGESTION]
+             Every finding must carry a tag with a defined action. Do NOT post optional/nice-to-have
+             observations — if a finding has no clear action, omit it.
+             Severity tags:
+               [BLOCKER]  — must fix before merge
+               [WARNING]  — should fix, may merge with justification
+               [IDIOM]    — non-idiomatic implementation for the language; worth fixing, not blocking
+               [ARCH]     — architectural concern requiring human design review; do NOT propose a fix, escalate
+             If there are no findings under any tag, post a single line: "No findings."
              NEVER approve or request-changes — comment only.
           PROMPT
