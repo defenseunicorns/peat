@@ -844,14 +844,20 @@ fn main() -> anyhow::Result<()> {
     )?;
     info!("I2C initialized");
 
-    // Initialize MPU6886 IMU for activity/fall detection
+    // Initialize MPU6886 IMU for activity/fall detection.
+    //
+    // `imu_ok` is mutable because boot-time init can fail transiently
+    // (I2C bus glitch, slow MPU6886 power-up). If that happens we'd be
+    // stuck with activity detection disabled forever, so the main loop
+    // periodically retries `imu::init` (see IMU_BOOT_RETRY_MS) until
+    // it succeeds.
     info!("Initializing IMU...");
-    let imu_ok = imu::init(&mut i2c);
+    let mut imu_ok = imu::init(&mut i2c);
     let mut imu_state = imu::ImuState::default();
     if imu_ok {
         info!("IMU initialized successfully");
     } else {
-        warn!("IMU initialization failed - activity detection disabled");
+        warn!("IMU initialization failed - activity detection disabled (will retry)");
     }
 
     // Initialize AXP (detect hardware version and enable LCD power/backlight)
@@ -1021,6 +1027,14 @@ fn main() -> anyhow::Result<()> {
     let mut imu_reinit_giveup_logged = false;
     const IMU_REINIT_GIVEUP_STREAK: u32 = 5;
 
+    // If boot-time `imu::init` failed, retry it from the main loop so a
+    // transient I2C/power glitch at startup doesn't permanently disable
+    // activity detection. Retry every 30 s — fast enough to recover
+    // before the operator notices a frozen STAND/PRONE, slow enough not
+    // to spam the bus.
+    let mut last_imu_boot_retry: u32 = 0;
+    const IMU_BOOT_RETRY_MS: u32 = 30_000;
+
     // Alert state
     let mut alert_active = false;
     let mut vibration_on = false;
@@ -1050,6 +1064,18 @@ fn main() -> anyhow::Result<()> {
         for node_id in nimble::take_disconnected_node_ids() {
             info!(">>> Peer disconnected: {:08X}", node_id);
             needs_redraw = true;
+        }
+
+        // If IMU init failed at boot, try again periodically. Without
+        // this, a transient I2C glitch at startup leaves activity
+        // detection permanently off — the badge displays the last
+        // known activity (often STAND) forever, which looks "frozen".
+        if !imu_ok && current_time.saturating_sub(last_imu_boot_retry) >= IMU_BOOT_RETRY_MS {
+            last_imu_boot_retry = current_time;
+            if imu::init(&mut i2c) {
+                info!("IMU: post-boot init retry succeeded — activity detection enabled");
+                imu_ok = true;
+            }
         }
 
         // Read IMU and detect activity/falls (every 100ms)
