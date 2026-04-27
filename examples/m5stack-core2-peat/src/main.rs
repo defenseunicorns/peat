@@ -1048,7 +1048,20 @@ fn main() -> anyhow::Result<()> {
     loop {
         let button = read_button(&mut i2c);
         let connected = nimble::is_connected();
-        let current_time = unsafe { esp_idf_svc::sys::esp_timer_get_time() as u32 / 1000 };
+        // Divide the i64 µs counter as u64 *before* casting to u32 so the
+        // ms value doesn't wrap every ~71.6 min (which is what `as u32`
+        // before `/1000` did). With `as u64 / 1000 as u32`, ms wraps at
+        // ~49.7 days — past any plausible badge uptime — and all the
+        // `saturating_sub` time gates below stay correct.
+        //
+        // Symptom of the old form: after the first 71 min, `current_time`
+        // jumps backward to a small value while `last_imu_read` (and the
+        // other "last_*" timestamps) still hold the big pre-wrap number,
+        // so every gated path (IMU reads, periodic gossip, redraw,
+        // vibration toggle) silently stops firing — the badge looks
+        // frozen on its last classification while buttons (un-gated) keep
+        // working.
+        let current_time = (unsafe { esp_idf_svc::sys::esp_timer_get_time() as u64 } / 1000) as u32;
 
         // Check for connection state changes
         if nimble::take_connection_changed() {
