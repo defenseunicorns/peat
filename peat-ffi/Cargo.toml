@@ -30,7 +30,7 @@ required-features = ["sync", "bluetooth"]
 
 [features]
 default = ["sync"]
-sync = ["peat-protocol/automerge-backend"]
+sync = ["peat-protocol/automerge-backend", "dep:peat-mesh", "peat-mesh/automerge-backend"]
 # Bluetooth LE transport - BLE mesh networking (ADR-039)
 # Enables peat-btle integration via TransportManager
 bluetooth = ["peat-protocol/bluetooth", "dep:peat-btle"]
@@ -42,8 +42,11 @@ uniffi = { version = "0.28", features = ["cli", "tokio"] }
 # JNI for direct Android native method binding (bypasses JNA symbol lookup issues)
 jni = "0.21"
 
-# Peat crates
+# Peat crates - no ditto-backend for Android cross-compilation
 peat-protocol = { path = "../peat-protocol", default-features = false }
+# peat-mesh direct for blob storage (ADR-060). Pulls NetworkedIrohBlobStore
+# which we use behind the peat_mesh::storage::BlobStore trait.
+peat-mesh = { workspace = true, optional = true }
 
 # Time handling
 chrono = "0.4"
