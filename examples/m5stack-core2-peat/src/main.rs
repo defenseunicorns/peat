@@ -993,7 +993,18 @@ fn main() -> anyhow::Result<()> {
     // Draw static UI once, then update dynamic parts
     draw_static_ui(&mut display, node_id.as_u32());
     update_button_labels(&mut display, false);  // Initial state: ACK greyed out
-    let mut display_state = DisplayState::default();
+    // Seed `prev` with `alert_active = true` so the first `update_display`
+    // call sees a mode transition (true → false) and paints every zone
+    // — callsign, READY+activity badge, and peer list. Without this the
+    // default `prev` matches the initial `current` exactly (both
+    // alert_active=false, activity=0, no peers, no battery), the diff
+    // collapses every zone branch, and the center of the screen stays
+    // blank until something — typically an IMU-driven activity flip when
+    // the operator picks the badge up — finally changes a tracked field.
+    let mut display_state = DisplayState {
+        alert_active: true,
+        ..DisplayState::default()
+    };
     let acked = get_acked_peers_from_mesh(&mesh);
     display_state = update_display(&mut display, &mesh, false, battery_pct, "BtnC=EMERG  BtnA=ACK", &display_state, &acked, imu::Activity::Standing);
     print_status(&mesh, false, "BtnC=EMERG  BtnA=ACK");
