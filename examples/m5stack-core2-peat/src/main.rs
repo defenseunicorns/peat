@@ -844,14 +844,20 @@ fn main() -> anyhow::Result<()> {
     )?;
     info!("I2C initialized");
 
-    // Initialize MPU6886 IMU for activity/fall detection
+    // Initialize MPU6886 IMU for activity/fall detection.
+    //
+    // `imu_ok` is mutable because boot-time init can fail transiently
+    // (I2C bus glitch, slow MPU6886 power-up). If that happens we'd be
+    // stuck with activity detection disabled forever, so the main loop
+    // periodically retries `imu::init` (see IMU_BOOT_RETRY_MS) until
+    // it succeeds.
     info!("Initializing IMU...");
-    let imu_ok = imu::init(&mut i2c);
+    let mut imu_ok = imu::init(&mut i2c);
     let mut imu_state = imu::ImuState::default();
     if imu_ok {
         info!("IMU initialized successfully");
     } else {
-        warn!("IMU initialization failed - activity detection disabled");
+        warn!("IMU initialization failed - activity detection disabled (will retry)");
     }
 
     // Initialize AXP (detect hardware version and enable LCD power/backlight)
@@ -987,7 +993,18 @@ fn main() -> anyhow::Result<()> {
     // Draw static UI once, then update dynamic parts
     draw_static_ui(&mut display, node_id.as_u32());
     update_button_labels(&mut display, false);  // Initial state: ACK greyed out
-    let mut display_state = DisplayState::default();
+    // Seed `prev` with `alert_active = true` so the first `update_display`
+    // call sees a mode transition (true → false) and paints every zone
+    // — callsign, READY+activity badge, and peer list. Without this the
+    // default `prev` matches the initial `current` exactly (both
+    // alert_active=false, activity=0, no peers, no battery), the diff
+    // collapses every zone branch, and the center of the screen stays
+    // blank until something — typically an IMU-driven activity flip when
+    // the operator picks the badge up — finally changes a tracked field.
+    let mut display_state = DisplayState {
+        alert_active: true,
+        ..DisplayState::default()
+    };
     let acked = get_acked_peers_from_mesh(&mesh);
     display_state = update_display(&mut display, &mesh, false, battery_pct, "BtnC=EMERG  BtnA=ACK", &display_state, &acked, imu::Activity::Standing);
     print_status(&mesh, false, "BtnC=EMERG  BtnA=ACK");
@@ -1021,6 +1038,14 @@ fn main() -> anyhow::Result<()> {
     let mut imu_reinit_giveup_logged = false;
     const IMU_REINIT_GIVEUP_STREAK: u32 = 5;
 
+    // If boot-time `imu::init` failed, retry it from the main loop so a
+    // transient I2C/power glitch at startup doesn't permanently disable
+    // activity detection. Retry every 30 s — fast enough to recover
+    // before the operator notices a frozen STAND/PRONE, slow enough not
+    // to spam the bus.
+    let mut last_imu_boot_retry: u32 = 0;
+    const IMU_BOOT_RETRY_MS: u32 = 30_000;
+
     // Alert state
     let mut alert_active = false;
     let mut vibration_on = false;
@@ -1034,7 +1059,20 @@ fn main() -> anyhow::Result<()> {
     loop {
         let button = read_button(&mut i2c);
         let connected = nimble::is_connected();
-        let current_time = unsafe { esp_idf_svc::sys::esp_timer_get_time() as u32 / 1000 };
+        // Divide the i64 µs counter as u64 *before* casting to u32 so the
+        // ms value doesn't wrap every ~71.6 min (which is what `as u32`
+        // before `/1000` did). With `as u64 / 1000 as u32`, ms wraps at
+        // ~49.7 days — past any plausible badge uptime — and all the
+        // `saturating_sub` time gates below stay correct.
+        //
+        // Symptom of the old form: after the first 71 min, `current_time`
+        // jumps backward to a small value while `last_imu_read` (and the
+        // other "last_*" timestamps) still hold the big pre-wrap number,
+        // so every gated path (IMU reads, periodic gossip, redraw,
+        // vibration toggle) silently stops firing — the badge looks
+        // frozen on its last classification while buttons (un-gated) keep
+        // working.
+        let current_time = (unsafe { esp_idf_svc::sys::esp_timer_get_time() as u64 } / 1000) as u32;
 
         // Check for connection state changes
         if nimble::take_connection_changed() {
@@ -1050,6 +1088,18 @@ fn main() -> anyhow::Result<()> {
         for node_id in nimble::take_disconnected_node_ids() {
             info!(">>> Peer disconnected: {:08X}", node_id);
             needs_redraw = true;
+        }
+
+        // If IMU init failed at boot, try again periodically. Without
+        // this, a transient I2C glitch at startup leaves activity
+        // detection permanently off — the badge displays the last
+        // known activity (often STAND) forever, which looks "frozen".
+        if !imu_ok && current_time.saturating_sub(last_imu_boot_retry) >= IMU_BOOT_RETRY_MS {
+            last_imu_boot_retry = current_time;
+            if imu::init(&mut i2c) {
+                info!("IMU: post-boot init retry succeeded — activity detection enabled");
+                imu_ok = true;
+            }
         }
 
         // Read IMU and detect activity/falls (every 100ms)
