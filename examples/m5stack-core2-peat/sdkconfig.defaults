@@ -57,5 +57,14 @@ CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096
 # WDT triggers don't reboot the device on a transient stall.
 CONFIG_ESP_TASK_WDT_TIMEOUT_S=60
 
+# Interrupt watchdog. Default 300 ms was tripping under sustained BLE
+# controller load (heavy peer RX combined with our 1 Hz health updates
+# and synchronous CCCD writes inside `gatt_disc_dsc_cb`), with the
+# backtrace landing inside the VHCI ISR (`vhci_recv_end`). Bumping to
+# 1000 ms absorbs that controller-stress window without disabling the
+# IWDT — a real ISR hang would still reboot us, just on a more
+# realistic threshold for NimBLE on ESP32.
+CONFIG_ESP_INT_WDT_TIMEOUT_MS=1000
+
 # Optimize for size
 CONFIG_COMPILER_OPTIMIZATION_SIZE=y
